@@ -113,8 +113,11 @@ def ensure_issuer(db: Session) -> None:
 
 
 def seed_if_empty(db: Session) -> None:
-    """Admin + demo cliente + identidad Aitorepuestos + emisor FE. Sin demos de stock."""
+    """Admin + demo cliente + identidad Aitorepuestos + emisor FE + tiendas. Sin demos de stock."""
+    from app.part_shops import ensure_default_shops
+
     ensure_admin(db)
     ensure_demo_client(db)
     ensure_settings(db)
     ensure_issuer(db)
+    ensure_default_shops(db)

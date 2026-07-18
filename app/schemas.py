@@ -116,6 +116,30 @@ class SupplierIn(BaseModel):
     email: str = ""
     city: str = "Liberia"
     notes: str = ""
+    kind: str = "tienda"  # tienda | aliado
+    website: str = ""
+    whatsapp: str = ""
+    search_url: str = ""
+    specialty: str = ""
+
+
+class AllyJobIn(BaseModel):
+    ally_id: int
+    reception_id: int | None = None
+    work_order_id: int | None = None
+    plate: str = ""
+    vehicle_info: str = ""
+    job_type: str = "otro"
+    description: str = ""
+    cost_estimated: float = 0
+    due_at: str | None = None  # ISO date
+
+
+class AllyJobUpdateIn(BaseModel):
+    status: str | None = None
+    note: str = ""
+    cost_final: float | None = None
+    due_at: str | None = None
 
 
 class PurchaseOrderIn(BaseModel):

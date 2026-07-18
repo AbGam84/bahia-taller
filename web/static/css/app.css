@@ -731,6 +731,25 @@ tr:hover td { background: rgba(30, 201, 167, 0.04); }
   .taller-layout { grid-template-columns: 1fr; }
 }
 
+.shop-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+.shop-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(5, 9, 16, 0.4);
+}
+.shop-card h3 {
+  margin: 0 0 6px;
+  font-family: var(--display);
+  font-size: 1.05rem;
+}
+.shop-card .spec { color: var(--mist); font-size: 0.84rem; margin-bottom: 10px; min-height: 2.4em; }
+.shop-card .row-actions { margin-top: 8px; }
+
 .toast {
   position: fixed;
   right: 18px;

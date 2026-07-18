@@ -188,11 +188,64 @@ class Supplier(Base):
     email: Mapped[str] = mapped_column(String(160), default="")
     city: Mapped[str] = mapped_column(String(80), default="Liberia")
     notes: Mapped[str] = mapped_column(Text, default="")
+    # tienda = compra repuestos | aliado = envía trabajos (cajas, motores, etc.)
+    kind: Mapped[str] = mapped_column(String(30), default="tienda")
+    website: Mapped[str] = mapped_column(String(255), default="")
+    whatsapp: Mapped[str] = mapped_column(String(40), default="")
+    # URL con {q} para buscar el repuesto en su tienda
+    search_url: Mapped[str] = mapped_column(String(400), default="")
+    specialty: Mapped[str] = mapped_column(String(200), default="")
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     parts: Mapped[list["Part"]] = relationship(back_populates="preferred_supplier")
     purchase_orders: Mapped[list["PurchaseOrder"]] = relationship(back_populates="supplier")
+    ally_jobs: Mapped[list["AllyJob"]] = relationship(back_populates="ally")
+
+
+class AllyJob(Base):
+    """Trabajo enviado a un aliado: cajas, motores, radiadores, etc."""
+
+    __tablename__ = "ally_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String(30), unique=True, index=True)
+    ally_id: Mapped[int] = mapped_column(ForeignKey("suppliers.id"))
+    reception_id: Mapped[int | None] = mapped_column(ForeignKey("receptions.id"), nullable=True)
+    work_order_id: Mapped[int | None] = mapped_column(ForeignKey("work_orders.id"), nullable=True)
+    plate: Mapped[str] = mapped_column(String(20), default="")
+    vehicle_info: Mapped[str] = mapped_column(String(200), default="")
+    job_type: Mapped[str] = mapped_column(String(60), default="otro")
+    # caja_cambios | motor | radiador | electrico | carroceria | inyeccion | otro
+    description: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(40), default="cotizado")
+    # cotizado | enviado | en_proceso | listo | recibido | cancelado
+    cost_estimated: Mapped[float] = mapped_column(Float, default=0)
+    cost_final: Mapped[float] = mapped_column(Float, default=0)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    returned_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_by: Mapped[str] = mapped_column(String(120), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    ally: Mapped["Supplier"] = relationship(back_populates="ally_jobs")
+    events: Mapped[list["AllyJobEvent"]] = relationship(
+        back_populates="job", cascade="all, delete-orphan"
+    )
+
+
+class AllyJobEvent(Base):
+    __tablename__ = "ally_job_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    job_id: Mapped[int] = mapped_column(ForeignKey("ally_jobs.id"))
+    status: Mapped[str] = mapped_column(String(40), default="")
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_by: Mapped[str] = mapped_column(String(120), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    job: Mapped["AllyJob"] = relationship(back_populates="events")
 
 
 class Part(Base):

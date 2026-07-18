@@ -31,15 +31,27 @@ def migrate_schema() -> None:
     if not DATABASE_URL.startswith("sqlite"):
         return
     insp = inspect(engine)
-    if "receptions" not in insp.get_table_names():
-        return
-    cols = {c["name"] for c in insp.get_columns("receptions")}
+    tables = set(insp.get_table_names())
     with engine.begin() as conn:
-        if "public_token" not in cols:
-            conn.execute(text("ALTER TABLE receptions ADD COLUMN public_token VARCHAR(64) DEFAULT ''"))
-        if "work_orders" in insp.get_table_names():
+        if "receptions" in tables:
+            cols = {c["name"] for c in insp.get_columns("receptions")}
+            if "public_token" not in cols:
+                conn.execute(text("ALTER TABLE receptions ADD COLUMN public_token VARCHAR(64) DEFAULT ''"))
+        if "work_orders" in tables:
             wcols = {c["name"] for c in insp.get_columns("work_orders")}
             if "payment_status" not in wcols:
                 conn.execute(
                     text("ALTER TABLE work_orders ADD COLUMN payment_status VARCHAR(30) DEFAULT 'pendiente'")
                 )
+        if "suppliers" in tables:
+            scols = {c["name"] for c in insp.get_columns("suppliers")}
+            adds = {
+                "kind": "VARCHAR(30) DEFAULT 'tienda'",
+                "website": "VARCHAR(255) DEFAULT ''",
+                "whatsapp": "VARCHAR(40) DEFAULT ''",
+                "search_url": "VARCHAR(400) DEFAULT ''",
+                "specialty": "VARCHAR(200) DEFAULT ''",
+            }
+            for name, ddl in adds.items():
+                if name not in scols:
+                    conn.execute(text(f"ALTER TABLE suppliers ADD COLUMN {name} {ddl}"))

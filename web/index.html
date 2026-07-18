@@ -34,10 +34,14 @@
         </button>
         <button data-section="proveedores">
           <span class="n">05</span>
-          <span class="t">Cadena de repuesto</span>
+          <span class="t">Repuestos & tiendas</span>
+        </button>
+        <button data-section="aliados">
+          <span class="n">06</span>
+          <span class="t">Aliados</span>
         </button>
         <button data-section="facturacion">
-          <span class="n">06</span>
+          <span class="n">07</span>
           <span class="t">Facturación CR</span>
         </button>
         <button data-section="config">
@@ -293,19 +297,29 @@
       <section id="sec-proveedores" class="section">
         <div class="topbar">
           <div>
-            <h1>Cadena de repuesto</h1>
-            <p>Del proveedor a su estantería — y de ahí directo a la orden del carro.</p>
+            <h1>Repuestos & tiendas</h1>
+            <p>Busque y pida en Gigante, Guacamaya y su cadena. Pedidos en ruta a la vista.</p>
           </div>
+        </div>
+        <div class="panel" style="margin-bottom:16px">
+          <h2>Buscar / comprar en tiendas</h2>
+          <p class="muted" style="margin-top:0">Escriba el repuesto (ej. pastillas Corolla 2018) y abra la tienda o WhatsApp.</p>
+          <div class="row-actions" style="margin-bottom:12px">
+            <input id="marketQuery" placeholder="Nombre del repuesto, marca, modelo..." style="flex:1;min-width:220px" />
+            <input id="marketVehicle" placeholder="Vehículo (placa / modelo)" style="max-width:220px" />
+            <button class="btn btn-primary" id="marketSearchBtn">Buscar en tiendas</button>
+          </div>
+          <div id="marketShops" class="shop-cards"></div>
         </div>
         <div class="grid-2">
           <div class="panel">
             <div class="panel-head">
-              <h2>Proveedores</h2>
+              <h2>Proveedores / tiendas</h2>
               <button class="btn btn-primary" id="newSupplierBtn">Sumar</button>
             </div>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>Nombre</th><th>Ciudad</th><th>Teléfono</th><th>Notas</th></tr></thead>
+                <thead><tr><th>Nombre</th><th>Tipo</th><th>Ciudad</th><th>Tel / WA</th><th></th></tr></thead>
                 <tbody id="suppliersBody"></tbody>
               </table>
             </div>
@@ -318,6 +332,40 @@
                 <tbody id="poBody"></tbody>
               </table>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="sec-aliados" class="section">
+        <div class="topbar">
+          <div>
+            <h1>Aliados</h1>
+            <p>Control de trabajos enviados: cajas, motores, radiadores y más — con seguimiento.</p>
+          </div>
+          <button class="btn btn-primary" id="newAllyJobBtn">Enviar a aliado</button>
+        </div>
+        <div class="panel" style="margin-bottom:16px">
+          <div class="panel-head">
+            <h2>Talleres aliados</h2>
+            <button class="btn btn-ghost" id="newAllyBtn">Registrar aliado</button>
+          </div>
+          <div id="alliesList" class="shop-cards"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Seguimiento de envíos</h2>
+            <button class="btn btn-ghost" id="refreshAllyJobsBtn">Refrescar</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Código</th><th>Aliado</th><th>Tipo</th><th>Vehículo</th>
+                  <th>Estado</th><th>Costo</th><th>Entrega</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="allyJobsBody"></tbody>
+            </table>
           </div>
         </div>
       </section>

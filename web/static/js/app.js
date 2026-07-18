@@ -74,6 +74,7 @@ function showSection(name) {
   if (name === "taller") loadTaller();
   if (name === "bodega") loadParts();
   if (name === "proveedores") loadSuppliers();
+  if (name === "aliados") loadAliados();
   if (name === "config") loadSettings();
   if (name === "facturacion") loadFacturacion();
 }
@@ -462,6 +463,11 @@ async function openTallerJob(id) {
           <p class="muted" style="margin:6px 0 0">${esc(r.code)} · ${esc(c.name || "")} · ${badge(r.status)}</p>
           <p style="margin:10px 0 0"><strong>Queja:</strong> ${esc(r.customer_complaint || "—")}</p>
         </div>
+        <div class="row-actions">
+          <button class="btn btn-ghost" id="printDiagBtn">Imprimir diagnóstico</button>
+          <button class="btn btn-ghost" id="buyPartsBtn">Buscar repuestos</button>
+          <button class="btn btn-ghost" id="sendAllyBtn">Enviar a aliado</button>
+        </div>
       </div>
 
       <h3>1 · Lectura por sistemas (semáforo)</h3>
@@ -597,10 +603,106 @@ async function openTallerJob(id) {
     document.getElementById("otReady")?.addEventListener("click", () => patch("listo"));
     document.getElementById("otDeliver")?.addEventListener("click", () => patch("entregado"));
     document.getElementById("otOpenFicha")?.addEventListener("click", () => openReception(id));
+    document.getElementById("printDiagBtn")?.addEventListener("click", async () => {
+      try {
+        const res = await fetch(`/api/receptions/${id}/diagnosis/print`, {
+          headers: { Authorization: `Bearer ${token()}` },
+        });
+        if (!res.ok) throw new Error("No se pudo generar la impresión");
+        const html = await res.text();
+        const w = window.open("", "_blank");
+        w.document.write(html);
+        w.document.close();
+      } catch (err) {
+        toast(err.message);
+      }
+    });
+    document.getElementById("buyPartsBtn")?.addEventListener("click", () => {
+      const q = [d.recommended_work, v.brand, v.model, v.year].filter(Boolean).join(" ");
+      showSection("proveedores");
+      const mq = document.getElementById("marketQuery");
+      const mv = document.getElementById("marketVehicle");
+      if (mq) mq.value = q || "";
+      if (mv) mv.value = `${v.plate || ""} ${v.brand || ""} ${v.model || ""}`.trim();
+      runMarketSearch();
+    });
+    document.getElementById("sendAllyBtn")?.addEventListener("click", () => {
+      showSection("aliados");
+      openNewAllyJob({
+        reception_id: id,
+        work_order_id: wo?.id || null,
+        plate: v.plate || "",
+        vehicle_info: `${v.brand || ""} ${v.model || ""} ${v.year || ""}`.trim(),
+        description: d.recommended_work || r.customer_complaint || "",
+      });
+    });
   } catch (err) {
     ws.innerHTML = `<div class="empty-state"><strong>Error</strong>${esc(err.message || "No se pudo abrir la lectura")}</div>`;
     toast(err.message || "Error al abrir diagnóstico");
   }
+}
+
+async function openNewAllyJob(prefill = {}) {
+  let allies = [];
+  try {
+    allies = await api("/api/suppliers?kind=aliado");
+  } catch (_) {}
+  if (!allies.length) {
+    toast("Primero registre un aliado (taller de cajas/motores)");
+    return;
+  }
+  openModal(`
+    <h2>Enviar trabajo a aliado</h2>
+    <form id="allyJobForm" class="form-grid">
+      <label>Aliado
+        <select name="ally_id" required>
+          ${allies.map((a) => `<option value="${a.id}">${esc(a.name)} — ${esc(a.specialty || "")}</option>`).join("")}
+        </select>
+      </label>
+      <label>Tipo de trabajo
+        <select name="job_type">
+          <option value="caja_cambios">Caja de cambios</option>
+          <option value="motor">Motor / rectificación</option>
+          <option value="radiador">Radiador</option>
+          <option value="electrico">Eléctrico / alternador</option>
+          <option value="inyeccion">Inyección</option>
+          <option value="carroceria">Carrocería / pintura</option>
+          <option value="otro">Otro</option>
+        </select>
+      </label>
+      <label>Placa<input name="plate" value="${esc(prefill.plate || "")}" /></label>
+      <label>Vehículo<input name="vehicle_info" value="${esc(prefill.vehicle_info || "")}" /></label>
+      <label>Costo estimado<input name="cost_estimated" type="number" value="0" /></label>
+      <label>Entrega prometida<input name="due_at" type="date" /></label>
+      <label class="full">Qué se envía<textarea name="description" required placeholder="Ej. Caja automática Toyota Yaris — no engata 3ra">${esc(prefill.description || "")}</textarea></label>
+      <input type="hidden" name="reception_id" value="${prefill.reception_id || ""}" />
+      <input type="hidden" name="work_order_id" value="${prefill.work_order_id || ""}" />
+      <div class="full row-actions">
+        <button class="btn btn-primary" type="submit">Registrar envío</button>
+        <button class="btn btn-ghost" type="button" id="closeModalBtn">Cancelar</button>
+      </div>
+    </form>
+  `);
+  document.getElementById("closeModalBtn").onclick = closeModal;
+  document.getElementById("allyJobForm").onsubmit = async (ev) => {
+    ev.preventDefault();
+    try {
+      const fd = new FormData(ev.target);
+      const body = Object.fromEntries(fd.entries());
+      body.ally_id = Number(body.ally_id);
+      body.cost_estimated = Number(body.cost_estimated || 0);
+      body.reception_id = body.reception_id ? Number(body.reception_id) : null;
+      body.work_order_id = body.work_order_id ? Number(body.work_order_id) : null;
+      if (body.due_at) body.due_at = `${body.due_at}T12:00:00`;
+      else delete body.due_at;
+      const job = await api("/api/ally-jobs", { method: "POST", body: JSON.stringify(body) });
+      toast(`Seguimiento ${job.code} creado`);
+      closeModal();
+      loadAliados();
+    } catch (err) {
+      toast(err.message);
+    }
+  };
 }
 
 async function loadParts() {
@@ -626,14 +728,48 @@ async function loadParts() {
   });
 }
 
+async function runMarketSearch() {
+  const q = document.getElementById("marketQuery")?.value?.trim() || "";
+  const vehicle = document.getElementById("marketVehicle")?.value?.trim() || "";
+  const box = document.getElementById("marketShops");
+  if (!box) return;
+  try {
+    const data = await api(`/api/parts/market-search?q=${encodeURIComponent(q)}&vehicle=${encodeURIComponent(vehicle)}`);
+    box.innerHTML = (data.shops || [])
+      .map((s) => `<div class="shop-card">
+        <h3>${esc(s.name)}</h3>
+        <div class="spec">${esc(s.specialty || s.notes || s.city || "")}</div>
+        <div class="muted" style="font-size:0.8rem;margin-bottom:8px">${esc(s.phone || "")} ${s.whatsapp ? "· WA " + esc(s.whatsapp) : ""}</div>
+        <div class="row-actions">
+          ${s.search_link ? `<a class="btn btn-primary" href="${esc(s.search_link)}" target="_blank" rel="noopener">Buscar en web</a>` : ""}
+          ${s.whatsapp_link ? `<a class="btn btn-ok" href="${esc(s.whatsapp_link)}" target="_blank" rel="noopener">Pedir por WA</a>` : ""}
+          ${s.website ? `<a class="btn btn-ghost" href="${esc(s.website)}" target="_blank" rel="noopener">Sitio</a>` : ""}
+        </div>
+      </div>`)
+      .join("") || `<div class="empty-state"><strong>Sin tiendas</strong>Agregue proveedores tipo tienda</div>`;
+  } catch (err) {
+    toast(err.message || "No se pudo buscar en tiendas");
+  }
+}
+
 async function loadSuppliers() {
   const [suppliers, orders] = await Promise.all([
     api("/api/suppliers"),
     api("/api/purchase-orders"),
   ]);
-  document.getElementById("suppliersBody").innerHTML = suppliers
-    .map((s) => `<tr><td>${s.name}</td><td>${s.city}</td><td>${s.phone}</td><td>${s.notes || ""}</td></tr>`)
-    .join("") || `<tr><td colspan="4"><div class="empty-state"><strong>Sin proveedores</strong>Agregue su cadena real de repuestos</div></td></tr>`;
+  const tiendas = suppliers.filter((s) => (s.kind || "tienda") !== "aliado");
+  document.getElementById("suppliersBody").innerHTML = tiendas
+    .map((s) => `<tr>
+      <td><strong>${esc(s.name)}</strong><br><span class="muted">${esc(s.specialty || "")}</span></td>
+      <td>${esc(s.kind || "tienda")}</td>
+      <td>${esc(s.city || "")}</td>
+      <td>${esc(s.phone || "")}<br><span class="muted">${esc(s.whatsapp || "")}</span></td>
+      <td class="row-actions">
+        ${s.website ? `<a class="btn btn-ghost" href="${esc(s.website)}" target="_blank" rel="noopener">Web</a>` : "—"}
+      </td>
+    </tr>`)
+    .join("") || `<tr><td colspan="5"><div class="empty-state"><strong>Sin proveedores</strong>Agregue Gigante, Guacamaya u otros</div></td></tr>`;
+  runMarketSearch();
   document.getElementById("poBody").innerHTML = orders
     .map((po) => `<tr>
       <td>${po.code}<br><span class="muted">${(po.lines || []).map((l) => l.part_name).join(", ")}</span></td>
@@ -667,6 +803,92 @@ async function loadSuppliers() {
       loadSuppliers();
     });
   });
+}
+
+async function loadAliados() {
+  try {
+    const [allies, jobs] = await Promise.all([
+      api("/api/suppliers?kind=aliado"),
+      api("/api/ally-jobs"),
+    ]);
+    document.getElementById("alliesList").innerHTML = allies
+      .map((s) => `<div class="shop-card">
+        <h3>${esc(s.name)}</h3>
+        <div class="spec">${esc(s.specialty || "Trabajos externos")}</div>
+        <div class="muted" style="font-size:0.82rem">${esc(s.city || "")} · ${esc(s.phone || "Sin teléfono")}</div>
+        ${s.whatsapp ? `<div class="row-actions" style="margin-top:8px"><a class="btn btn-ok" target="_blank" rel="noopener" href="https://wa.me/${esc(String(s.whatsapp).replace(/\D/g, ""))}">WhatsApp</a></div>` : ""}
+      </div>`)
+      .join("") || `<div class="empty-state"><strong>Sin aliados</strong>Registre el taller donde manda cajas o motores</div>`;
+
+    document.getElementById("allyJobsBody").innerHTML = jobs
+      .map((j) => `<tr>
+        <td>${esc(j.code)}</td>
+        <td>${esc(j.ally_name)}</td>
+        <td>${esc(j.job_type)}</td>
+        <td>${esc(j.plate)}<br><span class="muted">${esc(j.vehicle_info || "")}</span></td>
+        <td>${badge(j.status)}</td>
+        <td class="money">${money(j.cost_final || j.cost_estimated)}</td>
+        <td>${j.due_at ? new Date(j.due_at).toLocaleDateString("es-CR") : "—"}</td>
+        <td class="row-actions">
+          <button class="btn btn-ghost" data-ally-open="${j.id}">Seguimiento</button>
+        </td>
+      </tr>`)
+      .join("") || `<tr><td colspan="8"><div class="empty-state"><strong>Sin envíos</strong>Cuando mande una caja o motor, regístrelo aquí</div></td></tr>`;
+
+    document.querySelectorAll("[data-ally-open]").forEach((btn) => {
+      btn.onclick = () => openAllyJob(Number(btn.dataset.allyOpen), jobs);
+    });
+  } catch (err) {
+    toast(err.message || "No se pudo cargar aliados");
+  }
+}
+
+function openAllyJob(id, jobs) {
+  const j = (jobs || []).find((x) => x.id === id);
+  if (!j) return;
+  openModal(`
+    <div class="panel-head">
+      <div>
+        <h2 style="margin:0">${esc(j.code)} · ${esc(j.ally_name)}</h2>
+        <p class="muted">${esc(j.job_type)} · ${esc(j.plate)} · ${badge(j.status)}</p>
+      </div>
+      <button class="btn btn-ghost" id="closeModalBtn">Cerrar</button>
+    </div>
+    <p>${esc(j.description || "")}</p>
+    <p class="muted">Estimado ${money(j.cost_estimated)} · Final ${money(j.cost_final)}</p>
+    <h3>Línea de tiempo</h3>
+    <ul>${(j.events || []).map((e) => `<li><strong>${esc(e.status)}</strong> — ${esc(e.note)} <span class="muted">(${e.created_at ? new Date(e.created_at).toLocaleString("es-CR") : ""})</span></li>`).join("") || "<li class='muted'>Sin eventos</li>"}</ul>
+    <form id="allyTrackForm" class="form-grid" style="margin-top:14px">
+      <label>Estado
+        <select name="status">
+          ${["cotizado", "enviado", "en_proceso", "listo", "recibido", "cancelado"].map((s) => `<option value="${s}" ${j.status === s ? "selected" : ""}>${s}</option>`).join("")}
+        </select>
+      </label>
+      <label>Costo final<input name="cost_final" type="number" value="${j.cost_final || j.cost_estimated || 0}" /></label>
+      <label class="full">Nota de seguimiento<textarea name="note" placeholder="Ej. Ya lo recibieron / falta empaque / listo para recoger"></textarea></label>
+      <div class="full row-actions">
+        <button class="btn btn-primary" type="submit">Guardar seguimiento</button>
+      </div>
+    </form>
+  `);
+  document.getElementById("closeModalBtn").onclick = closeModal;
+  document.getElementById("allyTrackForm").onsubmit = async (ev) => {
+    ev.preventDefault();
+    try {
+      const fd = new FormData(ev.target);
+      const body = {
+        status: fd.get("status"),
+        note: fd.get("note") || "",
+        cost_final: Number(fd.get("cost_final") || 0),
+      };
+      await api(`/api/ally-jobs/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+      toast("Seguimiento actualizado");
+      closeModal();
+      loadAliados();
+    } catch (err) {
+      toast(err.message);
+    }
+  };
 }
 
 async function openReception(id) {
@@ -928,6 +1150,13 @@ function bindUI() {
   });
   document.getElementById("refreshBoard").onclick = loadDashboard;
   document.getElementById("refreshTallerBtn")?.addEventListener("click", () => loadTaller());
+  document.getElementById("marketSearchBtn")?.addEventListener("click", () => runMarketSearch());
+  document.getElementById("marketQuery")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runMarketSearch();
+  });
+  document.getElementById("refreshAllyJobsBtn")?.addEventListener("click", () => loadAliados());
+  document.getElementById("newAllyJobBtn")?.addEventListener("click", () => openNewAllyJob());
+  document.getElementById("newAllyBtn")?.addEventListener("click", () => openNewSupplier("aliado"));
   document.getElementById("partSearchBtn").onclick = loadParts;
   document.getElementById("onlyLow").onchange = loadParts;
   document.getElementById("partSearch").addEventListener("keydown", (e) => {
@@ -1221,14 +1450,26 @@ function bindUI() {
     };
   });
 
-  document.getElementById("newSupplierBtn").onclick = async () => {
+  document.getElementById("newSupplierBtn").onclick = () => openNewSupplier("tienda");
+
+  function openNewSupplier(kind) {
     openModal(`
-      <h2>Nuevo proveedor</h2>
+      <h2>${kind === "aliado" ? "Nuevo aliado" : "Nuevo proveedor / tienda"}</h2>
       <form id="supForm" class="form-grid">
-        <label>Nombre<input name="name" required /></label>
+        <label>Nombre<input name="name" required placeholder="${kind === "aliado" ? "Ej. Rectificadora del Norte" : "Ej. Repuestos XYZ"}" /></label>
+        <label>Tipo
+          <select name="kind">
+            <option value="tienda" ${kind === "tienda" ? "selected" : ""}>Tienda de repuestos</option>
+            <option value="aliado" ${kind === "aliado" ? "selected" : ""}>Aliado (trabajos externos)</option>
+          </select>
+        </label>
         <label>Ciudad<input name="city" value="Liberia" /></label>
         <label>Teléfono<input name="phone" /></label>
+        <label>WhatsApp<input name="whatsapp" placeholder="50688887777" /></label>
         <label>Email<input name="email" /></label>
+        <label class="full">Especialidad<input name="specialty" placeholder="Cajas / motores / frenos..." /></label>
+        <label class="full">Sitio web<input name="website" placeholder="https://..." /></label>
+        <label class="full">URL búsqueda (use {q})<input name="search_url" placeholder="https://tienda.com/?s={q}" /></label>
         <label class="full">Notas<textarea name="notes"></textarea></label>
         <div class="full row-actions">
           <button class="btn btn-primary" type="submit">Guardar</button>
@@ -1239,13 +1480,18 @@ function bindUI() {
     document.getElementById("closeModalBtn").onclick = closeModal;
     document.getElementById("supForm").onsubmit = async (ev) => {
       ev.preventDefault();
-      const body = Object.fromEntries(new FormData(ev.target).entries());
-      await api("/api/suppliers", { method: "POST", body: JSON.stringify(body) });
-      toast("Proveedor agregado");
-      closeModal();
-      loadSuppliers();
+      try {
+        const body = Object.fromEntries(new FormData(ev.target).entries());
+        await api("/api/suppliers", { method: "POST", body: JSON.stringify(body) });
+        toast(body.kind === "aliado" ? "Aliado registrado" : "Proveedor agregado");
+        closeModal();
+        if (body.kind === "aliado") loadAliados();
+        else loadSuppliers();
+      } catch (err) {
+        toast(err.message);
+      }
     };
-  };
+  }
 
   initZones();
   initArrivalPhotos();

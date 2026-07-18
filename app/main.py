@@ -25,6 +25,8 @@ from app.pro import (
     vehicle_history,
 )
 from app.models import (
+    AllyJob,
+    AllyJobEvent,
     Appointment,
     Customer,
     DamageItem,
@@ -41,6 +43,8 @@ from app.models import (
     WorkOrder,
 )
 from app.schemas import (
+    AllyJobIn,
+    AllyJobUpdateIn,
     CustomerIn,
     DiagnosisIn,
     LoginIn,
@@ -644,20 +648,56 @@ def parts_lookup(
 
 
 # ---------- Suppliers / Purchase orders ----------
+from app.part_shops import build_search_link, build_whatsapp_order, shop_dict
+from app.print_docs import diagnosis_print_html
+
+
+def _ally_job_dict(job: AllyJob) -> dict:
+    return {
+        "id": job.id,
+        "code": job.code,
+        "ally_id": job.ally_id,
+        "ally_name": job.ally.name if job.ally else "",
+        "ally_phone": job.ally.phone if job.ally else "",
+        "ally_whatsapp": (job.ally.whatsapp if job.ally else "") or "",
+        "reception_id": job.reception_id,
+        "work_order_id": job.work_order_id,
+        "plate": job.plate,
+        "vehicle_info": job.vehicle_info,
+        "job_type": job.job_type,
+        "description": job.description,
+        "status": job.status,
+        "cost_estimated": job.cost_estimated,
+        "cost_final": job.cost_final,
+        "sent_at": job.sent_at.isoformat() if job.sent_at else None,
+        "due_at": job.due_at.isoformat() if job.due_at else None,
+        "returned_at": job.returned_at.isoformat() if job.returned_at else None,
+        "created_by": job.created_by,
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+        "events": [
+            {
+                "id": e.id,
+                "status": e.status,
+                "note": e.note,
+                "created_by": e.created_by,
+                "created_at": e.created_at.isoformat() if e.created_at else None,
+            }
+            for e in sorted(job.events or [], key=lambda x: x.created_at or datetime.min)
+        ],
+    }
+
+
 @app.get("/api/suppliers")
-def suppliers_list(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    rows = db.query(Supplier).filter(Supplier.active.is_(True)).order_by(Supplier.name).all()
-    return [
-        {
-            "id": s.id,
-            "name": s.name,
-            "phone": s.phone,
-            "email": s.email,
-            "city": s.city,
-            "notes": s.notes,
-        }
-        for s in rows
-    ]
+def suppliers_list(
+    kind: str = "",
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    query = db.query(Supplier).filter(Supplier.active.is_(True))
+    if kind:
+        query = query.filter(Supplier.kind == kind)
+    rows = query.order_by(Supplier.kind, Supplier.name).all()
+    return [shop_dict(s) for s in rows]
 
 
 @app.post("/api/suppliers")
@@ -666,7 +706,148 @@ def suppliers_create(payload: SupplierIn, db: Session = Depends(get_db), user: U
     db.add(s)
     db.commit()
     db.refresh(s)
-    return {"id": s.id, "name": s.name, "phone": s.phone, "email": s.email, "city": s.city, "notes": s.notes}
+    return shop_dict(s)
+
+
+@app.get("/api/parts/market-search")
+def parts_market_search(
+    q: str = "",
+    vehicle: str = "",
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Buscar/comprar en tiendas proveedoras (Gigante, Guacamaya, etc.)."""
+    shops = (
+        db.query(Supplier)
+        .filter(Supplier.active.is_(True), Supplier.kind == "tienda")
+        .order_by(Supplier.name)
+        .all()
+    )
+    query = (q or "").strip()
+    results = []
+    for s in shops:
+        item = shop_dict(s)
+        item["search_link"] = build_search_link(s, query)
+        item["whatsapp_link"] = build_whatsapp_order(s, query or "repuesto", vehicle)
+        results.append(item)
+    return {"query": query, "vehicle": vehicle, "shops": results}
+
+
+@app.get("/api/receptions/{reception_id}/diagnosis/print", response_class=HTMLResponse)
+def diagnosis_print(
+    reception_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    r = _load_reception(db, reception_id)
+    settings = get_settings(db)
+    return HTMLResponse(diagnosis_print_html(r, shop_name=settings.shop_name or "Aitorepuestos"))
+
+
+@app.get("/api/ally-jobs")
+def ally_jobs_list(
+    status: str = "",
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    query = db.query(AllyJob).options(
+        joinedload(AllyJob.ally),
+        joinedload(AllyJob.events),
+    )
+    if status:
+        query = query.filter(AllyJob.status == status)
+    rows = query.order_by(AllyJob.created_at.desc()).limit(120).all()
+    return [_ally_job_dict(j) for j in rows]
+
+
+@app.post("/api/ally-jobs")
+def ally_jobs_create(
+    payload: AllyJobIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    ally = db.query(Supplier).filter(Supplier.id == payload.ally_id, Supplier.active.is_(True)).first()
+    if not ally:
+        raise HTTPException(status_code=404, detail="Aliado no encontrado")
+    due = None
+    if payload.due_at:
+        try:
+            due = datetime.fromisoformat(payload.due_at.replace("Z", ""))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Fecha due_at inválida") from exc
+    job = AllyJob(
+        code=next_code(db, "ALI", AllyJob),
+        ally_id=payload.ally_id,
+        reception_id=payload.reception_id,
+        work_order_id=payload.work_order_id,
+        plate=(payload.plate or "").upper().strip(),
+        vehicle_info=payload.vehicle_info,
+        job_type=payload.job_type or "otro",
+        description=payload.description,
+        status="cotizado",
+        cost_estimated=payload.cost_estimated or 0,
+        due_at=due,
+        created_by=user.name,
+    )
+    db.add(job)
+    db.flush()
+    db.add(
+        AllyJobEvent(
+            job_id=job.id,
+            status="cotizado",
+            note="Trabajo registrado para aliado",
+            created_by=user.name,
+        )
+    )
+    db.commit()
+    job = (
+        db.query(AllyJob)
+        .options(joinedload(AllyJob.ally), joinedload(AllyJob.events))
+        .filter(AllyJob.id == job.id)
+        .first()
+    )
+    return _ally_job_dict(job)
+
+
+@app.patch("/api/ally-jobs/{job_id}")
+def ally_jobs_update(
+    job_id: int,
+    payload: AllyJobUpdateIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    job = (
+        db.query(AllyJob)
+        .options(joinedload(AllyJob.ally), joinedload(AllyJob.events))
+        .filter(AllyJob.id == job_id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Seguimiento no encontrado")
+    if payload.status:
+        job.status = payload.status
+        if payload.status == "enviado" and not job.sent_at:
+            job.sent_at = datetime.utcnow()
+        if payload.status == "recibido" and not job.returned_at:
+            job.returned_at = datetime.utcnow()
+    if payload.cost_final is not None:
+        job.cost_final = payload.cost_final
+    if payload.due_at:
+        try:
+            job.due_at = datetime.fromisoformat(payload.due_at.replace("Z", ""))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Fecha due_at inválida") from exc
+    job.updated_at = datetime.utcnow()
+    note = (payload.note or "").strip() or f"Estado → {job.status}"
+    db.add(AllyJobEvent(job_id=job.id, status=job.status, note=note, created_by=user.name))
+    db.commit()
+    job = (
+        db.query(AllyJob)
+        .options(joinedload(AllyJob.ally), joinedload(AllyJob.events))
+        .filter(AllyJob.id == job_id)
+        .first()
+    )
+    return _ally_job_dict(job)
 
 
 @app.get("/api/purchase-orders")
