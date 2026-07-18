@@ -13,6 +13,8 @@ const STATUS_COLS = [
 ];
 
 const BRAND = "Katire";
+const arrivalPhotoFiles = [];
+let signaturePad = null;
 
 const money = (n) =>
   new Intl.NumberFormat("es-CR", { style: "currency", currency: "CRC", maximumFractionDigits: 0 }).format(n || 0);
@@ -141,6 +143,7 @@ function closeModal() {
 
 function initZones() {
   const grid = document.getElementById("zoneGrid");
+  if (!grid) return;
   grid.innerHTML = ZONES.map(
     (z) => `<button type="button" class="zone-chip" data-zone="${z}">${z}</button>`
   ).join("");
@@ -150,18 +153,150 @@ function initZones() {
   });
 }
 
+function renderPhotoPreviews() {
+  const grid = document.getElementById("photoPreviewGrid");
+  if (!grid) return;
+  if (!arrivalPhotoFiles.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;padding:18px"><strong>Sin fotos aún</strong>Agregue al menos una del estado del vehículo</div>`;
+    return;
+  }
+  grid.innerHTML = arrivalPhotoFiles
+    .map(
+      (file, i) => `<figure>
+        <img src="${URL.createObjectURL(file)}" alt="Foto ${i + 1}" />
+        <button type="button" data-rm="${i}" aria-label="Quitar">×</button>
+      </figure>`
+    )
+    .join("");
+  grid.querySelectorAll("[data-rm]").forEach((btn) => {
+    btn.onclick = () => {
+      arrivalPhotoFiles.splice(Number(btn.dataset.rm), 1);
+      renderPhotoPreviews();
+    };
+  });
+}
+
+function initArrivalPhotos() {
+  const input = document.getElementById("arrivalPhotos");
+  const clearBtn = document.getElementById("clearPhotosBtn");
+  if (!input) return;
+  input.addEventListener("change", () => {
+    [...(input.files || [])].forEach((f) => {
+      if (f.type.startsWith("image/")) arrivalPhotoFiles.push(f);
+    });
+    input.value = "";
+    renderPhotoPreviews();
+  });
+  clearBtn?.addEventListener("click", () => {
+    arrivalPhotoFiles.length = 0;
+    renderPhotoPreviews();
+  });
+  renderPhotoPreviews();
+}
+
+function initSignaturePad() {
+  const canvas = document.getElementById("signaturePad");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  const ratio = Math.max(window.devicePixelRatio || 1, 1);
+  const cssW = canvas.clientWidth || 640;
+  const cssH = 180;
+  canvas.width = Math.floor(cssW * ratio);
+  canvas.height = Math.floor(cssH * ratio);
+  ctx.scale(ratio, ratio);
+  ctx.fillStyle = "#f7f1ea";
+  ctx.fillRect(0, 0, cssW, cssH);
+  ctx.strokeStyle = "#1a1410";
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  let drawing = false;
+  let dirty = false;
+  const pos = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const src = e.touches ? e.touches[0] : e;
+    return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+  };
+  const start = (e) => {
+    e.preventDefault();
+    drawing = true;
+    const p = pos(e);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+  };
+  const move = (e) => {
+    if (!drawing) return;
+    e.preventDefault();
+    const p = pos(e);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    dirty = true;
+  };
+  const end = () => {
+    drawing = false;
+  };
+  canvas.addEventListener("mousedown", start);
+  canvas.addEventListener("mousemove", move);
+  window.addEventListener("mouseup", end);
+  canvas.addEventListener("touchstart", start, { passive: false });
+  canvas.addEventListener("touchmove", move, { passive: false });
+  canvas.addEventListener("touchend", end);
+
+  document.getElementById("clearSigBtn")?.addEventListener("click", () => {
+    ctx.fillStyle = "#f7f1ea";
+    ctx.fillRect(0, 0, cssW, cssH);
+    dirty = false;
+  });
+
+  signaturePad = {
+    isDirty: () => dirty,
+    toBlob: () =>
+      new Promise((resolve) => {
+        canvas.toBlob((blob) => resolve(blob), "image/png");
+      }),
+    clear: () => {
+      ctx.fillStyle = "#f7f1ea";
+      ctx.fillRect(0, 0, cssW, cssH);
+      dirty = false;
+    },
+  };
+}
+
+async function uploadArrivalMedia(receptionId) {
+  for (const file of arrivalPhotoFiles) {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("zone", "Ingreso");
+    fd.append("caption", "Foto al llegar");
+    await api(`/api/receptions/${receptionId}/photos`, { method: "POST", body: fd, headers: {} });
+  }
+  if (signaturePad?.isDirty()) {
+    const blob = await signaturePad.toBlob();
+    if (blob) {
+      const fd = new FormData();
+      fd.append("file", blob, "firma.png");
+      fd.append("zone", "Firma");
+      fd.append("caption", "Firma de quien entrega");
+      await api(`/api/receptions/${receptionId}/photos`, { method: "POST", body: fd, headers: {} });
+    }
+  }
+}
+
 async function loadSettings() {
   const s = await api("/api/settings");
   document.getElementById("shopSlogan").textContent =
     s.slogan || "De la llave al XML.";
+  const nameLabel = document.getElementById("shopNameLabel");
+  if (nameLabel) nameLabel.textContent = s.shop_name || "Aitorepuestos";
   const form = document.getElementById("settingsForm");
   if (!form) return;
-  form.shop_name.value = s.shop_name || "";
-  form.slogan.value = s.slogan || "";
-  form.phone.value = s.phone || "";
-  form.whatsapp.value = s.whatsapp || "";
-  form.address.value = s.address || "";
-  form.labor_rate.value = s.labor_rate || 0;
+  form.shop_name.value = s.shop_name || "Aitorepuestos";
+  form.slogan.value = s.slogan || "De la llave al XML.";
+  form.phone.value = s.phone || "+506 8870-8123";
+  form.whatsapp.value = s.whatsapp || "+506 8870-8123";
+  form.address.value = s.address || "Costa Rica";
+  form.labor_rate.value = s.labor_rate || 15000;
 
   try {
     const users = await api("/api/users");
@@ -179,54 +314,62 @@ async function loadSettings() {
 }
 
 async function loadDashboard() {
-  const d = await api("/api/dashboard");
-  document.getElementById("metricsPro").innerHTML = `
-    <div class="metric-card"><div class="k">Ingreso hoy</div><div class="v">${money(d.revenue_today)}</div><div class="s">Órdenes cerradas del día</div></div>
-    <div class="metric-card"><div class="k">ARO</div><div class="v">${money(d.aro)}</div><div class="s">Ticket promedio (como Tekmetric)</div></div>
-    <div class="metric-card"><div class="k">Conversión cotización</div><div class="v">${d.estimate_conversion_pct || 0}%</div><div class="s">${d.estimate_approved || 0} aprobadas / ${d.estimate_declined || 0} rechazadas</div></div>
-    <div class="metric-card"><div class="k">Margen repuestos</div><div class="v">${d.parts_margin_pct || 0}%</div><div class="s">${money(d.parts_margin)} esta temporada</div></div>
-  `;
-  document.getElementById("stats").innerHTML = `
-    <div class="stat"><div class="label">Entraron hoy</div><div class="value">${d.today_receptions}</div></div>
-    <div class="stat"><div class="label">En el patio</div><div class="value">${d.in_shop}</div></div>
-    <div class="stat"><div class="label">Listos</div><div class="value">${d.ready_for_delivery}</div></div>
-    <div class="stat"><div class="label">Piezas en ruta</div><div class="value">${d.open_purchase_orders}</div></div>
-    <div class="stat"><div class="label">Bajo mínimo</div><div class="value">${d.low_stock_count}</div></div>
-  `;
-  const kanban = document.getElementById("kanban");
-  kanban.innerHTML = STATUS_COLS.map(([key, title]) => {
-    const list = (d.board || []).filter((r) => r.status === key);
-    const cards = list
-      .map((r) => {
-        const v = r.vehicle || {};
-        return `<div class="card-job" data-id="${r.id}">
-          <strong>${v.plate || "—"}</strong>
-          <div class="meta">${v.brand || ""} ${v.model || ""}<br>${r.code}<br>${(r.customer_complaint || "").slice(0, 60)}</div>
-        </div>`;
-      })
-      .join("") || `<div class="empty-state" style="padding:14px;border:none"><strong>Vacío</strong>Nadie en esta estación</div>`;
-    return `<div class="kanban-col"><h4>${title}<span>${list.length}</span></h4>${cards}</div>`;
-  }).join("");
-  kanban.querySelectorAll(".card-job").forEach((el) => {
-    el.addEventListener("click", () => openReception(Number(el.dataset.id)));
-  });
-  document.getElementById("lowStockBody").innerHTML = (d.low_stock || [])
-    .map((p) => `<tr>
-      <td>${p.sku}</td><td>${p.name}</td>
-      <td><span class="badge badge-low">${p.stock_qty}</span></td>
-      <td>${p.min_stock}</td><td>${p.preferred_supplier || "—"}</td>
-    </tr>`)
-    .join("") || `<tr><td colspan="5"><div class="empty-state"><strong>Estantería firme</strong>Nada bajo el mínimo ahora</div></td></tr>`;
+  try {
+    const d = await api("/api/dashboard");
+    const inShop = Number(d.in_shop || 0);
+    const emptyCta = document.getElementById("patioEmptyCta");
+    if (emptyCta) emptyCta.classList.toggle("hidden", inShop > 0 || (d.board || []).length > 0);
 
-  document.getElementById("apptBody").innerHTML = (d.appointments || [])
-    .map((a) => `<tr>
-      <td>${new Date(a.starts_at).toLocaleString("es-CR")}</td>
-      <td>${a.customer_name}<br><span class="muted">${a.phone || ""}</span></td>
-      <td>${a.plate} ${a.vehicle_info || ""}</td>
-      <td>${a.reason || "—"}</td>
-      <td>${badge(a.status)}</td>
-    </tr>`)
-    .join("") || `<tr><td colspan="5"><div class="empty-state"><strong>Sin citas</strong>Planilla lista — agende la primera</div></td></tr>`;
+    document.getElementById("metricsPro").innerHTML = `
+      <div class="metric-card"><div class="k">Ingreso hoy</div><div class="v">${money(d.revenue_today)}</div><div class="s">Órdenes cerradas del día</div></div>
+      <div class="metric-card"><div class="k">ARO</div><div class="v">${money(d.aro)}</div><div class="s">Ticket promedio</div></div>
+      <div class="metric-card"><div class="k">Conversión cotización</div><div class="v">${d.estimate_conversion_pct || 0}%</div><div class="s">${d.estimate_approved || 0} aprobadas / ${d.estimate_declined || 0} rechazadas</div></div>
+      <div class="metric-card"><div class="k">Margen repuestos</div><div class="v">${d.parts_margin_pct || 0}%</div><div class="s">${money(d.parts_margin)} esta temporada</div></div>
+    `;
+    document.getElementById("stats").innerHTML = `
+      <div class="stat"><div class="label">Entraron hoy</div><div class="value">${d.today_receptions}</div></div>
+      <div class="stat"><div class="label">En el patio</div><div class="value">${d.in_shop}</div></div>
+      <div class="stat"><div class="label">Listos</div><div class="value">${d.ready_for_delivery}</div></div>
+      <div class="stat"><div class="label">Piezas en ruta</div><div class="value">${d.open_purchase_orders}</div></div>
+      <div class="stat"><div class="label">Bajo mínimo</div><div class="value">${d.low_stock_count}</div></div>
+    `;
+    const kanban = document.getElementById("kanban");
+    kanban.innerHTML = STATUS_COLS.map(([key, title]) => {
+      const list = (d.board || []).filter((r) => r.status === key);
+      const cards = list
+        .map((r) => {
+          const v = r.vehicle || {};
+          return `<div class="card-job" data-id="${r.id}">
+            <strong>${v.plate || "—"}</strong>
+            <div class="meta">${v.brand || ""} ${v.model || ""}<br>${r.code}<br>${(r.customer_complaint || "").slice(0, 60)}</div>
+          </div>`;
+        })
+        .join("") || `<div class="empty-state" style="padding:14px;border:none"><strong>Vacío</strong>Nadie en esta estación</div>`;
+      return `<div class="kanban-col"><h4>${title}<span>${list.length}</span></h4>${cards}</div>`;
+    }).join("");
+    kanban.querySelectorAll(".card-job").forEach((el) => {
+      el.addEventListener("click", () => openReception(Number(el.dataset.id)));
+    });
+    document.getElementById("lowStockBody").innerHTML = (d.low_stock || [])
+      .map((p) => `<tr>
+        <td>${p.sku}</td><td>${p.name}</td>
+        <td><span class="badge badge-low">${p.stock_qty}</span></td>
+        <td>${p.min_stock}</td><td>${p.preferred_supplier || "—"}</td>
+      </tr>`)
+      .join("") || `<tr><td colspan="5"><div class="empty-state"><strong>Estantería firme</strong>Nada bajo el mínimo ahora</div></td></tr>`;
+
+    document.getElementById("apptBody").innerHTML = (d.appointments || [])
+      .map((a) => `<tr>
+        <td>${new Date(a.starts_at).toLocaleString("es-CR")}</td>
+        <td>${a.customer_name}<br><span class="muted">${a.phone || ""}</span></td>
+        <td>${a.plate} ${a.vehicle_info || ""}</td>
+        <td>${a.reason || "—"}</td>
+        <td>${badge(a.status)}</td>
+      </tr>`)
+      .join("") || `<tr><td colspan="5"><div class="empty-state"><strong>Sin citas</strong>Planilla lista — agende la primera</div></td></tr>`;
+  } catch (err) {
+    toast(err.message || "No se pudo cargar el patio");
+  }
 }
 
 async function loadReceptions() {
@@ -386,7 +529,7 @@ async function openReception(id) {
             ${(r.photos || []).map((p) => `<figure><img src="${p.url}" alt=""/><figcaption>${p.zone || p.caption || ""}</figcaption></figure>`).join("")}
           </div>
           <form id="photoForm" class="row-actions" style="margin-top:12px">
-            <input type="file" name="file" accept="image/*" required />
+            <input type="file" name="file" accept="image/*" capture="environment" required />
             <input name="zone" placeholder="Zona" style="max-width:140px" />
             <button class="btn btn-primary" type="submit">Subir foto</button>
           </form>
@@ -593,46 +736,72 @@ function bindUI() {
 
   document.getElementById("receptionForm").onsubmit = async (e) => {
     e.preventDefault();
-    const fd = new FormData(e.target);
-    const zones = [...document.querySelectorAll(".zone-chip.active")].map((el) => el.dataset.zone);
-    const damageNotes = fd.get("damage_notes") || "";
-    const body = {
-      customer: {
-        name: fd.get("customer_name"),
-        phone: fd.get("customer_phone"),
-        id_number: fd.get("customer_id_number"),
-      },
-      plate: String(fd.get("plate") || "").toUpperCase(),
-      brand: fd.get("brand"),
-      model: fd.get("model"),
-      year: Number(fd.get("year") || 0),
-      color: fd.get("color"),
-      odometer_km: Number(fd.get("odometer_km") || 0),
-      fuel_level: fd.get("fuel_level"),
-      promised_hours: Number(fd.get("promised_hours") || 24),
-      customer_complaint: fd.get("customer_complaint"),
-      accessories: fd.get("accessories"),
-      received_by: fd.get("received_by"),
-      customer_signature_name: fd.get("customer_signature_name"),
-      customer_accepted: fd.get("customer_accepted") === "on",
-      damages: zones.map((zone) => ({
-        zone,
-        severity: "leve",
-        description: damageNotes,
-        present_on_arrival: true,
-      })),
-    };
-    if (!body.damages.length && damageNotes) {
-      body.damages = [{ zone: "Otro", severity: "leve", description: damageNotes, present_on_arrival: true }];
+    const btn = document.getElementById("submitIntakeBtn");
+    try {
+      if (!arrivalPhotoFiles.length) {
+        toast("Suba al menos una foto del vehículo al llegar");
+        return;
+      }
+      if (!signaturePad?.isDirty()) {
+        toast("Pida la firma en el recuadro (dedo o mouse)");
+        return;
+      }
+      const fd = new FormData(e.target);
+      const zones = [...document.querySelectorAll("#zoneGrid .zone-chip.active")].map((el) => el.dataset.zone);
+      const damageNotes = fd.get("damage_notes") || "";
+      const body = {
+        customer: {
+          name: fd.get("customer_name"),
+          phone: fd.get("customer_phone"),
+          id_number: fd.get("customer_id_number"),
+        },
+        plate: String(fd.get("plate") || "").toUpperCase(),
+        brand: fd.get("brand"),
+        model: fd.get("model"),
+        year: Number(fd.get("year") || 0),
+        color: fd.get("color"),
+        odometer_km: Number(fd.get("odometer_km") || 0),
+        fuel_level: fd.get("fuel_level"),
+        promised_hours: Number(fd.get("promised_hours") || 24),
+        customer_complaint: fd.get("customer_complaint"),
+        accessories: fd.get("accessories"),
+        received_by: fd.get("received_by"),
+        customer_signature_name: fd.get("customer_signature_name"),
+        customer_accepted: fd.get("customer_accepted") === "on",
+        damages: zones.map((zone) => ({
+          zone,
+          severity: "leve",
+          description: damageNotes,
+          present_on_arrival: true,
+        })),
+      };
+      if (!body.damages.length && damageNotes) {
+        body.damages = [{ zone: "Otro", severity: "leve", description: damageNotes, present_on_arrival: true }];
+      }
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Guardando ingreso…";
+      }
+      const created = await api("/api/receptions", { method: "POST", body: JSON.stringify(body) });
+      await uploadArrivalMedia(created.id);
+      toast(`Ingreso ${created.code} listo — fotos y firma guardadas`);
+      e.target.reset();
+      arrivalPhotoFiles.length = 0;
+      renderPhotoPreviews();
+      signaturePad?.clear();
+      document.querySelectorAll("#zoneGrid .zone-chip.active").forEach((el) => el.classList.remove("active"));
+      document.getElementById("receivedBy").value = user().name;
+      loadReceptions();
+      loadDashboard();
+      openReception(created.id);
+    } catch (err) {
+      toast(err.message || "No se pudo cerrar el ingreso");
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = "Cerrar ingreso y meter al patio";
+      }
     }
-    const created = await api("/api/receptions", { method: "POST", body: JSON.stringify(body) });
-    toast(`Recepción ${created.code} creada`);
-    e.target.reset();
-    document.querySelectorAll(".zone-chip.active").forEach((el) => el.classList.remove("active"));
-    document.getElementById("receivedBy").value = user().name;
-    loadReceptions();
-    loadDashboard();
-    openReception(created.id);
   };
 
   document.getElementById("settingsForm").onsubmit = async (e) => {
@@ -876,8 +1045,10 @@ function bindUI() {
   };
 
   initZones();
+  initArrivalPhotos();
+  initSignaturePad();
   loadSettings();
-  showSection("tablero");
+  showSection("recepcion");
 }
 
 bindUI();

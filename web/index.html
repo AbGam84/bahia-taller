@@ -10,7 +10,9 @@
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
+        <img src="/static/brand/logo.png" alt="Katire" style="width:52px;height:52px;border-radius:14px;margin-bottom:10px;object-fit:cover" />
         <div class="brand-mark"><span class="k">K</span>atire</div>
+        <small id="shopNameLabel" style="display:block;margin-top:6px;color:var(--foam);font-weight:700">Aitorepuestos</small>
         <small id="shopSlogan">De la llave al XML.</small>
       </div>
       <nav class="nav" id="nav">
@@ -57,9 +59,16 @@
         <div class="topbar">
           <div>
             <h1>Patio en vivo</h1>
-            <p>De la llave al XML — del elevador a Hacienda, en un solo flujo.</p>
+            <p>Vehículos en el taller ahora. Para meter un carro nuevo use Ingreso.</p>
           </div>
-          <button class="btn btn-primary" data-go="recepcion">Recibir vehículo</button>
+          <button class="btn btn-primary" data-go="recepcion">+ Recibir vehículo</button>
+        </div>
+        <div class="panel intake-cta" id="patioEmptyCta">
+          <div>
+            <h2 style="margin:0 0 8px;font-family:var(--display)">¿Llegó un carro?</h2>
+            <p class="muted" style="margin:0">Aquí verá el patio cuando haya ingresos. Primero registre llegada con fotos, daños y firma.</p>
+          </div>
+          <button class="btn btn-primary" data-go="recepcion" style="white-space:nowrap">Ir a Ingreso</button>
         </div>
         <div class="journey">
           <div class="journey-step"><b>Ingreso</b><span>Foto, daños y firma al llegar</span></div>
@@ -104,13 +113,13 @@
       <section id="sec-recepcion" class="section">
         <div class="topbar">
           <div>
-            <h1>Ingreso</h1>
-            <p>El cliente deja el carro. Usted deja constancia — digital, firmada, con foto del daño.</p>
+            <h1>Ingreso al patio</h1>
+            <p>Al llegar: datos del carro, fotos, daños marcados y firma de quien entrega.</p>
           </div>
         </div>
         <div class="grid-2">
           <div class="panel">
-            <h2>Nueva entrada al patio</h2>
+            <h2>1 · Datos del vehículo</h2>
             <form id="receptionForm" class="form-grid">
               <label>Quién entrega
                 <input name="customer_name" required placeholder="Nombre del cliente" />
@@ -160,24 +169,51 @@
               <label class="full">Lo que dejó adentro
                 <input name="accessories" placeholder="Cables, casco, herramientas..." />
               </label>
-              <div class="full">
-                <p class="muted" style="margin:0 0 8px">Mapa de daño al llegar — toque las zonas</p>
-                <div class="zone-grid" id="zoneGrid"></div>
+
+              <div class="full intake-block">
+                <h3>2 · Fotos al llegar</h3>
+                <p class="muted" style="margin:0 0 10px">Tome frente, laterales, trasera y el daño. En el celular abre la cámara.</p>
+                <div class="row-actions" style="margin-bottom:10px">
+                  <label class="btn btn-primary" style="cursor:pointer;margin:0">
+                    Tomar / subir fotos
+                    <input id="arrivalPhotos" type="file" accept="image/*" capture="environment" multiple hidden />
+                  </label>
+                  <button type="button" class="btn btn-ghost" id="clearPhotosBtn">Limpiar fotos</button>
+                </div>
+                <div class="photo-preview-grid" id="photoPreviewGrid">
+                  <div class="empty-state" style="grid-column:1/-1;padding:18px"><strong>Sin fotos aún</strong>Agregue al menos una del estado del vehículo</div>
+                </div>
               </div>
-              <label class="full">Detalle visual
-                <textarea name="damage_notes" placeholder="Rayón puerta, golpe defensa, faro rajado..."></textarea>
-              </label>
-              <label>Firma del que entrega
-                <input name="customer_signature_name" placeholder="Nombre completo" />
-              </label>
-              <label style="justify-content:end">
-                <span style="display:flex;align-items:center;gap:8px;margin-top:24px;color:var(--foam)">
-                  <input type="checkbox" name="customer_accepted" style="width:auto" />
-                  Acepta el estado de ingreso
-                </span>
-              </label>
+
+              <div class="full intake-block">
+                <h3>3 · Daños al llegar</h3>
+                <p class="muted" style="margin:0 0 8px">Toque las zonas dañadas</p>
+                <div class="zone-grid" id="zoneGrid"></div>
+                <label class="full" style="margin-top:12px">Detalle visual
+                  <textarea name="damage_notes" placeholder="Rayón puerta, golpe defensa, faro rajado..."></textarea>
+                </label>
+              </div>
+
+              <div class="full intake-block">
+                <h3>4 · Firma de quien entrega</h3>
+                <label>Nombre completo
+                  <input name="customer_signature_name" required placeholder="Nombre de quien firma" />
+                </label>
+                <p class="muted" style="margin:8px 0">Firme con el dedo o el mouse en el recuadro</p>
+                <canvas id="signaturePad" class="signature-pad" width="640" height="180"></canvas>
+                <div class="row-actions" style="margin-top:8px">
+                  <button type="button" class="btn btn-ghost" id="clearSigBtn">Borrar firma</button>
+                </div>
+                <label style="margin-top:12px">
+                  <span style="display:flex;align-items:center;gap:8px;color:var(--foam)">
+                    <input type="checkbox" name="customer_accepted" style="width:auto" required />
+                    Cliente acepta el estado de ingreso (fotos + daños)
+                  </span>
+                </label>
+              </div>
+
               <div class="full row-actions">
-                <button class="btn btn-primary" type="submit">Cerrar ingreso</button>
+                <button class="btn btn-primary" type="submit" id="submitIntakeBtn">Cerrar ingreso y meter al patio</button>
               </div>
             </form>
           </div>
