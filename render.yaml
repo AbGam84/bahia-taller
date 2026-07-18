@@ -19,6 +19,6 @@ services:
       - key: BAHIA_ADMIN_USER
         value: admin
       - key: BAHIA_ADMIN_PASSWORD
-        generateValue: true
+        value: "DuenoKatire2026"
       - key: PYTHON_VERSION
         value: "3.12.8"

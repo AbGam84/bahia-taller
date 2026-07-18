@@ -21,7 +21,16 @@ SECRET_KEY = _env("BAHIA_SECRET_KEY") or _env("SECRET_KEY") or "bahia-dev-local-
 ACCESS_TOKEN_HOURS = int(_env("BAHIA_TOKEN_HOURS", "12"))
 
 ADMIN_USERNAME = _env("BAHIA_ADMIN_USER", "admin")
-ADMIN_PASSWORD = _env("BAHIA_ADMIN_PASSWORD", "admin123")
+# Clave dueño recuperable (Render generateValue no se puede leer después).
+# Puede cambiarla con KATIRE_OWNER_PASSWORD en Environment.
+ADMIN_PASSWORD = (
+    _env("KATIRE_OWNER_PASSWORD")
+    or _env("BAHIA_ADMIN_PASSWORD")
+    or "DuenoKatire2026"
+)
+# Si solo existe la clave aleatoria de Render y el dueño la perdió, use la fija:
+if not _env("KATIRE_OWNER_PASSWORD"):
+    ADMIN_PASSWORD = "DuenoKatire2026"
 ADMIN_NAME = _env("BAHIA_ADMIN_NAME", "Administrador")
 
 # Acceso de demostración para el cliente (no es dueño)
