@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>bahía — patio del taller</title>
+  <link rel="stylesheet" href="/static/css/app.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">bah<i>í</i>a</div>
+        <small id="shopSlogan">El carro entra. La certeza sale.</small>
+      </div>
+      <nav class="nav" id="nav">
+        <button data-section="tablero" class="active">
+          <span class="n">01</span>
+          <span class="t">Patio en vivo</span>
+        </button>
+        <button data-section="recepcion">
+          <span class="n">02</span>
+          <span class="t">Ingreso</span>
+        </button>
+        <button data-section="taller">
+          <span class="n">03</span>
+          <span class="t">Diagnóstico & OT</span>
+        </button>
+        <button data-section="bodega">
+          <span class="n">04</span>
+          <span class="t">Estantería viva</span>
+        </button>
+        <button data-section="proveedores">
+          <span class="n">05</span>
+          <span class="t">Cadena de repuesto</span>
+        </button>
+        <button data-section="config">
+          <span class="n">Casa</span>
+          <span class="t">Identidad del taller</span>
+        </button>
+      </nav>
+      <div class="user-box">
+        <strong id="userName">—</strong>
+        <span id="userRole">—</span>
+        <div style="margin-top:10px">
+          <button class="btn btn-ghost" id="logoutBtn" style="width:100%">Salir del patio</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section id="sec-tablero" class="section active">
+        <div class="topbar">
+          <div>
+            <h1>Patio en vivo</h1>
+            <p>Cada carro en su estación. Sin gritar por el pasillo. Sin adivinar el stock.</p>
+          </div>
+          <button class="btn btn-primary" data-go="recepcion">Recibir vehículo</button>
+        </div>
+        <div class="journey">
+          <div class="journey-step"><b>Ingreso</b><span>Foto, daños y firma al llegar</span></div>
+          <div class="journey-step"><b>Lectura</b><span>Diagnóstico que habla claro</span></div>
+          <div class="journey-step"><b>Pieza</b><span>Bodega o pedido al instante</span></div>
+          <div class="journey-step"><b>Salida</b><span>Listo, cobrado, entregado</span></div>
+        </div>
+        <div class="metrics-pro" id="metricsPro"></div>
+        <div class="stats" id="stats"></div>
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Corriente del patio</h2>
+            <button class="btn btn-ghost" id="refreshBoard">Refrescar</button>
+          </div>
+          <div class="kanban" id="kanban"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Citas</h2>
+            <button class="btn btn-primary" id="newApptBtn">Agendar</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Cuándo</th><th>Cliente</th><th>Vehículo</th><th>Motivo</th><th>Estado</th></tr></thead>
+              <tbody id="apptBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <h3>Estantería bajo presión</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>SKU</th><th>Pieza</th><th>Stock</th><th>Mínimo</th><th>Proveedor</th></tr>
+              </thead>
+              <tbody id="lowStockBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="sec-recepcion" class="section">
+        <div class="topbar">
+          <div>
+            <h1>Ingreso</h1>
+            <p>El cliente deja el carro. Usted deja constancia — digital, firmada, con foto del daño.</p>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="panel">
+            <h2>Nueva entrada al patio</h2>
+            <form id="receptionForm" class="form-grid">
+              <label>Quién entrega
+                <input name="customer_name" required placeholder="Nombre del cliente" />
+              </label>
+              <label>WhatsApp
+                <input name="customer_phone" placeholder="+506 ..." />
+              </label>
+              <label>Cédula / ID
+                <input name="customer_id_number" />
+              </label>
+              <label>Quién recibe
+                <input name="received_by" id="receivedBy" />
+              </label>
+              <label>Placa
+                <input name="plate" required placeholder="GAA-123" style="text-transform:uppercase" />
+              </label>
+              <label>Marca
+                <input name="brand" required placeholder="Toyota" />
+              </label>
+              <label>Modelo
+                <input name="model" required placeholder="Corolla" />
+              </label>
+              <label>Año
+                <input name="year" type="number" placeholder="2018" />
+              </label>
+              <label>Color
+                <input name="color" />
+              </label>
+              <label>Kilometraje
+                <input name="odometer_km" type="number" value="0" />
+              </label>
+              <label>Combustible
+                <select name="fuel_level">
+                  <option>1/4</option>
+                  <option selected>1/2</option>
+                  <option>3/4</option>
+                  <option>Lleno</option>
+                  <option>Reserva</option>
+                </select>
+              </label>
+              <label>Promesa (horas)
+                <input name="promised_hours" type="number" value="24" />
+              </label>
+              <label class="full">Qué trae el carro / qué dice el cliente
+                <textarea name="customer_complaint" required placeholder="Ej. Chillido al frenar, testigo encendido, vibra en 3ra..."></textarea>
+              </label>
+              <label class="full">Lo que dejó adentro
+                <input name="accessories" placeholder="Cables, casco, herramientas..." />
+              </label>
+              <div class="full">
+                <p class="muted" style="margin:0 0 8px">Mapa de daño al llegar — toque las zonas</p>
+                <div class="zone-grid" id="zoneGrid"></div>
+              </div>
+              <label class="full">Detalle visual
+                <textarea name="damage_notes" placeholder="Rayón puerta, golpe defensa, faro rajado..."></textarea>
+              </label>
+              <label>Firma del que entrega
+                <input name="customer_signature_name" placeholder="Nombre completo" />
+              </label>
+              <label style="justify-content:end">
+                <span style="display:flex;align-items:center;gap:8px;margin-top:24px;color:var(--foam)">
+                  <input type="checkbox" name="customer_accepted" style="width:auto" />
+                  Acepta el estado de ingreso
+                </span>
+              </label>
+              <div class="full row-actions">
+                <button class="btn btn-primary" type="submit">Cerrar ingreso</button>
+              </div>
+            </form>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Últimas entradas</h2>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Código</th><th>Vehículo</th><th>Estado</th><th></th></tr>
+                </thead>
+                <tbody id="receptionList"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="sec-taller" class="section">
+        <div class="topbar">
+          <div>
+            <h1>Diagnóstico & OT</h1>
+            <p>Lee el carro, mira la estantería y pide lo que falta — sin salir de la ficha.</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Ingreso</th><th>Vehículo</th><th>Cliente</th><th>Estado</th><th>OT</th><th></th></tr>
+              </thead>
+              <tbody id="tallerList"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="sec-bodega" class="section">
+        <div class="topbar">
+          <div>
+            <h1>Estantería viva</h1>
+            <p>Si está aquí, se reserva. Si no está, se pide. El patio no espera a que alguien “revise el inventario”.</p>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <div class="row-actions" style="flex:1">
+              <input id="partSearch" placeholder="SKU, nombre, marca o compatibilidad..." style="max-width:420px" />
+              <button class="btn btn-ghost" id="partSearchBtn">Buscar</button>
+              <label style="flex-direction:row;align-items:center;gap:8px;color:var(--foam)">
+                <input type="checkbox" id="onlyLow" style="width:auto" /> Solo bajo mínimo
+              </label>
+            </div>
+            <button class="btn btn-primary" id="newPartBtn">Nueva pieza</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>SKU</th><th>Pieza</th><th>Compatibilidad</th><th>Ubicación</th>
+                  <th>Stock</th><th>Precio</th><th>Proveedor</th><th></th>
+                </tr>
+              </thead>
+              <tbody id="partsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="sec-proveedores" class="section">
+        <div class="topbar">
+          <div>
+            <h1>Cadena de repuesto</h1>
+            <p>Del proveedor a su estantería — y de ahí directo a la orden del carro.</p>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Proveedores</h2>
+              <button class="btn btn-primary" id="newSupplierBtn">Sumar</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Nombre</th><th>Ciudad</th><th>Teléfono</th><th>Notas</th></tr></thead>
+                <tbody id="suppliersBody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="panel">
+            <h2>Pedidos en ruta</h2>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Código</th><th>Proveedor</th><th>Total</th><th>Estado</th><th></th></tr></thead>
+                <tbody id="poBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="sec-config" class="section">
+        <div class="topbar">
+          <div>
+            <h1>Identidad del taller</h1>
+            <p>Lo que ve el cliente en fichas y lo que cobra la mano de obra.</p>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="panel">
+            <h2>Identidad</h2>
+            <form id="settingsForm" class="form-grid">
+              <label>Nombre del taller<input name="shop_name" placeholder="Nombre comercial" required /></label>
+              <label>Teléfono<input name="phone" placeholder="+506 ..." /></label>
+              <label class="full">Frase del patio<input name="slogan" placeholder="Su frase profesional" /></label>
+              <label>WhatsApp<input name="whatsapp" placeholder="+506 ..." /></label>
+              <label>Tarifa hora (CRC)<input name="labor_rate" type="number" placeholder="0" /></label>
+              <label class="full">Dirección<input name="address" placeholder="Provincia, cantón, señas" /></label>
+              <div class="full"><button class="btn btn-primary" type="submit">Guardar identidad</button></div>
+            </form>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Equipo</h2>
+              <button class="btn btn-primary" id="newUserBtn">Nuevo usuario</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th></tr></thead>
+                <tbody id="usersBody"></tbody>
+              </table>
+            </div>
+            <div class="panel-head" style="margin-top:22px">
+              <h2>Catálogo de servicios</h2>
+              <button class="btn btn-primary" id="newServiceBtn">Nuevo servicio</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Servicio</th><th>Categoría</th><th>Horas</th><th>Precio</th></tr></thead>
+                <tbody id="servicesBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="modal">
+    <div class="modal" id="modalBody"></div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script src="/static/js/app.js"></script>
+  <script src="/static/js/ficha.js"></script>
+</body>
+</html>

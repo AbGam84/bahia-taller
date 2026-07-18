@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Seguimiento — bahía</title>
+  <link rel="stylesheet" href="/static/css/app.css" />
+  <style>
+    .track-wrap { max-width: 720px; margin: 0 auto; padding: 28px 18px 60px; }
+    .track-hero {
+      padding: 28px 22px;
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      background:
+        radial-gradient(500px 200px at 10% 0%, rgba(30,201,167,0.22), transparent 60%),
+        linear-gradient(160deg, #122838, #0a121c);
+      margin-bottom: 18px;
+      animation: riseIn 0.45s ease;
+    }
+    .track-hero .mark {
+      font-family: var(--display);
+      font-size: 1.8rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+    }
+    .track-hero .mark i { font-style: normal; color: var(--lagoon); }
+    .timeline { display: flex; flex-direction: column; gap: 0; margin: 18px 0; }
+    .tl-item {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 12px;
+      padding: 0 0 16px;
+      position: relative;
+    }
+    .tl-item::before {
+      content: "";
+      position: absolute;
+      left: 12px;
+      top: 22px;
+      bottom: 0;
+      width: 2px;
+      background: var(--line);
+    }
+    .tl-item:last-child::before { display: none; }
+    .tl-dot {
+      width: 24px; height: 24px; border-radius: 50%;
+      border: 2px solid var(--line);
+      background: var(--deep);
+      z-index: 1;
+    }
+    .tl-item.done .tl-dot {
+      background: var(--lagoon);
+      border-color: var(--lagoon);
+      box-shadow: 0 0 0 4px rgba(30,201,167,0.15);
+    }
+    .dvi-list { display: grid; gap: 8px; }
+    .dvi-row {
+      display: flex; justify-content: space-between; gap: 10px;
+      padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line);
+      background: rgba(0,0,0,0.2);
+    }
+    .est-line {
+      display: flex; justify-content: space-between; gap: 12px;
+      padding: 10px 0; border-bottom: 1px solid var(--line);
+    }
+    .approve-box {
+      position: sticky; bottom: 12px;
+      padding: 14px; border-radius: 16px;
+      background: rgba(16,36,51,0.95);
+      border: 1px solid rgba(30,201,167,0.35);
+      box-shadow: var(--shadow);
+      display: flex; gap: 8px; flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="track-wrap" id="app">
+    <div class="muted">Cargando seguimiento…</div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script>
+    const money = (n) => new Intl.NumberFormat("es-CR", { style: "currency", currency: "CRC", maximumFractionDigits: 0 }).format(n || 0);
+    const toast = (m) => {
+      const el = document.getElementById("toast");
+      el.textContent = m; el.classList.add("show");
+      setTimeout(() => el.classList.remove("show"), 3000);
+    };
+    const token = location.pathname.split("/").filter(Boolean).pop();
+    const statusLabel = { ok: "Bien", watch: "Revisar", fail: "Urgente", na: "Sin revisar" };
+    const statusClass = { ok: "badge-ok", watch: "badge-en_diagnostico", fail: "badge-low", na: "badge-entregado" };
+
+    async function load() {
+      const res = await fetch(`/api/public/${token}`);
+      const d = await res.json();
+      if (!res.ok) {
+        document.getElementById("app").innerHTML = `<div class="panel"><h2>Enlace no válido</h2><p class="muted">Pida al taller un nuevo link de seguimiento.</p></div>`;
+        return;
+      }
+      const est = d.estimate;
+      const canDecide = est && est.status === "enviada";
+      document.getElementById("app").innerHTML = `
+        <div class="track-hero">
+          <div class="mark">bah<i>í</i>a</div>
+          <p class="muted" style="margin:8px 0 0">${d.shop.slogan || ""}</p>
+          <h1 style="font-family:var(--display);font-size:1.6rem;margin:18px 0 6px;letter-spacing:-0.03em">${d.plate} · ${d.vehicle}</h1>
+          <p class="muted">${d.code} · ${d.customer_name || "Cliente"} · estado: <strong style="color:var(--foam)">${(d.status||"").replaceAll("_"," ")}</strong></p>
+          <p style="margin:14px 0 0">${d.complaint || ""}</p>
+        </div>
+
+        <div class="panel">
+          <h2>Progreso</h2>
+          <div class="timeline">
+            ${(d.timeline||[]).map(t => `
+              <div class="tl-item ${t.done ? "done" : ""}">
+                <div class="tl-dot"></div>
+                <div><strong>${t.label}</strong></div>
+              </div>`).join("")}
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>Inspección digital</h2>
+          <div class="dvi-list">
+            ${(d.inspection||[]).filter(i => i.status !== "na").map(i => `
+              <div class="dvi-row">
+                <div><strong>${i.system_name}</strong><div class="muted">${i.notes || ""}</div></div>
+                <span class="badge ${statusClass[i.status] || ""}">${statusLabel[i.status] || i.status}</span>
+              </div>`).join("") || `<div class="empty-state"><strong>En revisión</strong>El patio está inspeccionando el vehículo</div>`}
+          </div>
+        </div>
+
+        ${(d.photos||[]).length ? `<div class="panel"><h2>Fotos</h2><div class="photo-grid">
+          ${d.photos.map(p => `<figure><img src="${p.url}" alt=""/><figcaption>${p.zone||p.caption||""}</figcaption></figure>`).join("")}
+        </div></div>` : ""}
+
+        ${est ? `<div class="panel">
+          <h2>Cotización ${est.code}</h2>
+          <p class="muted">${est.customer_message || ""}</p>
+          ${(est.lines||[]).map(l => `
+            <div class="est-line">
+              <div><strong>${l.description}</strong><div class="muted">${l.kind} · × ${l.quantity}</div></div>
+              <div class="money">${money(l.line_total)}</div>
+            </div>`).join("")}
+          <div style="display:flex;justify-content:space-between;margin-top:14px;font-family:var(--display)">
+            <span>Total</span><strong class="money" style="font-size:1.4rem">${money(est.grand_total)}</strong>
+          </div>
+          <p style="margin-top:10px">${est.status === "aprobada" ? `<span class="badge badge-listo">aprobada</span>` : est.status === "rechazada" ? `<span class="badge badge-low">rechazada</span>` : `<span class="badge badge-en_diagnostico">${est.status}</span>`}</p>
+        </div>` : ""}
+
+        <div class="panel">
+          <h3>Contacto del taller</h3>
+          <p>${d.shop.name}<br/><span class="muted">${d.shop.address || ""}</span></p>
+          <p>${d.shop.whatsapp || d.shop.phone || ""}</p>
+        </div>
+
+        ${canDecide ? `<div class="approve-box">
+          <button class="btn btn-primary" id="btnOk" style="flex:1">Aprobar cotización</button>
+          <button class="btn btn-danger" id="btnNo" style="flex:1">Rechazar</button>
+        </div>` : ""}
+      `;
+
+      document.getElementById("btnOk")?.addEventListener("click", async () => {
+        const res = await fetch(`/api/public/${token}/approve`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        if (!res.ok) return toast("No se pudo aprobar");
+        toast("Cotización aprobada. Gracias.");
+        load();
+      });
+      document.getElementById("btnNo")?.addEventListener("click", async () => {
+        const message = prompt("¿Por qué rechaza? (opcional)") || "";
+        const res = await fetch(`/api/public/${token}/decline`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message }),
+        });
+        if (!res.ok) return toast("No se pudo rechazar");
+        toast("Registrado. El taller le contactará.");
+        load();
+      });
+    }
+    load();
+  </script>
+</body>
+</html>

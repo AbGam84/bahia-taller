@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>bahía — acceso</title>
+  <link rel="stylesheet" href="/static/css/app.css" />
+</head>
+<body class="login-page">
+  <section class="login-hero" aria-label="bahía">
+    <div class="login-hero-top">Guanacaste · Costa Rica</div>
+    <div class="login-hero-copy">
+      <h1 class="wordmark">bah<i>í</i>a</h1>
+      <p>El carro entra. La certeza sale.</p>
+    </div>
+  </section>
+
+  <section class="login-panel">
+    <div class="login-card">
+      <p class="kicker">Acceso al patio</p>
+      <h2>Iniciar sesión</h2>
+      <p class="sub">Sistema vacío y listo para cargar su taller: clientes, stock, proveedores y órdenes reales.</p>
+      <form id="loginForm" class="stack">
+        <label>Usuario
+          <input name="username" autocomplete="username" required placeholder="Usuario" />
+        </label>
+        <label>Clave
+          <input name="password" type="password" autocomplete="current-password" required placeholder="Clave" />
+        </label>
+        <button class="btn btn-primary" type="submit">Entrar</button>
+      </form>
+      <p class="hint">
+        Primera instalación: usuario <strong>admin</strong>.  
+        Cambie la clave y complete la identidad del taller en Casa.
+      </p>
+    </div>
+  </section>
+
+  <div class="toast" id="toast"></div>
+  <script>
+    const toast = (msg) => {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.classList.add("show");
+      setTimeout(() => el.classList.remove("show"), 3200);
+    };
+    if (localStorage.getItem("tp_token")) location.href = "/";
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      try {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: fd.get("username"),
+            password: fd.get("password"),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "No se pudo entrar");
+        localStorage.setItem("tp_token", data.access_token);
+        localStorage.setItem("tp_user", JSON.stringify(data.user));
+        location.href = "/";
+      } catch (err) {
+        toast(err.message);
+      }
+    });
+  </script>
+</body>
+</html>

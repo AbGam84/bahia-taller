@@ -1,0 +1,19 @@
+services:
+  bahia:
+    build: .
+    ports:
+      - "8096:8096"
+    environment:
+      ENVIRONMENT: production
+      BAHIA_DATA_DIR: /data
+      BAHIA_SECRET_KEY: ${BAHIA_SECRET_KEY:-cambie-esta-clave-segura}
+      BAHIA_ADMIN_USER: ${BAHIA_ADMIN_USER:-admin}
+      BAHIA_ADMIN_PASSWORD: ${BAHIA_ADMIN_PASSWORD:-admin123}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      PORT: 8096
+    volumes:
+      - bahia_data:/data
+    restart: unless-stopped
+
+volumes:
+  bahia_data:

@@ -1,0 +1,362 @@
+from datetime import datetime
+
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.database import Base
+
+
+def utcnow() -> datetime:
+    return datetime.utcnow()
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    username: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    role: Mapped[str] = mapped_column(String(40), default="mecanico")  # admin, recepcion, mecanico
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class Customer(Base):
+    __tablename__ = "customers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(160))
+    phone: Mapped[str] = mapped_column(String(40), default="")
+    email: Mapped[str] = mapped_column(String(160), default="")
+    id_number: Mapped[str] = mapped_column(String(60), default="")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    vehicles: Mapped[list["Vehicle"]] = relationship(back_populates="customer")
+
+
+class Vehicle(Base):
+    __tablename__ = "vehicles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"))
+    plate: Mapped[str] = mapped_column(String(20), index=True)
+    brand: Mapped[str] = mapped_column(String(80))
+    model: Mapped[str] = mapped_column(String(80))
+    year: Mapped[int] = mapped_column(Integer, default=0)
+    color: Mapped[str] = mapped_column(String(40), default="")
+    vin: Mapped[str] = mapped_column(String(60), default="")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    customer: Mapped["Customer"] = relationship(back_populates="vehicles")
+    receptions: Mapped[list["Reception"]] = relationship(back_populates="vehicle")
+
+
+class Reception(Base):
+    __tablename__ = "receptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String(30), unique=True, index=True)
+    vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id"))
+    received_by: Mapped[str] = mapped_column(String(120), default="")
+    odometer_km: Mapped[int] = mapped_column(Integer, default=0)
+    fuel_level: Mapped[str] = mapped_column(String(20), default="1/2")
+    customer_complaint: Mapped[str] = mapped_column(Text, default="")
+    accessories: Mapped[str] = mapped_column(Text, default="")  # JSON list as text
+    status: Mapped[str] = mapped_column(String(40), default="recibido")
+    # recibido | en_diagnostico | esperando_repuestos | en_reparacion | listo | entregado | cancelado
+    promised_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    customer_accepted: Mapped[bool] = mapped_column(Boolean, default=False)
+    customer_signature_name: Mapped[str] = mapped_column(String(160), default="")
+    public_token: Mapped[str] = mapped_column(String(64), default="", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    vehicle: Mapped["Vehicle"] = relationship(back_populates="receptions")
+    damages: Mapped[list["DamageItem"]] = relationship(back_populates="reception", cascade="all, delete-orphan")
+    photos: Mapped[list["ReceptionPhoto"]] = relationship(back_populates="reception", cascade="all, delete-orphan")
+    diagnosis: Mapped["Diagnosis | None"] = relationship(back_populates="reception", uselist=False)
+    work_order: Mapped["WorkOrder | None"] = relationship(back_populates="reception", uselist=False)
+    inspection_checks: Mapped[list["InspectionCheck"]] = relationship(
+        back_populates="reception", cascade="all, delete-orphan"
+    )
+    estimate: Mapped["Estimate | None"] = relationship(back_populates="reception", uselist=False)
+
+
+class DamageItem(Base):
+    __tablename__ = "damage_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    reception_id: Mapped[int] = mapped_column(ForeignKey("receptions.id"))
+    zone: Mapped[str] = mapped_column(String(60))
+    severity: Mapped[str] = mapped_column(String(20), default="leve")  # leve, medio, grave
+    description: Mapped[str] = mapped_column(Text, default="")
+    present_on_arrival: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    reception: Mapped["Reception"] = relationship(back_populates="damages")
+
+
+class ReceptionPhoto(Base):
+    __tablename__ = "reception_photos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    reception_id: Mapped[int] = mapped_column(ForeignKey("receptions.id"))
+    filename: Mapped[str] = mapped_column(String(255))
+    caption: Mapped[str] = mapped_column(String(200), default="")
+    zone: Mapped[str] = mapped_column(String(60), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    reception: Mapped["Reception"] = relationship(back_populates="photos")
+
+
+class Diagnosis(Base):
+    __tablename__ = "diagnoses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    reception_id: Mapped[int] = mapped_column(ForeignKey("receptions.id"), unique=True)
+    technician: Mapped[str] = mapped_column(String(120), default="")
+    symptoms: Mapped[str] = mapped_column(Text, default="")
+    findings: Mapped[str] = mapped_column(Text, default="")
+    obd_codes: Mapped[str] = mapped_column(Text, default="")
+    recommended_work: Mapped[str] = mapped_column(Text, default="")
+    estimated_hours: Mapped[float] = mapped_column(Float, default=0)
+    estimated_parts_cost: Mapped[float] = mapped_column(Float, default=0)
+    estimated_labor_cost: Mapped[float] = mapped_column(Float, default=0)
+    priority: Mapped[str] = mapped_column(String(20), default="normal")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    reception: Mapped["Reception"] = relationship(back_populates="diagnosis")
+
+
+class WorkOrder(Base):
+    __tablename__ = "work_orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    reception_id: Mapped[int] = mapped_column(ForeignKey("receptions.id"), unique=True)
+    code: Mapped[str] = mapped_column(String(30), unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(40), default="abierta")
+    labor_notes: Mapped[str] = mapped_column(Text, default="")
+    labor_hours: Mapped[float] = mapped_column(Float, default=0)
+    labor_rate: Mapped[float] = mapped_column(Float, default=15000)
+    labor_total: Mapped[float] = mapped_column(Float, default=0)
+    parts_total: Mapped[float] = mapped_column(Float, default=0)
+    grand_total: Mapped[float] = mapped_column(Float, default=0)
+    assigned_to: Mapped[str] = mapped_column(String(120), default="")
+    payment_status: Mapped[str] = mapped_column(String(30), default="pendiente")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    reception: Mapped["Reception"] = relationship(back_populates="work_order")
+    lines: Mapped[list["WorkOrderLine"]] = relationship(back_populates="work_order", cascade="all, delete-orphan")
+
+
+class WorkOrderLine(Base):
+    __tablename__ = "work_order_lines"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    work_order_id: Mapped[int] = mapped_column(ForeignKey("work_orders.id"))
+    part_id: Mapped[int | None] = mapped_column(ForeignKey("parts.id"), nullable=True)
+    description: Mapped[str] = mapped_column(String(255))
+    quantity: Mapped[float] = mapped_column(Float, default=1)
+    unit_price: Mapped[float] = mapped_column(Float, default=0)
+    line_total: Mapped[float] = mapped_column(Float, default=0)
+    status: Mapped[str] = mapped_column(String(40), default="pendiente")
+    # pendiente | reservado | pedido | instalado
+
+    work_order: Mapped["WorkOrder"] = relationship(back_populates="lines")
+    part: Mapped["Part | None"] = relationship()
+
+
+class Supplier(Base):
+    __tablename__ = "suppliers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(160))
+    phone: Mapped[str] = mapped_column(String(40), default="")
+    email: Mapped[str] = mapped_column(String(160), default="")
+    city: Mapped[str] = mapped_column(String(80), default="Liberia")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    parts: Mapped[list["Part"]] = relationship(back_populates="preferred_supplier")
+    purchase_orders: Mapped[list["PurchaseOrder"]] = relationship(back_populates="supplier")
+
+
+class Part(Base):
+    __tablename__ = "parts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    sku: Mapped[str] = mapped_column(String(60), unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    brand: Mapped[str] = mapped_column(String(80), default="")
+    category: Mapped[str] = mapped_column(String(80), default="General")
+    compatible_with: Mapped[str] = mapped_column(Text, default="")  # marcas/modelos
+    location: Mapped[str] = mapped_column(String(60), default="")  # pasillo/estante
+    cost_price: Mapped[float] = mapped_column(Float, default=0)
+    sale_price: Mapped[float] = mapped_column(Float, default=0)
+    stock_qty: Mapped[float] = mapped_column(Float, default=0)
+    min_stock: Mapped[float] = mapped_column(Float, default=1)
+    unit: Mapped[str] = mapped_column(String(20), default="und")
+    preferred_supplier_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id"), nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    preferred_supplier: Mapped["Supplier | None"] = relationship(back_populates="parts")
+    movements: Mapped[list["StockMovement"]] = relationship(back_populates="part")
+
+
+class StockMovement(Base):
+    __tablename__ = "stock_movements"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    part_id: Mapped[int] = mapped_column(ForeignKey("parts.id"))
+    movement_type: Mapped[str] = mapped_column(String(30))  # entrada, salida, ajuste, reserva, liberacion
+    quantity: Mapped[float] = mapped_column(Float)
+    reference: Mapped[str] = mapped_column(String(120), default="")
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    created_by: Mapped[str] = mapped_column(String(120), default="")
+
+    part: Mapped["Part"] = relationship(back_populates="movements")
+
+
+class PurchaseOrder(Base):
+    __tablename__ = "purchase_orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String(30), unique=True, index=True)
+    supplier_id: Mapped[int] = mapped_column(ForeignKey("suppliers.id"))
+    work_order_id: Mapped[int | None] = mapped_column(ForeignKey("work_orders.id"), nullable=True)
+    status: Mapped[str] = mapped_column(String(40), default="solicitado")
+    # solicitado | confirmado | en_camino | recibido | cancelado
+    notes: Mapped[str] = mapped_column(Text, default="")
+    total: Mapped[float] = mapped_column(Float, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    received_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    supplier: Mapped["Supplier"] = relationship(back_populates="purchase_orders")
+    lines: Mapped[list["PurchaseOrderLine"]] = relationship(back_populates="purchase_order", cascade="all, delete-orphan")
+
+
+class PurchaseOrderLine(Base):
+    __tablename__ = "purchase_order_lines"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    purchase_order_id: Mapped[int] = mapped_column(ForeignKey("purchase_orders.id"))
+    part_id: Mapped[int] = mapped_column(ForeignKey("parts.id"))
+    quantity: Mapped[float] = mapped_column(Float, default=1)
+    unit_cost: Mapped[float] = mapped_column(Float, default=0)
+    line_total: Mapped[float] = mapped_column(Float, default=0)
+
+    purchase_order: Mapped["PurchaseOrder"] = relationship(back_populates="lines")
+    part: Mapped["Part"] = relationship()
+
+
+class ShopSettings(Base):
+    __tablename__ = "shop_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    shop_name: Mapped[str] = mapped_column(String(160), default="bahía")
+    slogan: Mapped[str] = mapped_column(String(200), default="El carro entra. La certeza sale.")
+    phone: Mapped[str] = mapped_column(String(40), default="")
+    whatsapp: Mapped[str] = mapped_column(String(40), default="")
+    address: Mapped[str] = mapped_column(String(255), default="Guanacaste, Costa Rica")
+    labor_rate: Mapped[float] = mapped_column(Float, default=15000)
+    currency: Mapped[str] = mapped_column(String(10), default="CRC")
+
+
+class InspectionCheck(Base):
+    """Digital Vehicle Inspection item — Tekmetric/Shopmonkey style traffic light."""
+
+    __tablename__ = "inspection_checks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    reception_id: Mapped[int] = mapped_column(ForeignKey("receptions.id"))
+    system_key: Mapped[str] = mapped_column(String(40))
+    system_name: Mapped[str] = mapped_column(String(80))
+    status: Mapped[str] = mapped_column(String(20), default="ok")  # ok | watch | fail | na
+    notes: Mapped[str] = mapped_column(Text, default="")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    reception: Mapped["Reception"] = relationship(back_populates="inspection_checks")
+
+
+class Estimate(Base):
+    __tablename__ = "estimates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    reception_id: Mapped[int] = mapped_column(ForeignKey("receptions.id"), unique=True)
+    code: Mapped[str] = mapped_column(String(30), unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(30), default="borrador")
+    # borrador | enviada | aprobada | rechazada
+    notes: Mapped[str] = mapped_column(Text, default="")
+    labor_total: Mapped[float] = mapped_column(Float, default=0)
+    parts_total: Mapped[float] = mapped_column(Float, default=0)
+    grand_total: Mapped[float] = mapped_column(Float, default=0)
+    customer_message: Mapped[str] = mapped_column(Text, default="")
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    reception: Mapped["Reception"] = relationship(back_populates="estimate")
+    lines: Mapped[list["EstimateLine"]] = relationship(
+        back_populates="estimate", cascade="all, delete-orphan"
+    )
+
+
+class EstimateLine(Base):
+    __tablename__ = "estimate_lines"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    estimate_id: Mapped[int] = mapped_column(ForeignKey("estimates.id"))
+    kind: Mapped[str] = mapped_column(String(20), default="servicio")  # servicio | repuesto
+    description: Mapped[str] = mapped_column(String(255))
+    quantity: Mapped[float] = mapped_column(Float, default=1)
+    unit_price: Mapped[float] = mapped_column(Float, default=0)
+    line_total: Mapped[float] = mapped_column(Float, default=0)
+    part_id: Mapped[int | None] = mapped_column(ForeignKey("parts.id"), nullable=True)
+    recommended: Mapped[bool] = mapped_column(Boolean, default=True)
+    approved: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    estimate: Mapped["Estimate"] = relationship(back_populates="lines")
+
+
+class ServiceCatalog(Base):
+    __tablename__ = "service_catalog"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(160))
+    category: Mapped[str] = mapped_column(String(80), default="General")
+    hours: Mapped[float] = mapped_column(Float, default=1)
+    price: Mapped[float] = mapped_column(Float, default=0)
+    description: Mapped[str] = mapped_column(Text, default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class Appointment(Base):
+    __tablename__ = "appointments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    customer_name: Mapped[str] = mapped_column(String(160))
+    phone: Mapped[str] = mapped_column(String(40), default="")
+    plate: Mapped[str] = mapped_column(String(20), default="")
+    vehicle_info: Mapped[str] = mapped_column(String(160), default="")
+    reason: Mapped[str] = mapped_column(Text, default="")
+    starts_at: Mapped[datetime] = mapped_column(DateTime)
+    status: Mapped[str] = mapped_column(String(30), default="agendada")
+    # agendada | confirmada | llegada | cancelada | no_show
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
