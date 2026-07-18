@@ -410,10 +410,13 @@ def diagnosis_upsert(
         r.status = "en_diagnostico"
     if payload.create_work_order:
         wo = ensure_work_order(db, r, assigned_to=payload.technician or user.name)
+        wo.assigned_to = payload.technician or user.name or wo.assigned_to
         if payload.estimated_hours:
             wo.labor_hours = payload.estimated_hours
-        if payload.recommended_work and not wo.labor_notes:
+        if payload.recommended_work:
             wo.labor_notes = payload.recommended_work
+        if wo.status in ("abierta", "borrador", ""):
+            wo.status = "en_proceso"
         recalculate_work_order(wo)
         if r.status in ("recibido", "en_diagnostico"):
             r.status = "en_reparacion"

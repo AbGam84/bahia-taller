@@ -674,6 +674,63 @@ tr:hover td { background: rgba(30, 201, 167, 0.04); }
   cursor: crosshair;
 }
 
+.taller-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) 1fr;
+  gap: 16px;
+  align-items: start;
+}
+.taller-cards { display: grid; gap: 10px; }
+.taller-card {
+  text-align: left;
+  width: 100%;
+  border: 1px solid var(--line);
+  background: rgba(5, 9, 16, 0.45);
+  border-radius: 14px;
+  padding: 12px 14px;
+  color: inherit;
+  cursor: pointer;
+}
+.taller-card.active {
+  border-color: rgba(255, 138, 51, 0.55);
+  background: rgba(255, 77, 46, 0.12);
+  box-shadow: 0 0 0 1px rgba(255, 138, 51, 0.15);
+}
+.taller-card strong { display: block; font-size: 1.05rem; }
+.taller-card .meta { color: var(--mist); font-size: 0.86rem; margin-top: 4px; }
+.dvi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 10px 0 16px;
+}
+.dvi-item {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(5, 9, 16, 0.35);
+}
+.dvi-item .name { font-size: 0.82rem; margin-bottom: 8px; color: var(--foam); }
+.dvi-item .lights { display: flex; gap: 6px; }
+.dvi-item button {
+  flex: 1;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 0;
+  font-size: 0.72rem;
+  background: transparent;
+  color: var(--mist);
+  cursor: pointer;
+}
+.dvi-item button.on-ok { background: rgba(30, 201, 167, 0.2); color: #9ff0dc; border-color: rgba(30, 201, 167, 0.45); }
+.dvi-item button.on-watch { background: rgba(255, 176, 32, 0.2); color: #ffd27a; border-color: rgba(255, 176, 32, 0.45); }
+.dvi-item button.on-fail { background: rgba(255, 77, 46, 0.22); color: #ffb0a0; border-color: rgba(255, 77, 46, 0.5); }
+.dvi-item button.on-na { background: rgba(255, 255, 255, 0.06); color: #fff; }
+
+@media (max-width: 900px) {
+  .taller-layout { grid-template-columns: 1fr; }
+}
+
 .toast {
   position: fixed;
   right: 18px;

@@ -15,9 +15,18 @@ const STATUS_COLS = [
 const BRAND = "Katire";
 const arrivalPhotoFiles = [];
 let signaturePad = null;
+let tallerActiveId = null;
 
 const money = (n) =>
   new Intl.NumberFormat("es-CR", { style: "currency", currency: "CRC", maximumFractionDigits: 0 }).format(n || 0);
+
+const esc = (s) =>
+  String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 
 const toast = (msg) => {
   const el = document.getElementById("toast");
@@ -392,25 +401,206 @@ async function loadReceptions() {
 }
 
 async function loadTaller() {
-  const rows = await api("/api/receptions");
-  document.getElementById("tallerList").innerHTML = rows
-    .filter((r) => r.status !== "entregado")
-    .map((r) => {
-      const v = r.vehicle || {};
-      const c = v.customer || {};
-      return `<tr>
-        <td>${r.code}</td>
-        <td>${v.plate} · ${v.brand} ${v.model}</td>
-        <td>${c.name || "—"}</td>
-        <td>${badge(r.status)}</td>
-        <td>${r.work_order?.code || "—"}</td>
-        <td><button class="btn btn-primary" data-id="${r.id}">Diagnosticar / OT</button></td>
-      </tr>`;
-    })
-    .join("") || `<tr><td colspan="6"><div class="empty-state"><strong>Patio libre</strong>Cuando ingrese un vehículo aparecerá aquí</div></td></tr>`;
-  document.querySelectorAll("#tallerList [data-id]").forEach((btn) => {
-    btn.addEventListener("click", () => openReception(Number(btn.dataset.id)));
+  const list = document.getElementById("tallerList");
+  if (!list) return;
+  try {
+    const rows = await api("/api/receptions");
+    const open = rows.filter((r) => r.status !== "entregado" && r.status !== "cancelado");
+    if (!open.length) {
+      list.innerHTML = `<div class="empty-state"><strong>Patio libre</strong>Haga un ingreso primero (fotos + daños + firma)</div>
+        <button class="btn btn-primary" data-go="recepcion" style="width:100%;margin-top:10px">Ir a Ingreso</button>`;
+      list.querySelector("[data-go]")?.addEventListener("click", () => showSection("recepcion"));
+      if (!tallerActiveId) {
+        document.getElementById("tallerWorkspace").innerHTML =
+          `<div class="empty-state"><strong>Sin vehículos</strong>Cuando entre un carro, aquí hará la lectura y la OT.</div>`;
+      }
+      return;
+    }
+    list.innerHTML = open
+      .map((r) => {
+        const v = r.vehicle || {};
+        const c = v.customer || {};
+        const active = Number(r.id) === Number(tallerActiveId) ? "active" : "";
+        return `<button type="button" class="taller-card ${active}" data-id="${r.id}">
+          <strong>${esc(v.plate || "—")}</strong>
+          <div class="meta">${esc(v.brand)} ${esc(v.model)} · ${esc(c.name || "")}<br>${esc(r.code)} · ${badge(r.status)} · OT ${esc(r.work_order?.code || "—")}</div>
+        </button>`;
+      })
+      .join("");
+    list.querySelectorAll(".taller-card").forEach((btn) => {
+      btn.onclick = () => openTallerJob(Number(btn.dataset.id));
+    });
+    if (tallerActiveId) {
+      const still = open.some((r) => r.id === tallerActiveId);
+      if (still) await openTallerJob(tallerActiveId);
+      else tallerActiveId = null;
+    }
+  } catch (err) {
+    toast(err.message || "No se pudo cargar Diagnóstico & OT");
+  }
+}
+
+async function openTallerJob(id) {
+  tallerActiveId = id;
+  const ws = document.getElementById("tallerWorkspace");
+  document.querySelectorAll("#tallerList .taller-card").forEach((el) => {
+    el.classList.toggle("active", Number(el.dataset.id) === id);
   });
+  ws.innerHTML = `<div class="empty-state"><strong>Cargando lectura…</strong></div>`;
+  try {
+    const r = await api(`/api/receptions/${id}`);
+    const v = r.vehicle || {};
+    const c = v.customer || {};
+    const d = r.diagnosis || {};
+    const wo = r.work_order;
+    const checks = r.inspection || [];
+
+    ws.innerHTML = `
+      <div class="panel-head" style="margin-bottom:12px">
+        <div>
+          <h2 style="margin:0;font-family:var(--display)">${esc(v.plate)} · ${esc(v.brand)} ${esc(v.model)}</h2>
+          <p class="muted" style="margin:6px 0 0">${esc(r.code)} · ${esc(c.name || "")} · ${badge(r.status)}</p>
+          <p style="margin:10px 0 0"><strong>Queja:</strong> ${esc(r.customer_complaint || "—")}</p>
+        </div>
+      </div>
+
+      <h3>1 · Lectura por sistemas (semáforo)</h3>
+      <p class="muted" style="margin-top:0">Verde OK · Amarillo vigilar · Rojo falla</p>
+      <div class="dvi-grid" id="dviGrid">
+        ${checks.map((ch) => `
+          <div class="dvi-item" data-key="${esc(ch.system_key)}">
+            <div class="name">${esc(ch.system_name)}</div>
+            <div class="lights">
+              <button type="button" data-st="ok" class="${ch.status === "ok" ? "on-ok" : ""}">OK</button>
+              <button type="button" data-st="watch" class="${ch.status === "watch" ? "on-watch" : ""}">!</button>
+              <button type="button" data-st="fail" class="${ch.status === "fail" ? "on-fail" : ""}">X</button>
+              <button type="button" data-st="na" class="${ch.status === "na" ? "on-na" : ""}">—</button>
+            </div>
+          </div>`).join("") || `<div class="muted">Sin checklist</div>`}
+      </div>
+      <div class="row-actions" style="margin-bottom:18px">
+        <button class="btn btn-ghost" id="saveDviBtn">Guardar lectura</button>
+      </div>
+
+      <h3>2 · Diagnóstico del mecánico</h3>
+      <form id="tallerDiagForm" class="form-grid">
+        <label>Técnico<input name="technician" value="${esc(d.technician || user()?.name || "")}" required /></label>
+        <label>Prioridad
+          <select name="priority">
+            <option value="normal" ${d.priority === "normal" || !d.priority ? "selected" : ""}>normal</option>
+            <option value="alta" ${d.priority === "alta" ? "selected" : ""}>alta</option>
+            <option value="urgente" ${d.priority === "urgente" ? "selected" : ""}>urgente</option>
+          </select>
+        </label>
+        <label class="full">Síntomas<textarea name="symptoms" required>${esc(d.symptoms || r.customer_complaint || "")}</textarea></label>
+        <label class="full">Hallazgos<textarea name="findings" required placeholder="Qué encontró en el carro">${esc(d.findings || "")}</textarea></label>
+        <label class="full">Códigos OBD (opcional)<input name="obd_codes" value="${esc(d.obd_codes || "")}" placeholder="P0301, C1201..." /></label>
+        <label class="full">Trabajo recomendado<textarea name="recommended_work" required placeholder="Ej. Cambio de pastillas delanteras + rectificado">${esc(d.recommended_work || "")}</textarea></label>
+        <label>Horas estimadas<input name="estimated_hours" type="number" step="0.25" min="0.25" value="${esc(d.estimated_hours || 1)}" required /></label>
+        <div class="full row-actions">
+          <button class="btn btn-primary" type="submit" id="saveDiagBtn">Guardar diagnóstico y crear OT</button>
+        </div>
+      </form>
+
+      <div id="tallerOtBox" style="margin-top:18px">
+        ${wo ? `
+          <h3>3 · Orden de trabajo ${esc(wo.code)}</h3>
+          <p class="muted">Mano de obra: ${money(wo.labor_total)} · Repuestos: ${money(wo.parts_total)} · <strong>Total ${money(wo.grand_total)}</strong></p>
+          <p>${esc(wo.labor_notes || d.recommended_work || "")}</p>
+          <ul>${(wo.lines || []).map((l) => `<li>${esc(l.description)} × ${l.quantity} · ${badge(l.status)} · ${money(l.line_total)}</li>`).join("") || "<li class='muted'>Sin repuestos aún — agréguelos desde Bodega o la ficha</li>"}</ul>
+          <div class="row-actions">
+            <button class="btn btn-warn" id="otRepair">En reparación</button>
+            <button class="btn btn-ok" id="otReady">Marcar listo</button>
+            <button class="btn btn-primary" id="otDeliver">Entregar</button>
+            <button class="btn btn-ghost" id="otOpenFicha">Ver ficha completa</button>
+          </div>
+        ` : `<p class="muted" style="margin-top:14px">Aún no hay OT. Complete el diagnóstico y pulse el botón verde.</p>`}
+      </div>
+    `;
+
+    const dviState = {};
+    checks.forEach((ch) => { dviState[ch.system_key] = ch.status || "na"; });
+    ws.querySelectorAll(".dvi-item").forEach((item) => {
+      const key = item.dataset.key;
+      item.querySelectorAll("button[data-st]").forEach((btn) => {
+        btn.onclick = () => {
+          dviState[key] = btn.dataset.st;
+          item.querySelectorAll("button[data-st]").forEach((b) => {
+            b.className = "";
+            if (b.dataset.st === dviState[key]) b.classList.add(`on-${dviState[key]}`);
+          });
+        };
+      });
+    });
+
+    document.getElementById("saveDviBtn").onclick = async () => {
+      try {
+        await api(`/api/receptions/${id}/inspection`, {
+          method: "PUT",
+          body: JSON.stringify({
+            items: Object.entries(dviState).map(([system_key, status]) => ({ system_key, status, notes: "" })),
+          }),
+        });
+        toast("Lectura por sistemas guardada");
+        loadDashboard();
+        openTallerJob(id);
+      } catch (err) {
+        toast(err.message || "No se pudo guardar la lectura");
+      }
+    };
+
+    document.getElementById("tallerDiagForm").onsubmit = async (ev) => {
+      ev.preventDefault();
+      const btn = document.getElementById("saveDiagBtn");
+      try {
+        btn.disabled = true;
+        btn.textContent = "Guardando…";
+        // Guarda semáforo también
+        await api(`/api/receptions/${id}/inspection`, {
+          method: "PUT",
+          body: JSON.stringify({
+            items: Object.entries(dviState).map(([system_key, status]) => ({ system_key, status, notes: "" })),
+          }),
+        });
+        const fd = new FormData(ev.target);
+        const body = Object.fromEntries(fd.entries());
+        body.estimated_hours = Number(body.estimated_hours || 1);
+        body.create_work_order = true;
+        const res = await api(`/api/receptions/${id}/diagnosis`, {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+        toast(`Diagnóstico listo · OT ${res.work_order?.code || "creada"}`);
+        loadDashboard();
+        await loadTaller();
+        await openTallerJob(id);
+      } catch (err) {
+        toast(err.message || "No se pudo crear el diagnóstico / OT");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Guardar diagnóstico y crear OT";
+      }
+    };
+
+    const patch = async (status) => {
+      try {
+        await api(`/api/receptions/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+        toast(`Estado: ${status.replaceAll("_", " ")}`);
+        loadDashboard();
+        await loadTaller();
+        await openTallerJob(id);
+      } catch (err) {
+        toast(err.message);
+      }
+    };
+    document.getElementById("otRepair")?.addEventListener("click", () => patch("en_reparacion"));
+    document.getElementById("otReady")?.addEventListener("click", () => patch("listo"));
+    document.getElementById("otDeliver")?.addEventListener("click", () => patch("entregado"));
+    document.getElementById("otOpenFicha")?.addEventListener("click", () => openReception(id));
+  } catch (err) {
+    ws.innerHTML = `<div class="empty-state"><strong>Error</strong>${esc(err.message || "No se pudo abrir la lectura")}</div>`;
+    toast(err.message || "Error al abrir diagnóstico");
+  }
 }
 
 async function loadParts() {
@@ -506,12 +696,13 @@ async function openReception(id) {
       <div>
         <div class="panel" style="box-shadow:none;margin:0 0 12px;padding:0;border:none;background:transparent">
           <h3>Queja / ingreso</h3>
-          <p>${r.customer_complaint || "—"}</p>
-          <p class="muted">Combustible: ${r.fuel_level} · Km: ${r.odometer_km} · Firma: ${r.customer_signature_name || "—"}</p>
+          <p>${esc(r.customer_complaint || "—")}</p>
+          <p class="muted">Combustible: ${esc(r.fuel_level)} · Km: ${esc(r.odometer_km)} · Firma: ${esc(r.customer_signature_name || "—")}</p>
+          <button class="btn btn-primary" id="goTallerFromFicha" style="margin-top:10px">Abrir Lectura / OT</button>
         </div>
         <div class="panel" style="box-shadow:none;border:1px solid var(--line)">
           <h3>Daños al llegar</h3>
-          ${(r.damages || []).map((x) => `<div style="margin-bottom:8px"><strong>${x.zone}</strong> · ${x.severity}<br><span class="muted">${x.description || ""}</span></div>`).join("") || "<p class='muted'>Sin daños registrados</p>"}
+          ${(r.damages || []).map((x) => `<div style="margin-bottom:8px"><strong>${esc(x.zone)}</strong> · ${esc(x.severity)}<br><span class="muted">${esc(x.description || "")}</span></div>`).join("") || "<p class='muted'>Sin daños registrados</p>"}
           <div class="form-grid" style="margin-top:12px">
             <label>Zona
               <select id="dmgZone">${ZONES.map((z) => `<option>${z}</option>`).join("")}</select>
@@ -540,18 +731,18 @@ async function openReception(id) {
         <div class="panel" style="box-shadow:none;border:1px solid var(--line)">
           <h3>Diagnóstico guiado</h3>
           <form id="diagForm" class="stack">
-            <label>Técnico<input name="technician" value="${d.technician || user()?.name || ""}" /></label>
-            <label>Síntomas<textarea name="symptoms">${d.symptoms || r.customer_complaint || ""}</textarea></label>
-            <label>Hallazgos del mecánico<textarea name="findings">${d.findings || ""}</textarea></label>
-            <label>Códigos OBD (opcional)<input name="obd_codes" value="${d.obd_codes || ""}" placeholder="P0301, C1201..." /></label>
-            <label>Trabajo recomendado<textarea name="recommended_work">${d.recommended_work || ""}</textarea></label>
+            <label>Técnico<input name="technician" value="${esc(d.technician || user()?.name || "")}" /></label>
+            <label>Síntomas<textarea name="symptoms">${esc(d.symptoms || r.customer_complaint || "")}</textarea></label>
+            <label>Hallazgos del mecánico<textarea name="findings">${esc(d.findings || "")}</textarea></label>
+            <label>Códigos OBD (opcional)<input name="obd_codes" value="${esc(d.obd_codes || "")}" placeholder="P0301, C1201..." /></label>
+            <label>Trabajo recomendado<textarea name="recommended_work">${esc(d.recommended_work || "")}</textarea></label>
             <div class="form-grid">
-              <label>Horas estimadas<input name="estimated_hours" type="number" step="0.5" value="${d.estimated_hours || 1}" /></label>
+              <label>Horas estimadas<input name="estimated_hours" type="number" step="0.5" value="${esc(d.estimated_hours || 1)}" /></label>
               <label>Prioridad
                 <select name="priority">
-                  <option ${d.priority === "normal" ? "selected" : ""}>normal</option>
-                  <option ${d.priority === "alta" ? "selected" : ""}>alta</option>
-                  <option ${d.priority === "urgente" ? "selected" : ""}>urgente</option>
+                  <option value="normal" ${!d.priority || d.priority === "normal" ? "selected" : ""}>normal</option>
+                  <option value="alta" ${d.priority === "alta" ? "selected" : ""}>alta</option>
+                  <option value="urgente" ${d.priority === "urgente" ? "selected" : ""}>urgente</option>
                 </select>
               </label>
             </div>
@@ -594,6 +785,11 @@ async function openReception(id) {
   `);
 
   document.getElementById("closeModalBtn").onclick = closeModal;
+  document.getElementById("goTallerFromFicha")?.addEventListener("click", () => {
+    closeModal();
+    showSection("taller");
+    openTallerJob(id);
+  });
 
   document.getElementById("addDamage").onclick = async () => {
     const fd = new FormData();
@@ -615,15 +811,21 @@ async function openReception(id) {
 
   document.getElementById("diagForm").onsubmit = async (e) => {
     e.preventDefault();
-    const fd = new FormData(e.target);
-    const body = Object.fromEntries(fd.entries());
-    body.estimated_hours = Number(body.estimated_hours || 0);
-    body.create_work_order = true;
-    await api(`/api/receptions/${id}/diagnosis`, { method: "POST", body: JSON.stringify(body) });
-    toast("Diagnóstico guardado y OT creada");
-    openReception(id);
-    loadDashboard();
-    loadTaller();
+    try {
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      body.estimated_hours = Number(body.estimated_hours || 1);
+      body.create_work_order = true;
+      const res = await api(`/api/receptions/${id}/diagnosis`, { method: "POST", body: JSON.stringify(body) });
+      toast(`Diagnóstico guardado · OT ${res.work_order?.code || "creada"}`);
+      closeModal();
+      showSection("taller");
+      await loadTaller();
+      await openTallerJob(id);
+      loadDashboard();
+    } catch (err) {
+      toast(err.message || "No se pudo guardar el diagnóstico");
+    }
   };
 
   document.querySelectorAll(".btn-add-part").forEach((btn) => {
@@ -725,6 +927,7 @@ function bindUI() {
     btn.addEventListener("click", () => showSection(btn.dataset.go));
   });
   document.getElementById("refreshBoard").onclick = loadDashboard;
+  document.getElementById("refreshTallerBtn")?.addEventListener("click", () => loadTaller());
   document.getElementById("partSearchBtn").onclick = loadParts;
   document.getElementById("onlyLow").onchange = loadParts;
   document.getElementById("partSearch").addEventListener("keydown", (e) => {

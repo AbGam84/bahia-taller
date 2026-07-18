@@ -236,18 +236,24 @@
       <section id="sec-taller" class="section">
         <div class="topbar">
           <div>
-            <h1>Diagnóstico & OT</h1>
-            <p>Lee el carro, mira la estantería y pide lo que falta — sin salir de la ficha.</p>
+            <h1>Lectura · Diagnóstico & OT</h1>
+            <p>Elija el vehículo del patio, marque sistemas, escriba el diagnóstico y genere la orden de trabajo.</p>
           </div>
+          <button class="btn btn-ghost" data-go="recepcion">+ Nuevo ingreso</button>
         </div>
-        <div class="panel">
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr><th>Ingreso</th><th>Vehículo</th><th>Cliente</th><th>Estado</th><th>OT</th><th></th></tr>
-              </thead>
-              <tbody id="tallerList"></tbody>
-            </table>
+        <div class="taller-layout">
+          <div class="panel taller-list-panel">
+            <div class="panel-head">
+              <h2>En el patio</h2>
+              <button class="btn btn-ghost" id="refreshTallerBtn">Refrescar</button>
+            </div>
+            <div id="tallerList" class="taller-cards"></div>
+          </div>
+          <div class="panel taller-work-panel" id="tallerWorkspace">
+            <div class="empty-state" id="tallerEmpty">
+              <strong>Seleccione un vehículo</strong>
+              Primero debe existir un ingreso. Luego toque un carro de la lista para diagnosticar y crear la OT.
+            </div>
           </div>
         </div>
       </section>
