@@ -1248,14 +1248,19 @@ def health():
 
 # ---------- Katire Facturación Electrónica CR ----------
 from app.fe_cr import DOC_TYPES, IVA_RATES, ID_TYPES, CONDICION_VENTA, MEDIO_PAGO, HaciendaClient
+from app.config import CERTS_DIR
 from app.fe_service import (
     get_issuer,
     html_for_invoice,
     invoice_dict,
+    issue_and_send,
     issue_from_work_order,
     issuer_dict,
+    poll_hacienda_status,
+    readiness,
     rebuild_xml,
     send_to_hacienda,
+    sign_invoice,
 )
 from app.models import ElectronicInvoice, IssuerProfile
 
@@ -1277,6 +1282,7 @@ class IssuerIn(BaseModel):
     ambiente: str = "sandbox"
     hacienda_user: str = ""
     hacienda_password: str = ""
+    pin_cert: str = ""
     cabys_default_servicio: str = "8314100000000"
     cabys_default_repuesto: str = "4530000000000"
 
@@ -1287,6 +1293,7 @@ class IssueInvoiceIn(BaseModel):
     condicion_venta: str = "01"
     medio_pago: str = "01"
     tarifa_codigo: str = "08"
+    send_now: bool = False
 
 
 @app.get("/api/fe/meta")
@@ -1299,7 +1306,13 @@ def fe_meta(user: User = Depends(get_current_user)):
         "medio_pago": MEDIO_PAGO,
         "brand": "Katire",
         "schema": "v4.4",
+        "signing": "XAdES-EPES + .p12",
     }
+
+
+@app.get("/api/fe/readiness")
+def fe_readiness(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    return readiness(db)
 
 
 @app.get("/api/fe/issuer")
@@ -1314,12 +1327,59 @@ def fe_issuer_put(payload: IssuerIn, db: Session = Depends(get_db), user: User =
     issuer = get_issuer(db)
     data = payload.model_dump()
     pwd = data.pop("hacienda_password", "")
+    pin = data.pop("pin_cert", "")
     for k, v in data.items():
         setattr(issuer, k, v)
     if pwd:
         issuer.hacienda_password = pwd
+    if pin:
+        issuer.pin_cert = pin
     db.commit()
     return issuer_dict(issuer)
+
+
+@app.post("/api/fe/cert")
+async def fe_cert_upload(
+    file: UploadFile = File(...),
+    pin: str = Form(""),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Solo administrador")
+    name = Path(file.filename or "cert.p12").name
+    ext = Path(name).suffix.lower()
+    if ext not in {".p12", ".pfx"}:
+        raise HTTPException(status_code=400, detail="Suba un certificado .p12 o .pfx")
+    safe = f"emisor_{uuid.uuid4().hex[:10]}{ext}"
+    dest = CERTS_DIR / safe
+    content = await file.read()
+    if len(content) < 100:
+        raise HTTPException(status_code=400, detail="Archivo de certificado inválido")
+    dest.write_bytes(content)
+    issuer = get_issuer(db)
+    # borra cert anterior si existe
+    if issuer.cert_filename:
+        old = CERTS_DIR / Path(issuer.cert_filename).name
+        if old.exists() and old != dest:
+            try:
+                old.unlink()
+            except OSError:
+                pass
+    issuer.cert_filename = safe
+    if pin:
+        issuer.pin_cert = pin
+    db.commit()
+    # Validar PIN si vino
+    info = {"ok": True, "cert_filename": safe}
+    if issuer.pin_cert:
+        try:
+            from app.fe_signer import try_validate_p12
+
+            info.update(try_validate_p12(dest, issuer.pin_cert))
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Certificado o PIN inválido: {exc}") from exc
+    return {**info, "issuer": issuer_dict(issuer)}
 
 
 @app.post("/api/fe/test-auth")
@@ -1349,6 +1409,15 @@ def fe_invoices(db: Session = Depends(get_db), user: User = Depends(get_current_
 @app.post("/api/fe/issue")
 def fe_issue(payload: IssueInvoiceIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     try:
+        if payload.send_now:
+            return issue_and_send(
+                db,
+                payload.work_order_id,
+                tipo_documento=payload.tipo_documento,
+                condicion_venta=payload.condicion_venta,
+                medio_pago=payload.medio_pago,
+                tarifa_codigo=payload.tarifa_codigo,
+            )
         inv = issue_from_work_order(
             db,
             payload.work_order_id,
@@ -1371,10 +1440,31 @@ def fe_rebuild(invoice_id: int, db: Session = Depends(get_db), user: User = Depe
     return invoice_dict(inv)
 
 
+@app.post("/api/fe/invoices/{invoice_id}/sign")
+def fe_sign(invoice_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    try:
+        inv = sign_invoice(db, invoice_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "message": "XML firmado XAdES-EPES", "invoice": invoice_dict(inv)}
+
+
 @app.post("/api/fe/invoices/{invoice_id}/send")
 def fe_send(invoice_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     try:
-        return send_to_hacienda(db, invoice_id)
+        return send_to_hacienda(db, invoice_id, wait_acceptance=True)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/fe/invoices/{invoice_id}/refresh-status")
+def fe_refresh(invoice_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    try:
+        return poll_hacienda_status(db, invoice_id, attempts=6, wait_seconds=1.5)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:

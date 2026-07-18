@@ -374,14 +374,21 @@
         <div class="topbar">
           <div>
             <h1>Facturación electrónica</h1>
-            <p>Hacienda Costa Rica v4.4 — clave, consecutivo, XML, transmisión ATV. El diferencial que se vende.</p>
+            <p>Hacienda CR v4.4 — firma XAdES, envío ATV y aceptación en el mismo flujo.</p>
           </div>
+        </div>
+        <div class="panel" id="feReadyPanel" style="margin-bottom:16px">
+          <div class="panel-head">
+            <h2>Listo para Hacienda</h2>
+            <button class="btn btn-ghost" id="refreshFeReadyBtn">Verificar</button>
+          </div>
+          <div id="feReadyBody" class="muted">Cargando checklist…</div>
         </div>
         <div class="grid-2">
           <div class="panel">
             <div class="panel-head">
               <h2>Emisor ATV / Hacienda</h2>
-              <button class="btn btn-ghost" id="testHaciendaBtn">Probar auth</button>
+              <button class="btn btn-ghost" id="testHaciendaBtn">Probar auth ATV</button>
             </div>
             <form id="issuerForm" class="form-grid">
               <label>Nombre legal<input name="nombre" required placeholder="Razón social" /></label>
@@ -406,6 +413,7 @@
               </label>
               <label>Usuario Hacienda<input name="hacienda_user" placeholder="cedula@comprobanteselectronicos.go.cr" /></label>
               <label>Clave ATV<input name="hacienda_password" type="password" placeholder="Solo si cambia" /></label>
+              <label>PIN certificado .p12<input name="pin_cert" type="password" placeholder="PIN del .p12" /></label>
               <label>Sucursal<input name="sucursal" value="001" /></label>
               <label>Terminal<input name="terminal" value="00001" /></label>
               <label>Provincia<input name="provincia" value="5" /></label>
@@ -416,17 +424,25 @@
               <label>CABYS repuesto<input name="cabys_default_repuesto" /></label>
               <div class="full"><button class="btn btn-primary" type="submit">Guardar emisor</button></div>
             </form>
+            <form id="certForm" class="form-grid" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line)">
+              <h3 class="full" style="margin:0">Certificado digital (.p12)</h3>
+              <p class="full muted" style="margin:0">Sin este archivo Hacienda no acepta. Suba el .p12 de su firma digital.</p>
+              <label class="full">Archivo .p12 / .pfx<input name="file" type="file" accept=".p12,.pfx" required /></label>
+              <label>PIN (si no lo guardó arriba)<input name="pin" type="password" /></label>
+              <div class="full"><button class="btn btn-ok" type="submit">Subir y validar certificado</button></div>
+              <p class="full muted" id="certStatus">Sin certificado cargado</p>
+            </form>
           </div>
           <div class="panel">
             <div class="panel-head">
               <h2>Comprobantes</h2>
-              <button class="btn btn-primary" id="issueFeBtn">Emitir desde OT</button>
+              <button class="btn btn-primary" id="issueFeBtn">Emitir + enviar a Hacienda</button>
             </div>
-            <p class="muted" style="margin-top:0">Genera Factura (01) o Tiquete (04) con IVA CR, XML v4.4 y clave de 50 posiciones.</p>
+            <p class="muted" style="margin-top:0">Firma XAdES, transmite a ATV y espera aceptación. Clave 50 + XML v4.4.</p>
             <div class="table-wrap">
               <table>
                 <thead>
-                  <tr><th>Clave</th><th>Tipo</th><th>Total</th><th>Estado</th><th></th></tr>
+                  <tr><th>Clave</th><th>Tipo</th><th>Total</th><th>Estado MH</th><th></th></tr>
                 </thead>
                 <tbody id="feBody"></tbody>
               </table>
@@ -486,7 +502,7 @@
     <div class="modal" id="modalBody"></div>
   </div>
   <div class="toast" id="toast"></div>
-  <script src="/static/js/app.js?v=20260718b"></script>
-  <script src="/static/js/ficha.js?v=20260718b"></script>
+  <script src="/static/js/app.js?v=20260718c"></script>
+  <script src="/static/js/ficha.js?v=20260718c"></script>
 </body>
 </html>

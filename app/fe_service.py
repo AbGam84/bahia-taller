@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import time
 from datetime import datetime
 from decimal import Decimal
+from pathlib import Path
 
 from sqlalchemy.orm import Session, joinedload
 
+from app.config import CERTS_DIR
 from app.fe_cr import (
     CR_TZ,
     HaciendaClient,
@@ -57,8 +60,40 @@ def issuer_dict(i: IssuerProfile) -> dict:
         "hacienda_user": i.hacienda_user,
         "has_password": bool(i.hacienda_password),
         "has_cert": bool(i.cert_filename),
+        "has_pin": bool(i.pin_cert),
+        "cert_filename": i.cert_filename or "",
         "cabys_default_servicio": i.cabys_default_servicio,
         "cabys_default_repuesto": i.cabys_default_repuesto,
+    }
+
+
+def cert_path(issuer: IssuerProfile) -> Path | None:
+    if not issuer.cert_filename:
+        return None
+    path = CERTS_DIR / Path(issuer.cert_filename).name
+    return path if path.exists() else None
+
+
+def readiness(db: Session) -> dict:
+    issuer = get_issuer(db)
+    checks = {
+        "emisor_nombre": bool(issuer.nombre and issuer.numero_id),
+        "actividad": bool(issuer.codigo_actividad),
+        "atv_user": bool(issuer.hacienda_user),
+        "atv_password": bool(issuer.hacienda_password),
+        "cert_p12": bool(cert_path(issuer)),
+        "cert_pin": bool(issuer.pin_cert),
+    }
+    ready = all(checks.values())
+    missing = [k for k, ok in checks.items() if not ok]
+    return {
+        "ready": ready,
+        "ambiente": issuer.ambiente,
+        "checks": checks,
+        "missing": missing,
+        "message": "Listo para transmitir a Hacienda"
+        if ready
+        else "Complete emisor ATV + certificado .p12 + PIN para aceptación real",
     }
 
 
@@ -299,7 +334,110 @@ def rebuild_xml(db: Session, invoice_id: int) -> ElectronicInvoice:
     return inv
 
 
-def send_to_hacienda(db: Session, invoice_id: int) -> dict:
+def _extract_ind_estado(status_payload: dict) -> str:
+    data = status_payload.get("data") or {}
+    if not isinstance(data, dict):
+        return ""
+    return str(
+        data.get("ind-estado")
+        or data.get("ind_estado")
+        or data.get("estado")
+        or ""
+    ).strip()
+
+
+def _apply_hacienda_ind(inv: ElectronicInvoice, ind: str) -> None:
+    if not ind:
+        return
+    inv.hacienda_status = ind
+    low = ind.lower()
+    if "acept" in low:
+        inv.status = "aceptado"
+    elif "rechaz" in low:
+        inv.status = "rechazado"
+    elif "proces" in low or "recib" in low:
+        inv.status = "enviado"
+
+
+def sign_invoice(db: Session, invoice_id: int) -> ElectronicInvoice:
+    from app.fe_signer import sign_fe_xml
+
+    inv = (
+        db.query(ElectronicInvoice)
+        .options(joinedload(ElectronicInvoice.lines))
+        .filter(ElectronicInvoice.id == invoice_id)
+        .first()
+    )
+    if not inv:
+        raise ValueError("Factura no encontrada")
+    issuer = get_issuer(db)
+    path = cert_path(issuer)
+    if not path:
+        raise ValueError("Suba el certificado digital .p12 en Facturación")
+    if not issuer.pin_cert:
+        raise ValueError("Configure el PIN del certificado .p12")
+    if not inv.xml_content or "Signature" not in inv.xml_content:
+        if not inv.xml_content:
+            rebuild_xml(db, invoice_id)
+            db.refresh(inv)
+        # Si ya estaba firmado, no re-firmar encima
+        if "Signature" not in inv.xml_content:
+            inv.xml_content = sign_fe_xml(inv.xml_content, path, issuer.pin_cert)
+            inv.status = "firmado"
+            inv.hacienda_status = "firmado_local"
+            db.commit()
+            db.refresh(inv)
+    return inv
+
+
+def poll_hacienda_status(
+    db: Session,
+    invoice_id: int,
+    *,
+    attempts: int = 10,
+    wait_seconds: float = 2.0,
+) -> dict:
+    inv = db.query(ElectronicInvoice).filter(ElectronicInvoice.id == invoice_id).first()
+    if not inv:
+        raise ValueError("Factura no encontrada")
+    issuer = get_issuer(db)
+    if not issuer.hacienda_user or not issuer.hacienda_password:
+        raise ValueError("Configure usuario y clave ATV")
+    client = HaciendaClient(issuer.ambiente)
+    client.authenticate(issuer.hacienda_user, issuer.hacienda_password)
+    last = {}
+    ind = ""
+    for i in range(max(1, attempts)):
+        last = client.get_status(inv.clave)
+        ind = _extract_ind_estado(last)
+        _apply_hacienda_ind(inv, ind)
+        inv.hacienda_response = json.dumps(
+            {"consulta": last, "intento": i + 1, "ind_estado": ind},
+            ensure_ascii=False,
+        )
+        db.commit()
+        if inv.status in ("aceptado", "rechazado"):
+            break
+        if i < attempts - 1:
+            time.sleep(wait_seconds)
+    db.refresh(inv)
+    return {
+        "ok": inv.status == "aceptado",
+        "ind_estado": ind or inv.hacienda_status,
+        "status": inv.status,
+        "invoice": invoice_dict(inv),
+        "consulta": last,
+        "message": (
+            "Hacienda aceptó el comprobante"
+            if inv.status == "aceptado"
+            else "Hacienda rechazó el comprobante"
+            if inv.status == "rechazado"
+            else f"Estado Hacienda: {ind or inv.hacienda_status or 'en proceso'}"
+        ),
+    }
+
+
+def send_to_hacienda(db: Session, invoice_id: int, *, wait_acceptance: bool = True) -> dict:
     inv = (
         db.query(ElectronicInvoice)
         .options(joinedload(ElectronicInvoice.lines))
@@ -311,62 +449,99 @@ def send_to_hacienda(db: Session, invoice_id: int) -> dict:
     issuer = get_issuer(db)
     if not issuer.hacienda_user or not issuer.hacienda_password:
         raise ValueError("Configure usuario y clave ATV de Hacienda en Facturación")
+    if not issuer.nombre or not issuer.numero_id:
+        raise ValueError("Complete nombre y cédula del emisor")
     if not inv.xml_content:
         rebuild_xml(db, invoice_id)
         db.refresh(inv)
 
+    # Firma XAdES obligatoria antes de transmitir
+    if "Signature" not in (inv.xml_content or ""):
+        try:
+            inv = sign_invoice(db, invoice_id)
+        except Exception as exc:
+            inv.hacienda_status = "pendiente_firma"
+            inv.status = "xml_listo"
+            inv.hacienda_response = json.dumps({"error_firma": str(exc)}, ensure_ascii=False)
+            db.commit()
+            return {
+                "ok": False,
+                "needs_signature": True,
+                "message": f"No se pudo firmar: {exc}",
+                "invoice": invoice_dict(inv),
+            }
+
     client = HaciendaClient(issuer.ambiente)
     client.authenticate(issuer.hacienda_user, issuer.hacienda_password)
-    # Nota: Hacienda exige XML firmado XAdES. Si aún no hay firma, se envía el XML
-    # generado para pruebas de estructura; en producción debe firmarse con .p12.
-    xml_to_send = inv.xml_content
-    if "Signature" not in xml_to_send:
-        inv.hacienda_status = "pendiente_firma"
-        inv.status = "xml_listo"
-        inv.hacienda_response = json.dumps(
-            {
-                "aviso": "XML listo. Firme con certificado digital (.p12) antes del envío final a producción.",
-                "ambiente": issuer.ambiente,
-            },
-            ensure_ascii=False,
-        )
-        db.commit()
-        return {
-            "ok": False,
-            "needs_signature": True,
-            "message": "XML generado. Falta firma digital XAdES con su .p12 para transmisión oficial.",
-            "invoice": invoice_dict(inv),
-        }
-
     issued = inv.issued_at
     fecha = issued.replace(tzinfo=CR_TZ).isoformat() if issued.tzinfo is None else issued.isoformat()
     result = client.send_document(
         clave=inv.clave,
         fecha=fecha,
         emisor_tipo=issuer.tipo_id,
-        emisor_numero=issuer.numero_id,
-        xml_signed=xml_to_send,
+        emisor_numero="".join(ch for ch in issuer.numero_id if ch.isdigit()),
+        xml_signed=inv.xml_content,
         receptor_tipo=inv.receptor_tipo_id if inv.tipo_documento != "04" else None,
-        receptor_numero=inv.receptor_numero_id if inv.tipo_documento != "04" else None,
+        receptor_numero="".join(ch for ch in (inv.receptor_numero_id or "") if ch.isdigit())
+        if inv.tipo_documento != "04"
+        else None,
     )
-    inv.hacienda_response = json.dumps(result, ensure_ascii=False)
-    if result.get("ok"):
-        inv.status = "enviado"
-        inv.hacienda_status = "recibido"
-        status = client.get_status(inv.clave)
-        inv.hacienda_response = json.dumps({"envio": result, "consulta": status}, ensure_ascii=False)
-        ind = (status.get("data") or {}).get("ind-estado") or (status.get("data") or {}).get("ind_estado")
-        if ind:
-            inv.hacienda_status = str(ind)
-            if "acept" in str(ind).lower():
-                inv.status = "aceptado"
-            elif "rechaz" in str(ind).lower():
-                inv.status = "rechazado"
-    else:
+    inv.hacienda_response = json.dumps({"envio": result}, ensure_ascii=False)
+    if not result.get("ok"):
         inv.status = "error"
         inv.hacienda_status = f"http_{result.get('status_code')}"
+        db.commit()
+        return {
+            "ok": False,
+            "result": result,
+            "invoice": invoice_dict(inv),
+            "message": f"Hacienda no recibió el XML (HTTP {result.get('status_code')})",
+        }
+
+    inv.status = "enviado"
+    inv.hacienda_status = "recibido"
     db.commit()
-    return {"ok": result.get("ok"), "result": result, "invoice": invoice_dict(inv)}
+
+    if wait_acceptance:
+        polled = poll_hacienda_status(db, invoice_id, attempts=12, wait_seconds=2.0)
+        return {
+            "ok": polled["ok"],
+            "result": result,
+            "invoice": polled["invoice"],
+            "ind_estado": polled["ind_estado"],
+            "message": polled["message"],
+            "consulta": polled.get("consulta"),
+        }
+
+    db.refresh(inv)
+    return {
+        "ok": True,
+        "result": result,
+        "invoice": invoice_dict(inv),
+        "message": "Enviado a Hacienda. Consulte el estado en unos segundos.",
+    }
+
+
+def issue_and_send(
+    db: Session,
+    work_order_id: int,
+    *,
+    tipo_documento: str = "01",
+    condicion_venta: str = "01",
+    medio_pago: str = "01",
+    tarifa_codigo: str = "08",
+) -> dict:
+    inv = issue_from_work_order(
+        db,
+        work_order_id,
+        tipo_documento=tipo_documento,
+        condicion_venta=condicion_venta,
+        medio_pago=medio_pago,
+        tarifa_codigo=tarifa_codigo,
+    )
+    sent = send_to_hacienda(db, inv.id, wait_acceptance=True)
+    sent["issued"] = True
+    return sent
 
 
 def html_for_invoice(db: Session, invoice_id: int) -> str:

@@ -12,6 +12,8 @@ DATA_DIR = Path(_env("BAHIA_DATA_DIR", str(ROOT / "data")))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 UPLOADS_DIR = DATA_DIR / "uploads"
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+CERTS_DIR = DATA_DIR / "certs"
+CERTS_DIR.mkdir(parents=True, exist_ok=True)
 
 DATABASE_URL = _env("DATABASE_URL", f"sqlite:///{DATA_DIR / 'tallerpro.db'}")
 if DATABASE_URL.startswith("postgres://"):

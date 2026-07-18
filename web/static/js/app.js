@@ -86,30 +86,67 @@ function showSection(name) {
   if (name === "facturacion") run(loadFacturacion);
 }
 
+async function loadFeReadiness() {
+  const box = document.getElementById("feReadyBody");
+  if (!box) return;
+  try {
+    const r = await api("/api/fe/readiness");
+    const labels = {
+      emisor_nombre: "Nombre + cédula emisor",
+      actividad: "Código actividad económica",
+      atv_user: "Usuario ATV",
+      atv_password: "Clave ATV",
+      cert_p12: "Certificado .p12",
+      cert_pin: "PIN del .p12",
+    };
+    const items = Object.entries(r.checks || {})
+      .map(([k, ok]) => `<span class="badge ${ok ? "badge-ok" : "badge-low"}">${ok ? "OK" : "Falta"} · ${labels[k] || k}</span>`)
+      .join(" ");
+    box.innerHTML = `
+      <p style="margin:0 0 10px"><strong>${r.ready ? "Listo para transmitir" : "Configuración incompleta"}</strong>
+      · Ambiente: ${esc(r.ambiente || "")}</p>
+      <div class="row-actions">${items}</div>
+      <p class="muted" style="margin:10px 0 0">${esc(r.message || "")}</p>`;
+  } catch (err) {
+    box.textContent = err.message || "No se pudo verificar";
+  }
+}
+
 async function loadFacturacion() {
   const issuer = await api("/api/fe/issuer");
   const form = document.getElementById("issuerForm");
   if (form) {
     Object.keys(issuer).forEach((k) => {
-      if (form[k] !== undefined && k !== "hacienda_password" && k !== "has_password" && k !== "has_cert" && k !== "id") {
+      if (
+        form[k] !== undefined &&
+        !["hacienda_password", "pin_cert", "has_password", "has_cert", "has_pin", "id", "cert_filename"].includes(k)
+      ) {
         form[k].value = issuer[k] ?? "";
       }
     });
   }
+  const certStatus = document.getElementById("certStatus");
+  if (certStatus) {
+    certStatus.textContent = issuer.has_cert
+      ? `Certificado cargado: ${issuer.cert_filename || "sí"} · PIN ${issuer.has_pin ? "guardado" : "pendiente"}`
+      : "Sin certificado cargado";
+  }
+  await loadFeReadiness();
   const rows = await api("/api/fe/invoices");
   document.getElementById("feBody").innerHTML = rows
     .map((inv) => `<tr>
-      <td><code style="font-size:0.72rem">${inv.clave}</code><br><span class="muted">${inv.numero_consecutivo}</span></td>
-      <td>${inv.tipo_documento}</td>
+      <td><code style="font-size:0.72rem">${esc(inv.clave)}</code><br><span class="muted">${esc(inv.numero_consecutivo)}</span></td>
+      <td>${esc(inv.tipo_documento)}</td>
       <td class="money">${money(inv.total_comprobante)}</td>
-      <td>${badge(inv.status)}<br><span class="muted">${inv.hacienda_status || ""}</span></td>
+      <td>${badge(inv.status)}<br><span class="muted">${esc(inv.hacienda_status || "")}</span></td>
       <td class="row-actions">
         <button class="btn btn-ghost" data-xml="${inv.id}">XML</button>
         <button class="btn btn-ghost" data-print="${inv.id}">PDF</button>
-        <button class="btn btn-primary" data-send="${inv.id}">Enviar</button>
+        <button class="btn btn-ok" data-send="${inv.id}">Enviar MH</button>
+        <button class="btn btn-ghost" data-refresh="${inv.id}">Estado</button>
       </td>
     </tr>`)
-    .join("") || `<tr><td colspan="5"><div class="empty-state"><strong>Sin comprobantes</strong>Emita desde una OT lista</div></td></tr>`;
+    .join("") || `<tr><td colspan="5"><div class="empty-state"><strong>Sin comprobantes</strong>Emita desde una OT y envíe a Hacienda</div></td></tr>`;
 
   document.querySelectorAll("[data-xml]").forEach((btn) => {
     btn.onclick = async () => {
@@ -139,8 +176,23 @@ async function loadFacturacion() {
   document.querySelectorAll("[data-send]").forEach((btn) => {
     btn.onclick = async () => {
       try {
+        toast("Firmando y enviando a Hacienda…");
         const res = await api(`/api/fe/invoices/${btn.dataset.send}/send`, { method: "POST", body: "{}" });
-        toast(res.message || (res.ok ? "Enviado a Hacienda" : "Revise firma / credenciales"));
+        toast(res.message || (res.ok ? "Aceptado por Hacienda" : "Revise firma / ATV"));
+        loadFacturacion();
+      } catch (err) {
+        toast(err.message);
+      }
+    };
+  });
+  document.querySelectorAll("[data-refresh]").forEach((btn) => {
+    btn.onclick = async () => {
+      try {
+        const res = await api(`/api/fe/invoices/${btn.dataset.refresh}/refresh-status`, {
+          method: "POST",
+          body: "{}",
+        });
+        toast(res.message || res.ind_estado || "Estado actualizado");
         loadFacturacion();
       } catch (err) {
         toast(err.message);
@@ -1339,6 +1391,7 @@ function bindUI() {
     e.preventDefault();
     const body = Object.fromEntries(new FormData(e.target).entries());
     if (!body.hacienda_password) delete body.hacienda_password;
+    if (!body.pin_cert) delete body.pin_cert;
     await api("/api/fe/issuer", { method: "PUT", body: JSON.stringify(body) });
     toast("Emisor Hacienda guardado");
     loadFacturacion();
@@ -1353,6 +1406,27 @@ function bindUI() {
     }
   });
 
+  document.getElementById("refreshFeReadyBtn")?.addEventListener("click", () => loadFeReadiness());
+
+  document.getElementById("certForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      const fd = new FormData(e.target);
+      const res = await fetch("/api/fe/cert", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token()}` },
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "No se pudo subir el certificado");
+      toast(data.subject ? `Certificado OK · ${data.subject}` : "Certificado cargado");
+      e.target.reset();
+      loadFacturacion();
+    } catch (err) {
+      toast(err.message);
+    }
+  });
+
   document.getElementById("issueFeBtn")?.addEventListener("click", async () => {
     const taller = await api("/api/receptions");
     const withOt = taller.filter((r) => r.work_order);
@@ -1361,7 +1435,8 @@ function bindUI() {
       return;
     }
     openModal(`
-      <h2>Emitir comprobante Katire</h2>
+      <h2>Emitir y enviar a Hacienda</h2>
+      <p class="muted">Katire firma con su .p12, transmite a ATV y consulta aceptación.</p>
       <form id="feIssueForm" class="form-grid">
         <label class="full">Orden de trabajo
           <select name="work_order_id" required>
@@ -1398,8 +1473,12 @@ function bindUI() {
             <option value="06">SINPE Móvil</option>
           </select>
         </label>
+        <label class="full" style="flex-direction:row;align-items:center;gap:8px">
+          <input type="checkbox" name="send_now" checked style="width:auto" />
+          Firmar y enviar a Hacienda ahora (esperar aceptación)
+        </label>
         <div class="full row-actions">
-          <button class="btn btn-primary" type="submit">Generar XML + clave</button>
+          <button class="btn btn-primary" type="submit">Procesar comprobante</button>
           <button class="btn btn-ghost" type="button" id="closeModalBtn">Cancelar</button>
         </div>
       </form>
@@ -1407,13 +1486,24 @@ function bindUI() {
     document.getElementById("closeModalBtn").onclick = closeModal;
     document.getElementById("feIssueForm").onsubmit = async (ev) => {
       ev.preventDefault();
-      const body = Object.fromEntries(new FormData(ev.target).entries());
-      body.work_order_id = Number(body.work_order_id);
-      const inv = await api("/api/fe/issue", { method: "POST", body: JSON.stringify(body) });
-      toast(`Comprobante ${inv.clave.slice(0, 12)}… listo`);
-      closeModal();
-      loadFacturacion();
-      showSection("facturacion");
+      try {
+        const body = Object.fromEntries(new FormData(ev.target).entries());
+        body.work_order_id = Number(body.work_order_id);
+        body.send_now = body.send_now === "on";
+        toast(body.send_now ? "Firmando y consultando Hacienda…" : "Generando XML…");
+        const res = await api("/api/fe/issue", { method: "POST", body: JSON.stringify(body) });
+        if (res.invoice || res.clave) {
+          const inv = res.invoice || res;
+          toast(res.message || `Comprobante ${String(inv.clave || "").slice(0, 12)}… · ${inv.status || ""}`);
+        } else {
+          toast(res.message || "Comprobante procesado");
+        }
+        closeModal();
+        loadFacturacion();
+        showSection("facturacion");
+      } catch (err) {
+        toast(err.message);
+      }
     };
   });
 
