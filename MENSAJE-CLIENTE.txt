@@ -1,0 +1,24 @@
+Copie y pegue esto al cliente (WhatsApp / correo):
+
+------------------------------------------------
+Buenas. Le dejo el acceso para que mire Katire
+(el sistema del taller + bodega + facturación CR)
+y nos vaya diciendo qué necesita exactamente.
+
+Enlace:
+https://katire.onrender.com
+
+Usuario: cliente
+Clave: VerKatire2026
+
+Puede entrar, explorar menús y anotarnos:
+1) Qué usa todos los días
+2) Qué le falta
+3) Qué sobra o le complica
+4) Prioridad: recepción, diagnóstico, bodega, pedidos o facturas
+
+Nota: la primera vez puede tardar 30–50 segundos en abrir
+(servidor en la nube). Si no abre, espere e intente de nuevo.
+
+Quedamos atentos a su feedback para dejarlo a su medida.
+------------------------------------------------
