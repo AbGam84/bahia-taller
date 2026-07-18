@@ -1,3 +1,5 @@
+# Despliegue 24/7 en Render — no depende de su PC
+# https://dashboard.render.com/blueprints/new?repo=https://github.com/AbGam84/bahia-taller
 services:
   - type: web
     name: bahia-taller
@@ -6,15 +8,12 @@ services:
     region: oregon
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    disk:
-      name: bahia-data
-      mountPath: /data
-      sizeGB: 1
+    healthCheckPath: /api/health
     envVars:
       - key: ENVIRONMENT
         value: production
       - key: BAHIA_DATA_DIR
-        value: /data
+        value: /tmp/bahia-data
       - key: BAHIA_SECRET_KEY
         generateValue: true
       - key: BAHIA_ADMIN_USER

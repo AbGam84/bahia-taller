@@ -28,14 +28,12 @@ git commit -m "bahia lista para nube" 2>nul
 
 echo.
 echo Creando/actualizando repo en GitHub...
-gh repo create bahia-taller --public --source=. --remote=origin --push 2>nul
-if errorlevel 1 (
-  git remote add origin https://github.com/AbGam84/bahia-taller.git 2>nul
-  git branch -M main
-  git push -u origin main
-)
+git remote add origin https://github.com/AbGam84/bahia-taller.git 2>nul
+git branch -M main
+git push -u origin main
 
 echo.
+echo Codigo: https://github.com/AbGam84/bahia-taller
 echo Abriendo Render Blueprint para desplegar...
 start "" "https://dashboard.render.com/blueprints/new?repo=https://github.com/AbGam84/bahia-taller"
 echo.
