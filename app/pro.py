@@ -17,6 +17,7 @@ from app.models import (
     ServiceCatalog,
     Vehicle,
     WorkOrder,
+    WorkOrderLine,
 )
 from app.services import (
     get_settings,
@@ -264,7 +265,7 @@ def owner_analytics(db: Session) -> dict:
 
     base = dashboard_stats(db)
     receptions = db.query(Reception).options(
-        joinedload(Reception.work_order).joinedload(WorkOrder.lines).joinedload("part"),
+        joinedload(Reception.work_order).joinedload(WorkOrder.lines).joinedload(WorkOrderLine.part),
         joinedload(Reception.estimate),
         joinedload(Reception.vehicle),
     ).all()

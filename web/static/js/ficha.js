@@ -25,6 +25,8 @@ function carSvg(inspection) {
 }
 
 async function openReception(id) {
+  const ex = typeof esc === "function" ? esc : (s) => String(s ?? "");
+  try {
   const r = await api(`/api/receptions/${id}`);
   const v = r.vehicle || {};
   const c = v.customer || {};
@@ -49,8 +51,8 @@ async function openReception(id) {
     <div class="panel-head">
       <div>
         <p class="muted" style="margin:0 0 6px;letter-spacing:0.14em;text-transform:uppercase;font-size:0.7rem;color:var(--lagoon)">Katire · expediente digital</p>
-        <h2 style="margin:0;font-family:var(--display);letter-spacing:-0.03em">${v.plate} · ${v.brand} ${v.model}</h2>
-        <p class="muted" style="margin:6px 0 0">${r.code} · ${c.name || ""} · ${c.phone || ""} · ${badge(r.status)}
+        <h2 style="margin:0;font-family:var(--display);letter-spacing:-0.03em">${ex(v.plate)} · ${ex(v.brand)} ${ex(v.model)}</h2>
+        <p class="muted" style="margin:6px 0 0">${ex(r.code)} · ${ex(c.name || "")} · ${ex(c.phone || "")} · ${badge(r.status)}
           · DVI <span class="badge badge-ok">${dvi.ok || 0} ok</span>
           <span class="badge badge-en_diagnostico">${dvi.watch || 0} watch</span>
           <span class="badge badge-low">${dvi.fail || 0} fail</span>
@@ -125,11 +127,11 @@ async function openReception(id) {
         <div class="panel" style="box-shadow:none;border:1px solid var(--line)">
           <h3>Diagnóstico + OT</h3>
           <form id="diagForm" class="stack">
-            <label>Técnico<input name="technician" value="${d.technician || user()?.name || ""}" /></label>
-            <label>Síntomas<textarea name="symptoms">${d.symptoms || r.customer_complaint || ""}</textarea></label>
-            <label>Hallazgos<textarea name="findings">${d.findings || ""}</textarea></label>
-            <label>OBD<input name="obd_codes" value="${d.obd_codes || ""}" placeholder="P0301..." /></label>
-            <label>Trabajo recomendado<textarea name="recommended_work">${d.recommended_work || ""}</textarea></label>
+            <label>Técnico<input name="technician" value="${ex(d.technician || user()?.name || "")}" /></label>
+            <label>Síntomas<textarea name="symptoms">${ex(d.symptoms || r.customer_complaint || "")}</textarea></label>
+            <label>Hallazgos<textarea name="findings">${ex(d.findings || "")}</textarea></label>
+            <label>OBD<input name="obd_codes" value="${ex(d.obd_codes || "")}" placeholder="P0301..." /></label>
+            <label>Trabajo recomendado<textarea name="recommended_work">${ex(d.recommended_work || "")}</textarea></label>
             <div class="form-grid">
               <label>Horas<input name="estimated_hours" type="number" step="0.5" value="${d.estimated_hours || 1}" /></label>
               <label>Prioridad
@@ -258,14 +260,18 @@ async function openReception(id) {
 
   document.getElementById("diagForm").onsubmit = async (e) => {
     e.preventDefault();
-    const body = Object.fromEntries(new FormData(e.target).entries());
-    body.estimated_hours = Number(body.estimated_hours || 0);
-    body.create_work_order = true;
-    await api(`/api/receptions/${id}/diagnosis`, { method: "POST", body: JSON.stringify(body) });
-    toast("Diagnóstico + OT listos");
-    openReception(id);
-    loadDashboard();
-    loadTaller();
+    try {
+      const body = Object.fromEntries(new FormData(e.target).entries());
+      body.estimated_hours = Number(body.estimated_hours || 1);
+      body.create_work_order = true;
+      await api(`/api/receptions/${id}/diagnosis`, { method: "POST", body: JSON.stringify(body) });
+      toast("Diagnóstico + OT listos");
+      openReception(id);
+      loadDashboard();
+      loadTaller();
+    } catch (err) {
+      toast(err.message || "No se pudo guardar el diagnóstico");
+    }
   };
 
   document.querySelectorAll(".btn-add-part").forEach((btn) => {
@@ -330,4 +336,7 @@ async function openReception(id) {
       toast(err.message);
     }
   });
+  } catch (err) {
+    toast(err.message || "No se pudo abrir la ficha");
+  }
 }

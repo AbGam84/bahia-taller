@@ -69,14 +69,21 @@ function showSection(name) {
   document.querySelectorAll(".section").forEach((s) => s.classList.remove("active"));
   document.querySelectorAll("#nav button").forEach((b) => b.classList.toggle("active", b.dataset.section === name));
   document.getElementById(`sec-${name}`)?.classList.add("active");
-  if (name === "tablero") loadDashboard();
-  if (name === "recepcion") loadReceptions();
-  if (name === "taller") loadTaller();
-  if (name === "bodega") loadParts();
-  if (name === "proveedores") loadSuppliers();
-  if (name === "aliados") loadAliados();
-  if (name === "config") loadSettings();
-  if (name === "facturacion") loadFacturacion();
+  const run = async (fn) => {
+    try {
+      await fn();
+    } catch (err) {
+      toast(err.message || "Error al cargar la sección");
+    }
+  };
+  if (name === "tablero") run(loadDashboard);
+  if (name === "recepcion") run(loadReceptions);
+  if (name === "taller") run(loadTaller);
+  if (name === "bodega") run(loadParts);
+  if (name === "proveedores") run(loadSuppliers);
+  if (name === "aliados") run(loadAliados);
+  if (name === "config") run(loadSettings);
+  if (name === "facturacion") run(loadFacturacion);
 }
 
 async function loadFacturacion() {
@@ -642,6 +649,47 @@ async function openTallerJob(id) {
   }
 }
 
+function openNewSupplier(kind) {
+  openModal(`
+    <h2>${kind === "aliado" ? "Nuevo aliado" : "Nuevo proveedor / tienda"}</h2>
+    <form id="supForm" class="form-grid">
+      <label>Nombre<input name="name" required placeholder="${kind === "aliado" ? "Ej. Rectificadora del Norte" : "Ej. Repuestos XYZ"}" /></label>
+      <label>Tipo
+        <select name="kind">
+          <option value="tienda" ${kind === "tienda" ? "selected" : ""}>Tienda de repuestos</option>
+          <option value="aliado" ${kind === "aliado" ? "selected" : ""}>Aliado (trabajos externos)</option>
+        </select>
+      </label>
+      <label>Ciudad<input name="city" value="Liberia" /></label>
+      <label>Teléfono<input name="phone" /></label>
+      <label>WhatsApp<input name="whatsapp" placeholder="50688887777" /></label>
+      <label>Email<input name="email" /></label>
+      <label class="full">Especialidad<input name="specialty" placeholder="Cajas / motores / frenos..." /></label>
+      <label class="full">Sitio web<input name="website" placeholder="https://..." /></label>
+      <label class="full">URL búsqueda (use {q})<input name="search_url" placeholder="https://tienda.com/?s={q}" /></label>
+      <label class="full">Notas<textarea name="notes"></textarea></label>
+      <div class="full row-actions">
+        <button class="btn btn-primary" type="submit">Guardar</button>
+        <button class="btn btn-ghost" type="button" id="closeModalBtn">Cancelar</button>
+      </div>
+    </form>
+  `);
+  document.getElementById("closeModalBtn").onclick = closeModal;
+  document.getElementById("supForm").onsubmit = async (ev) => {
+    ev.preventDefault();
+    try {
+      const body = Object.fromEntries(new FormData(ev.target).entries());
+      await api("/api/suppliers", { method: "POST", body: JSON.stringify(body) });
+      toast(body.kind === "aliado" ? "Aliado registrado" : "Proveedor agregado");
+      closeModal();
+      if (body.kind === "aliado") loadAliados();
+      else loadSuppliers();
+    } catch (err) {
+      toast(err.message);
+    }
+  };
+}
+
 async function openNewAllyJob(prefill = {}) {
   let allies = [];
   try {
@@ -1135,9 +1183,10 @@ function bindUI() {
     location.href = "/login";
     return;
   }
-  document.getElementById("userName").textContent = u.name;
-  document.getElementById("userRole").textContent = u.role;
-  document.getElementById("receivedBy").value = u.name;
+  const userNameEl = document.getElementById("userName");
+  const userRoleEl = document.getElementById("userRole");
+  if (userNameEl) userNameEl.textContent = u.name;
+  if (userRoleEl) userRoleEl.textContent = u.role;
   document.getElementById("logoutBtn").onclick = () => {
     localStorage.clear();
     location.href = "/login";
@@ -1157,26 +1206,31 @@ function bindUI() {
   document.getElementById("refreshAllyJobsBtn")?.addEventListener("click", () => loadAliados());
   document.getElementById("newAllyJobBtn")?.addEventListener("click", () => openNewAllyJob());
   document.getElementById("newAllyBtn")?.addEventListener("click", () => openNewSupplier("aliado"));
-  document.getElementById("partSearchBtn").onclick = loadParts;
-  document.getElementById("onlyLow").onchange = loadParts;
-  document.getElementById("partSearch").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") loadParts();
+  const partSearchBtn = document.getElementById("partSearchBtn");
+  const onlyLow = document.getElementById("onlyLow");
+  const partSearch = document.getElementById("partSearch");
+  if (partSearchBtn) partSearchBtn.onclick = () => loadParts().catch((e) => toast(e.message));
+  if (onlyLow) onlyLow.onchange = () => loadParts().catch((e) => toast(e.message));
+  partSearch?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") loadParts().catch((err) => toast(err.message));
   });
-  document.getElementById("modal").addEventListener("click", (e) => {
+  document.getElementById("modal")?.addEventListener("click", (e) => {
     if (e.target.id === "modal") closeModal();
   });
+  const receivedBy = document.getElementById("receivedBy");
+  if (receivedBy) receivedBy.value = u.name;
 
   document.getElementById("receptionForm").onsubmit = async (e) => {
     e.preventDefault();
     const btn = document.getElementById("submitIntakeBtn");
     try {
       if (!arrivalPhotoFiles.length) {
-        toast("Suba al menos una foto del vehículo al llegar");
-        return;
+        const ok = confirm("No hay fotos. ¿Cerrar el ingreso sin fotos?");
+        if (!ok) return;
       }
       if (!signaturePad?.isDirty()) {
-        toast("Pida la firma en el recuadro (dedo o mouse)");
-        return;
+        const ok = confirm("No hay firma dibujada. ¿Continuar solo con el nombre?");
+        if (!ok) return;
       }
       const fd = new FormData(e.target);
       const zones = [...document.querySelectorAll("#zoneGrid .zone-chip.active")].map((el) => el.dataset.zone);
@@ -1450,48 +1504,7 @@ function bindUI() {
     };
   });
 
-  document.getElementById("newSupplierBtn").onclick = () => openNewSupplier("tienda");
-
-  function openNewSupplier(kind) {
-    openModal(`
-      <h2>${kind === "aliado" ? "Nuevo aliado" : "Nuevo proveedor / tienda"}</h2>
-      <form id="supForm" class="form-grid">
-        <label>Nombre<input name="name" required placeholder="${kind === "aliado" ? "Ej. Rectificadora del Norte" : "Ej. Repuestos XYZ"}" /></label>
-        <label>Tipo
-          <select name="kind">
-            <option value="tienda" ${kind === "tienda" ? "selected" : ""}>Tienda de repuestos</option>
-            <option value="aliado" ${kind === "aliado" ? "selected" : ""}>Aliado (trabajos externos)</option>
-          </select>
-        </label>
-        <label>Ciudad<input name="city" value="Liberia" /></label>
-        <label>Teléfono<input name="phone" /></label>
-        <label>WhatsApp<input name="whatsapp" placeholder="50688887777" /></label>
-        <label>Email<input name="email" /></label>
-        <label class="full">Especialidad<input name="specialty" placeholder="Cajas / motores / frenos..." /></label>
-        <label class="full">Sitio web<input name="website" placeholder="https://..." /></label>
-        <label class="full">URL búsqueda (use {q})<input name="search_url" placeholder="https://tienda.com/?s={q}" /></label>
-        <label class="full">Notas<textarea name="notes"></textarea></label>
-        <div class="full row-actions">
-          <button class="btn btn-primary" type="submit">Guardar</button>
-          <button class="btn btn-ghost" type="button" id="closeModalBtn">Cancelar</button>
-        </div>
-      </form>
-    `);
-    document.getElementById("closeModalBtn").onclick = closeModal;
-    document.getElementById("supForm").onsubmit = async (ev) => {
-      ev.preventDefault();
-      try {
-        const body = Object.fromEntries(new FormData(ev.target).entries());
-        await api("/api/suppliers", { method: "POST", body: JSON.stringify(body) });
-        toast(body.kind === "aliado" ? "Aliado registrado" : "Proveedor agregado");
-        closeModal();
-        if (body.kind === "aliado") loadAliados();
-        else loadSuppliers();
-      } catch (err) {
-        toast(err.message);
-      }
-    };
-  }
+  document.getElementById("newSupplierBtn")?.addEventListener("click", () => openNewSupplier("tienda"));
 
   initZones();
   initArrivalPhotos();
@@ -1500,4 +1513,13 @@ function bindUI() {
   showSection("recepcion");
 }
 
-bindUI();
+try {
+  bindUI();
+} catch (err) {
+  console.error(err);
+  const el = document.getElementById("toast");
+  if (el) {
+    el.textContent = "Error al iniciar Katire. Recargue la página (Ctrl+F5).";
+    el.classList.add("show");
+  }
+}

@@ -34,6 +34,7 @@ from app.models import (
     Estimate,
     Part,
     PurchaseOrder,
+    PurchaseOrderLine,
     Reception,
     ReceptionPhoto,
     ServiceCatalog,
@@ -41,6 +42,7 @@ from app.models import (
     User,
     Vehicle,
     WorkOrder,
+    WorkOrderLine,
 )
 from app.schemas import (
     AllyJobIn,
@@ -101,8 +103,14 @@ def on_startup():
     migrate_schema()
     db = next(get_db())
     try:
-        seed_if_empty(db)
-        seed_services(db)
+        try:
+            seed_if_empty(db)
+        except Exception as exc:  # noqa: BLE001 — no tumbar el servidor por seed
+            print(f"[katire] seed warning: {exc}")
+        try:
+            seed_services(db)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[katire] services seed warning: {exc}")
     finally:
         db.close()
 
@@ -213,7 +221,7 @@ def receptions_list(
         joinedload(Reception.damages),
         joinedload(Reception.photos),
         joinedload(Reception.diagnosis),
-        joinedload(Reception.work_order).joinedload(WorkOrder.lines).joinedload("part"),
+        joinedload(Reception.work_order).joinedload(WorkOrder.lines).joinedload(WorkOrderLine.part),
     )
     if status:
         query = query.filter(Reception.status == status)
@@ -229,7 +237,7 @@ def _load_reception(db: Session, reception_id: int) -> Reception:
             joinedload(Reception.damages),
             joinedload(Reception.photos),
             joinedload(Reception.diagnosis),
-            joinedload(Reception.work_order).joinedload(WorkOrder.lines).joinedload("part"),
+            joinedload(Reception.work_order).joinedload(WorkOrder.lines).joinedload(WorkOrderLine.part),
             joinedload(Reception.inspection_checks),
             joinedload(Reception.estimate).joinedload(Estimate.lines),
         )
@@ -434,7 +442,7 @@ def diagnosis_upsert(
 def work_order_get(work_order_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     wo = (
         db.query(WorkOrder)
-        .options(joinedload(WorkOrder.lines).joinedload("part"))
+        .options(joinedload(WorkOrder.lines).joinedload(WorkOrderLine.part))
         .filter(WorkOrder.id == work_order_id)
         .first()
     )
@@ -479,7 +487,7 @@ def work_order_add_line(
 ):
     wo = (
         db.query(WorkOrder)
-        .options(joinedload(WorkOrder.lines).joinedload("part"))
+        .options(joinedload(WorkOrder.lines).joinedload(WorkOrderLine.part))
         .filter(WorkOrder.id == work_order_id)
         .first()
     )
@@ -854,7 +862,7 @@ def ally_jobs_update(
 def purchase_orders_list(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     rows = (
         db.query(PurchaseOrder)
-        .options(joinedload(PurchaseOrder.supplier), joinedload(PurchaseOrder.lines).joinedload("part"))
+        .options(joinedload(PurchaseOrder.supplier), joinedload(PurchaseOrder.lines).joinedload(PurchaseOrderLine.part))
         .order_by(PurchaseOrder.created_at.desc())
         .limit(100)
         .all()
@@ -938,7 +946,7 @@ def purchase_order_status(
 ):
     po = (
         db.query(PurchaseOrder)
-        .options(joinedload(PurchaseOrder.lines).joinedload("part"), joinedload(PurchaseOrder.supplier))
+        .options(joinedload(PurchaseOrder.lines).joinedload(PurchaseOrderLine.part), joinedload(PurchaseOrder.supplier))
         .filter(PurchaseOrder.id == po_id)
         .first()
     )
@@ -1216,12 +1224,25 @@ def uploaded_file(filename: str):
 def health():
     from app.config import ENVIRONMENT, IS_PRODUCTION
 
+    db_ok = False
+    try:
+        db = next(get_db())
+        try:
+            db.query(User).limit(1).all()
+            db_ok = True
+        finally:
+            db.close()
+    except Exception:  # noqa: BLE001
+        db_ok = False
+
     return {
         "ok": True,
         "service": "katire",
         "environment": ENVIRONMENT,
         "production": IS_PRODUCTION,
         "fe": "hacienda-cr-v4.4",
+        "db": db_ok,
+        "build": "20260718b",
     }
 
 
