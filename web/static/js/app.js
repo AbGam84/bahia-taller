@@ -12,7 +12,7 @@ const STATUS_COLS = [
   ["listo", "Listo para salir"],
 ];
 
-const BRAND = "bahía";
+const BRAND = "Katire";
 
 const money = (n) =>
   new Intl.NumberFormat("es-CR", { style: "currency", currency: "CRC", maximumFractionDigits: 0 }).format(n || 0);
@@ -64,6 +64,70 @@ function showSection(name) {
   if (name === "bodega") loadParts();
   if (name === "proveedores") loadSuppliers();
   if (name === "config") loadSettings();
+  if (name === "facturacion") loadFacturacion();
+}
+
+async function loadFacturacion() {
+  const issuer = await api("/api/fe/issuer");
+  const form = document.getElementById("issuerForm");
+  if (form) {
+    Object.keys(issuer).forEach((k) => {
+      if (form[k] !== undefined && k !== "hacienda_password" && k !== "has_password" && k !== "has_cert" && k !== "id") {
+        form[k].value = issuer[k] ?? "";
+      }
+    });
+  }
+  const rows = await api("/api/fe/invoices");
+  document.getElementById("feBody").innerHTML = rows
+    .map((inv) => `<tr>
+      <td><code style="font-size:0.72rem">${inv.clave}</code><br><span class="muted">${inv.numero_consecutivo}</span></td>
+      <td>${inv.tipo_documento}</td>
+      <td class="money">${money(inv.total_comprobante)}</td>
+      <td>${badge(inv.status)}<br><span class="muted">${inv.hacienda_status || ""}</span></td>
+      <td class="row-actions">
+        <button class="btn btn-ghost" data-xml="${inv.id}">XML</button>
+        <button class="btn btn-ghost" data-print="${inv.id}">PDF</button>
+        <button class="btn btn-primary" data-send="${inv.id}">Enviar</button>
+      </td>
+    </tr>`)
+    .join("") || `<tr><td colspan="5"><div class="empty-state"><strong>Sin comprobantes</strong>Emita desde una OT lista</div></td></tr>`;
+
+  document.querySelectorAll("[data-xml]").forEach((btn) => {
+    btn.onclick = async () => {
+      const res = await fetch(`/api/fe/invoices/${btn.dataset.xml}/xml`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `katire-${btn.dataset.xml}.xml`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+  });
+  document.querySelectorAll("[data-print]").forEach((btn) => {
+    btn.onclick = async () => {
+      const res = await fetch(`/api/fe/invoices/${btn.dataset.print}/print`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      const html = await res.text();
+      const w = window.open("", "_blank");
+      w.document.write(html);
+      w.document.close();
+    };
+  });
+  document.querySelectorAll("[data-send]").forEach((btn) => {
+    btn.onclick = async () => {
+      try {
+        const res = await api(`/api/fe/invoices/${btn.dataset.send}/send`, { method: "POST", body: "{}" });
+        toast(res.message || (res.ok ? "Enviado a Hacienda" : "Revise firma / credenciales"));
+        loadFacturacion();
+      } catch (err) {
+        toast(err.message);
+      }
+    };
+  });
 }
 
 function openModal(html) {
@@ -89,7 +153,7 @@ function initZones() {
 async function loadSettings() {
   const s = await api("/api/settings");
   document.getElementById("shopSlogan").textContent =
-    s.slogan || s.shop_name || "Complete la identidad del taller en Casa";
+    s.slogan || "De la llave al XML.";
   const form = document.getElementById("settingsForm");
   if (!form) return;
   form.shop_name.value = s.shop_name || "";
@@ -615,6 +679,88 @@ function bindUI() {
       loadParts();
     };
   };
+
+  document.getElementById("issuerForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = Object.fromEntries(new FormData(e.target).entries());
+    if (!body.hacienda_password) delete body.hacienda_password;
+    await api("/api/fe/issuer", { method: "PUT", body: JSON.stringify(body) });
+    toast("Emisor Hacienda guardado");
+    loadFacturacion();
+  });
+
+  document.getElementById("testHaciendaBtn")?.addEventListener("click", async () => {
+    try {
+      const res = await api("/api/fe/test-auth", { method: "POST", body: "{}" });
+      toast(`Auth Hacienda OK (${res.environment})`);
+    } catch (err) {
+      toast(err.message);
+    }
+  });
+
+  document.getElementById("issueFeBtn")?.addEventListener("click", async () => {
+    const taller = await api("/api/receptions");
+    const withOt = taller.filter((r) => r.work_order);
+    if (!withOt.length) {
+      toast("Primero cree una OT en Diagnóstico");
+      return;
+    }
+    openModal(`
+      <h2>Emitir comprobante Katire</h2>
+      <form id="feIssueForm" class="form-grid">
+        <label class="full">Orden de trabajo
+          <select name="work_order_id" required>
+            ${withOt.map((r) => `<option value="${r.work_order.id}">${r.work_order.code} · ${r.vehicle?.plate || ""} · ${money(r.work_order.grand_total)}</option>`).join("")}
+          </select>
+        </label>
+        <label>Tipo
+          <select name="tipo_documento">
+            <option value="01">01 Factura Electrónica</option>
+            <option value="04">04 Tiquete Electrónico</option>
+            <option value="03">03 Nota de Crédito</option>
+          </select>
+        </label>
+        <label>IVA
+          <select name="tarifa_codigo">
+            <option value="08">13% general</option>
+            <option value="04">4%</option>
+            <option value="03">2%</option>
+            <option value="02">1%</option>
+            <option value="01">Exento</option>
+          </select>
+        </label>
+        <label>Condición
+          <select name="condicion_venta">
+            <option value="01">Contado</option>
+            <option value="02">Crédito</option>
+          </select>
+        </label>
+        <label>Medio pago
+          <select name="medio_pago">
+            <option value="01">Efectivo</option>
+            <option value="02">Tarjeta</option>
+            <option value="04">Transferencia</option>
+            <option value="06">SINPE Móvil</option>
+          </select>
+        </label>
+        <div class="full row-actions">
+          <button class="btn btn-primary" type="submit">Generar XML + clave</button>
+          <button class="btn btn-ghost" type="button" id="closeModalBtn">Cancelar</button>
+        </div>
+      </form>
+    `);
+    document.getElementById("closeModalBtn").onclick = closeModal;
+    document.getElementById("feIssueForm").onsubmit = async (ev) => {
+      ev.preventDefault();
+      const body = Object.fromEntries(new FormData(ev.target).entries());
+      body.work_order_id = Number(body.work_order_id);
+      const inv = await api("/api/fe/issue", { method: "POST", body: JSON.stringify(body) });
+      toast(`Comprobante ${inv.clave.slice(0, 12)}… listo`);
+      closeModal();
+      loadFacturacion();
+      showSection("facturacion");
+    };
+  });
 
   document.getElementById("newUserBtn")?.addEventListener("click", () => {
     openModal(`

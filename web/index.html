@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>bahía — patio del taller</title>
+  <title>Katire — taller + factura electrónica CR</title>
   <link rel="stylesheet" href="/static/css/app.css" />
 </head>
 <body>
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
-        <div class="brand-mark">bah<i>í</i>a</div>
-        <small id="shopSlogan">El carro entra. La certeza sale.</small>
+        <div class="brand-mark"><span class="k">K</span>atire</div>
+        <small id="shopSlogan">De la llave al XML.</small>
       </div>
       <nav class="nav" id="nav">
         <button data-section="tablero" class="active">
@@ -34,9 +34,13 @@
           <span class="n">05</span>
           <span class="t">Cadena de repuesto</span>
         </button>
+        <button data-section="facturacion">
+          <span class="n">06</span>
+          <span class="t">Facturación CR</span>
+        </button>
         <button data-section="config">
           <span class="n">Casa</span>
-          <span class="t">Identidad del taller</span>
+          <span class="t">Identidad Katire</span>
         </button>
       </nav>
       <div class="user-box">
@@ -53,7 +57,7 @@
         <div class="topbar">
           <div>
             <h1>Patio en vivo</h1>
-            <p>Cada carro en su estación. Sin gritar por el pasillo. Sin adivinar el stock.</p>
+            <p>De la llave al XML — del elevador a Hacienda, en un solo flujo.</p>
           </div>
           <button class="btn btn-primary" data-go="recepcion">Recibir vehículo</button>
         </div>
@@ -276,11 +280,76 @@
         </div>
       </section>
 
+      <section id="sec-facturacion" class="section">
+        <div class="topbar">
+          <div>
+            <h1>Facturación electrónica</h1>
+            <p>Hacienda Costa Rica v4.4 — clave, consecutivo, XML, transmisión ATV. El diferencial que se vende.</p>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Emisor ATV / Hacienda</h2>
+              <button class="btn btn-ghost" id="testHaciendaBtn">Probar auth</button>
+            </div>
+            <form id="issuerForm" class="form-grid">
+              <label>Nombre legal<input name="nombre" required placeholder="Razón social" /></label>
+              <label>Nombre comercial<input name="nombre_comercial" /></label>
+              <label>Tipo ID
+                <select name="tipo_id">
+                  <option value="01">01 Física</option>
+                  <option value="02" selected>02 Jurídica</option>
+                  <option value="03">03 DIMEX</option>
+                  <option value="04">04 NITE</option>
+                </select>
+              </label>
+              <label>Número ID<input name="numero_id" required placeholder="3101xxxxxx" /></label>
+              <label>Código actividad<input name="codigo_actividad" required placeholder="Ej. 452001" /></label>
+              <label>Correo FE<input name="correo" type="email" /></label>
+              <label>Teléfono<input name="telefono" /></label>
+              <label>Ambiente
+                <select name="ambiente">
+                  <option value="sandbox">Sandbox ATV</option>
+                  <option value="production">Producción</option>
+                </select>
+              </label>
+              <label>Usuario Hacienda<input name="hacienda_user" placeholder="cedula@comprobanteselectronicos.go.cr" /></label>
+              <label>Clave ATV<input name="hacienda_password" type="password" placeholder="Solo si cambia" /></label>
+              <label>Sucursal<input name="sucursal" value="001" /></label>
+              <label>Terminal<input name="terminal" value="00001" /></label>
+              <label>Provincia<input name="provincia" value="5" /></label>
+              <label>Cantón<input name="canton" value="01" /></label>
+              <label>Distrito<input name="distrito" value="01" /></label>
+              <label class="full">Otras señas<input name="otras_senas" /></label>
+              <label>CABYS servicio<input name="cabys_default_servicio" /></label>
+              <label>CABYS repuesto<input name="cabys_default_repuesto" /></label>
+              <div class="full"><button class="btn btn-primary" type="submit">Guardar emisor</button></div>
+            </form>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <h2>Comprobantes</h2>
+              <button class="btn btn-primary" id="issueFeBtn">Emitir desde OT</button>
+            </div>
+            <p class="muted" style="margin-top:0">Genera Factura (01) o Tiquete (04) con IVA CR, XML v4.4 y clave de 50 posiciones.</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Clave</th><th>Tipo</th><th>Total</th><th>Estado</th><th></th></tr>
+                </thead>
+                <tbody id="feBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section id="sec-config" class="section">
         <div class="topbar">
           <div>
-            <h1>Identidad del taller</h1>
-            <p>Lo que ve el cliente en fichas y lo que cobra la mano de obra.</p>
+            <h1>Identidad Katire</h1>
+            <p>Marca del taller, equipo y catálogo de servicios.</p>
           </div>
         </div>
         <div class="grid-2">
@@ -289,7 +358,7 @@
             <form id="settingsForm" class="form-grid">
               <label>Nombre del taller<input name="shop_name" placeholder="Nombre comercial" required /></label>
               <label>Teléfono<input name="phone" placeholder="+506 ..." /></label>
-              <label class="full">Frase del patio<input name="slogan" placeholder="Su frase profesional" /></label>
+              <label class="full">Eslogan Katire<input name="slogan" placeholder="De la llave al XML." /></label>
               <label>WhatsApp<input name="whatsapp" placeholder="+506 ..." /></label>
               <label>Tarifa hora (CRC)<input name="labor_rate" type="number" placeholder="0" /></label>
               <label class="full">Dirección<input name="address" placeholder="Provincia, cantón, señas" /></label>

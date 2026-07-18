@@ -1,24 +1,25 @@
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Unbounded:wght@500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap");
 
 :root {
-  --night: #050910;
-  --deep: #0a121c;
-  --bay: #0d1f2d;
-  --panel: #102433;
-  --foam: #eef7f4;
-  --mist: #9bb0b8;
-  --lagoon: #1ec9a7;
-  --lagoon-dim: rgba(30, 201, 167, 0.14);
-  --ember: #ff6b3d;
+  --night: #0b0908;
+  --deep: #14110f;
+  --bay: #1c1612;
+  --panel: #221c17;
+  --foam: #f7f1ea;
+  --mist: #a89a8c;
+  --lagoon: #ff4d2e;
+  --lagoon-dim: rgba(255, 77, 46, 0.14);
+  --ember: #ffb347;
   --sand: #e6c07b;
-  --line: rgba(238, 247, 244, 0.1);
+  --line: rgba(247, 241, 234, 0.1);
   --ok: #3dd68c;
   --warn: #f0c35a;
   --danger: #ff6b7a;
   --radius: 18px;
-  --display: "Unbounded", sans-serif;
-  --body: "Manrope", sans-serif;
+  --display: "Syne", sans-serif;
+  --body: "DM Sans", sans-serif;
   --shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  --katire: linear-gradient(120deg, #ff4d2e 0%, #ffb347 42%, #1ec9a7 100%);
 }
 
 * { box-sizing: border-box; }
@@ -113,22 +114,40 @@ img { max-width: 100%; display: block; }
   margin: 0;
   font-family: var(--display);
   font-weight: 800;
-  font-size: clamp(4.2rem, 10vw, 7.5rem);
-  line-height: 0.88;
-  letter-spacing: -0.04em;
-  text-transform: lowercase;
+  font-size: clamp(4.4rem, 11vw, 8rem);
+  line-height: 0.86;
+  letter-spacing: -0.07em;
+  text-transform: none;
 }
 
-.login-hero-copy .wordmark i {
-  font-style: normal;
-  color: var(--lagoon);
+.login-hero-copy .wordmark .k {
+  background: var(--katire);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
   display: inline-block;
-  animation: pulseGlow 2.8s ease-in-out infinite;
+  transform: skewX(-8deg) rotate(-2deg);
+  filter: drop-shadow(0 10px 30px rgba(255, 77, 46, 0.35));
+  animation: katirePulse 3.2s ease-in-out infinite;
 }
 
-@keyframes pulseGlow {
-  0%, 100% { text-shadow: 0 0 0 transparent; }
-  50% { text-shadow: 0 0 28px rgba(30, 201, 167, 0.45); }
+.login-hero-copy .wordmark .rest {
+  display: inline-block;
+  letter-spacing: -0.08em;
+}
+
+@keyframes katirePulse {
+  0%, 100% { filter: drop-shadow(0 8px 18px rgba(255, 77, 46, 0.25)); transform: skewX(-8deg) rotate(-2deg) translateY(0); }
+  50% { filter: drop-shadow(0 14px 36px rgba(255, 179, 71, 0.45)); transform: skewX(-8deg) rotate(-1deg) translateY(-3px); }
+}
+
+.brand-mark .k {
+  background: var(--katire);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  display: inline-block;
+  transform: skewX(-8deg);
 }
 
 .login-hero-copy p {
@@ -246,16 +265,10 @@ input:focus, select:focus, textarea:focus {
 
 .brand-mark {
   font-family: var(--display);
-  font-size: 2rem;
+  font-size: 2.1rem;
   font-weight: 800;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.07em;
   line-height: 1;
-  text-transform: lowercase;
-}
-
-.brand-mark i {
-  font-style: normal;
-  color: var(--lagoon);
 }
 
 .brand small {
@@ -437,8 +450,8 @@ input:focus, select:focus, textarea:focus {
 .btn:hover { transform: translateY(-1px); }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--lagoon), #149e84);
-  color: #031510;
+  background: linear-gradient(135deg, #ff4d2e, #ff8a33 55%, #1ec9a7);
+  color: #140a06;
   border-color: transparent;
   font-weight: 800;
 }

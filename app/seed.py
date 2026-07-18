@@ -26,12 +26,23 @@ def ensure_admin(db: Session) -> None:
 
 
 def ensure_settings(db: Session) -> None:
-    if db.query(ShopSettings).first():
+    settings = db.query(ShopSettings).first()
+    if settings:
+        # Mantener identidad Katire si aún no personalizaron
+        if not (settings.slogan or "").strip() or settings.slogan in (
+            "El carro entra. La certeza sale.",
+            "El patio cobra. Hacienda recibe.",
+            "Diagnóstico claro. Repuesto listo. Servicio profesional.",
+        ):
+            settings.slogan = "De la llave al XML."
+        if not (settings.shop_name or "").strip() or settings.shop_name in ("bahía", "TallerPro", "TallerPro Guanacaste"):
+            settings.shop_name = "Katire"
+        db.commit()
         return
     db.add(
         ShopSettings(
-            shop_name="",
-            slogan="",
+            shop_name="Katire",
+            slogan="De la llave al XML.",
             phone="",
             whatsapp="",
             address="",

@@ -6,7 +6,7 @@ from typing import Annotated
 import aiofiles
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session, joinedload
 
@@ -77,9 +77,9 @@ ROOT = Path(__file__).resolve().parent.parent
 WEB_DIR = ROOT / "web"
 
 app = FastAPI(
-    title="bahía",
-    description="El patio del taller — recepción, diagnóstico, bodega y proveedores",
-    version="1.0.0",
+    title="Katire",
+    description="Katire — patio del taller + facturación electrónica Hacienda Costa Rica v4.4",
+    version="2.0.0",
 )
 
 app.add_middleware(
@@ -1034,10 +1034,167 @@ def health():
 
     return {
         "ok": True,
-        "service": "bahia",
+        "service": "katire",
         "environment": ENVIRONMENT,
         "production": IS_PRODUCTION,
+        "fe": "hacienda-cr-v4.4",
     }
+
+
+# ---------- Katire Facturación Electrónica CR ----------
+from app.fe_cr import DOC_TYPES, IVA_RATES, ID_TYPES, CONDICION_VENTA, MEDIO_PAGO, HaciendaClient
+from app.fe_service import (
+    get_issuer,
+    html_for_invoice,
+    invoice_dict,
+    issue_from_work_order,
+    issuer_dict,
+    rebuild_xml,
+    send_to_hacienda,
+)
+from app.models import ElectronicInvoice, IssuerProfile
+
+
+class IssuerIn(BaseModel):
+    nombre: str = ""
+    nombre_comercial: str = ""
+    tipo_id: str = "02"
+    numero_id: str = ""
+    codigo_actividad: str = ""
+    correo: str = ""
+    telefono: str = ""
+    provincia: str = "5"
+    canton: str = "01"
+    distrito: str = "01"
+    otras_senas: str = ""
+    sucursal: str = "001"
+    terminal: str = "00001"
+    ambiente: str = "sandbox"
+    hacienda_user: str = ""
+    hacienda_password: str = ""
+    cabys_default_servicio: str = "8314100000000"
+    cabys_default_repuesto: str = "4530000000000"
+
+
+class IssueInvoiceIn(BaseModel):
+    work_order_id: int
+    tipo_documento: str = "01"
+    condicion_venta: str = "01"
+    medio_pago: str = "01"
+    tarifa_codigo: str = "08"
+
+
+@app.get("/api/fe/meta")
+def fe_meta(user: User = Depends(get_current_user)):
+    return {
+        "doc_types": DOC_TYPES,
+        "iva_rates": {k: {"label": v[0], "rate": float(v[1])} for k, v in IVA_RATES.items()},
+        "id_types": ID_TYPES,
+        "condicion_venta": CONDICION_VENTA,
+        "medio_pago": MEDIO_PAGO,
+        "brand": "Katire",
+        "schema": "v4.4",
+    }
+
+
+@app.get("/api/fe/issuer")
+def fe_issuer_get(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    return issuer_dict(get_issuer(db))
+
+
+@app.put("/api/fe/issuer")
+def fe_issuer_put(payload: IssuerIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Solo administrador")
+    issuer = get_issuer(db)
+    data = payload.model_dump()
+    pwd = data.pop("hacienda_password", "")
+    for k, v in data.items():
+        setattr(issuer, k, v)
+    if pwd:
+        issuer.hacienda_password = pwd
+    db.commit()
+    return issuer_dict(issuer)
+
+
+@app.post("/api/fe/test-auth")
+def fe_test_auth(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    issuer = get_issuer(db)
+    if not issuer.hacienda_user or not issuer.hacienda_password:
+        raise HTTPException(status_code=400, detail="Faltan credenciales ATV")
+    try:
+        client = HaciendaClient(issuer.ambiente)
+        return client.authenticate(issuer.hacienda_user, issuer.hacienda_password)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/fe/invoices")
+def fe_invoices(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    rows = (
+        db.query(ElectronicInvoice)
+        .options(joinedload(ElectronicInvoice.lines))
+        .order_by(ElectronicInvoice.created_at.desc())
+        .limit(100)
+        .all()
+    )
+    return [invoice_dict(r) for r in rows]
+
+
+@app.post("/api/fe/issue")
+def fe_issue(payload: IssueInvoiceIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    try:
+        inv = issue_from_work_order(
+            db,
+            payload.work_order_id,
+            tipo_documento=payload.tipo_documento,
+            condicion_venta=payload.condicion_venta,
+            medio_pago=payload.medio_pago,
+            tarifa_codigo=payload.tarifa_codigo,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return invoice_dict(inv)
+
+
+@app.post("/api/fe/invoices/{invoice_id}/rebuild-xml")
+def fe_rebuild(invoice_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    try:
+        inv = rebuild_xml(db, invoice_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return invoice_dict(inv)
+
+
+@app.post("/api/fe/invoices/{invoice_id}/send")
+def fe_send(invoice_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    try:
+        return send_to_hacienda(db, invoice_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/fe/invoices/{invoice_id}/xml")
+def fe_xml(invoice_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    inv = db.query(ElectronicInvoice).filter(ElectronicInvoice.id == invoice_id).first()
+    if not inv or not inv.xml_content:
+        raise HTTPException(status_code=404, detail="XML no disponible")
+    return Response(
+        content=inv.xml_content,
+        media_type="application/xml",
+        headers={"Content-Disposition": f'attachment; filename="{inv.clave}.xml"'},
+    )
+
+
+@app.get("/api/fe/invoices/{invoice_id}/print")
+def fe_print(invoice_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    try:
+        html = html_for_invoice(db, invoice_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return HTMLResponse(html)
 
 
 @app.get("/")

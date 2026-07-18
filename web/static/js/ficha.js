@@ -48,7 +48,7 @@ async function openReception(id) {
   openModal(`
     <div class="panel-head">
       <div>
-        <p class="muted" style="margin:0 0 6px;letter-spacing:0.14em;text-transform:uppercase;font-size:0.7rem;color:var(--lagoon)">bahía · expediente digital</p>
+        <p class="muted" style="margin:0 0 6px;letter-spacing:0.14em;text-transform:uppercase;font-size:0.7rem;color:var(--lagoon)">Katire · expediente digital</p>
         <h2 style="margin:0;font-family:var(--display);letter-spacing:-0.03em">${v.plate} · ${v.brand} ${v.model}</h2>
         <p class="muted" style="margin:6px 0 0">${r.code} · ${c.name || ""} · ${c.phone || ""} · ${badge(r.status)}
           · DVI <span class="badge badge-ok">${dvi.ok || 0} ok</span>
@@ -175,6 +175,7 @@ async function openReception(id) {
                 <button class="btn btn-warn" id="statusRepair">En reparación</button>
                 <button class="btn btn-ok" id="statusReady">Listo</button>
                 <button class="btn btn-primary" id="statusDeliver">Entregar</button>
+                <button class="btn btn-primary" id="btnFacturar">Facturar CR</button>
               </div>
             </div>` : ""}
           ${est ? `<div style="margin-top:14px"><h3>Cotización ${est.code}</h3><p>${badge(est.status)} · ${money(est.grand_total)}</p></div>` : ""}
@@ -304,4 +305,29 @@ async function openReception(id) {
   document.getElementById("statusRepair")?.addEventListener("click", () => patchStatus("en_reparacion"));
   document.getElementById("statusReady")?.addEventListener("click", () => patchStatus("listo"));
   document.getElementById("statusDeliver")?.addEventListener("click", () => patchStatus("entregado"));
+  document.getElementById("btnFacturar")?.addEventListener("click", async () => {
+    if (!wo) return;
+    try {
+      const inv = await api("/api/fe/issue", {
+        method: "POST",
+        body: JSON.stringify({
+          work_order_id: wo.id,
+          tipo_documento: "01",
+          condicion_venta: "01",
+          medio_pago: "01",
+          tarifa_codigo: "08",
+        }),
+      });
+      toast(`Factura ${inv.clave} generada`);
+      const res = await fetch(`/api/fe/invoices/${inv.id}/print`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      const html = await res.text();
+      const w = window.open("", "_blank");
+      w.document.write(html);
+      w.document.close();
+    } catch (err) {
+      toast(err.message);
+    }
+  });
 }

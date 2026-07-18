@@ -1,50 +1,30 @@
-# bahía
+# Katire
 
-**El carro entra. La certeza sale.**
+# De la llave al XML.
 
-Software profesional para taller + repuestos.  
-Instalación vacía (sin demos). Puede correr en su PC **o en la nube 24/7** sin depender de una computadora local.
+**El patio repara. Katire factura. Hacienda acepta.**
 
-## Opción A — En la nube (recomendado)
+Eso nadie más lo dice — porque nadie más une en un solo flujo:
 
-El taller queda online aunque apague su PC.
+1. la llave del mecánico (taller, DVI, OT, bodega)  
+2. la clave de 50 de Hacienda (factura electrónica CR v4.4)
 
-1. Ejecute `Publicar-En-La-Nube.bat`  
-   (sube el código a GitHub y abre Render)
-2. En Render: **Apply** el blueprint `bahia-taller`
-3. Entre a la URL `https://….onrender.com`
-4. Usuario: `admin`  
-   Clave: la de la variable `BAHIA_ADMIN_PASSWORD` en Render → Environment
+Katire no es “otro software de taller”.  
+Es el **puente** entre el patio y el ATV.
 
-Variables importantes:
+## Por qué es único
 
-| Variable | Para qué |
-|----------|----------|
-| `BAHIA_SECRET_KEY` | Seguridad (Render la genera) |
-| `BAHIA_ADMIN_PASSWORD` | Clave del dueño |
-| `BAHIA_DATA_DIR=/data` | Guarda bodega, OT y fotos en disco persistente |
-| `PUBLIC_BASE_URL` | Se llena sola con `RENDER_EXTERNAL_URL` |
+| Otros | Katire |
+|-------|--------|
+| Taller sin Hacienda | Taller + FE CR en el mismo expediente |
+| FE genérica sin patio | Emite desde la OT real del carro |
+| Papel + Excel + proveedor aparte | Un solo sistema vendible |
 
-## Opción B — En un servidor propio (Docker)
+## Arranque
 
-```bash
-export BAHIA_SECRET_KEY=clave-larga
-export BAHIA_ADMIN_PASSWORD=clave-del-dueno
-docker compose up -d --build
-```
+`Iniciar-TallerPro.bat` → http://127.0.0.1:8096/login  
+Usuario inicial: `admin`
 
-Queda en `http://SERVIDOR:8096`
+## Nube
 
-## Opción C — Solo en esta PC (local)
-
-`Iniciar-TallerPro.bat` → [http://127.0.0.1:8096/login](http://127.0.0.1:8096/login)
-
-Para borrar todo y empezar vacío: `Limpiar-Y-Empezar.bat`
-
-## Primer uso (siempre vacío)
-
-1. Entrar como admin  
-2. **Casa** → nombre del taller, WhatsApp, tarifa  
-3. Crear usuarios del equipo  
-4. Cargar proveedores y estantería  
-5. Recibir el primer vehículo  
+https://github.com/AbGam84/bahia-taller · `Publicar-En-La-Nube.bat`

@@ -1,8 +1,8 @@
-# Despliegue 24/7 en Render — no depende de su PC
+# Katire — nube 24/7 (no depende de su PC)
 # https://dashboard.render.com/blueprints/new?repo=https://github.com/AbGam84/bahia-taller
 services:
   - type: web
-    name: bahia-taller
+    name: katire
     runtime: python
     plan: free
     region: oregon
@@ -13,7 +13,7 @@ services:
       - key: ENVIRONMENT
         value: production
       - key: BAHIA_DATA_DIR
-        value: /tmp/bahia-data
+        value: /tmp/katire-data
       - key: BAHIA_SECRET_KEY
         generateValue: true
       - key: BAHIA_ADMIN_USER

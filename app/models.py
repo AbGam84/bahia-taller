@@ -269,8 +269,8 @@ class ShopSettings(Base):
     __tablename__ = "shop_settings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    shop_name: Mapped[str] = mapped_column(String(160), default="bahía")
-    slogan: Mapped[str] = mapped_column(String(200), default="El carro entra. La certeza sale.")
+    shop_name: Mapped[str] = mapped_column(String(160), default="Katire")
+    slogan: Mapped[str] = mapped_column(String(200), default="De la llave al XML.")
     phone: Mapped[str] = mapped_column(String(40), default="")
     whatsapp: Mapped[str] = mapped_column(String(40), default="")
     address: Mapped[str] = mapped_column(String(255), default="Guanacaste, Costa Rica")
@@ -360,3 +360,95 @@ class Appointment(Base):
     # agendada | confirmada | llegada | cancelada | no_show
     notes: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class IssuerProfile(Base):
+    """Datos del emisor ante Hacienda / ATV."""
+
+    __tablename__ = "issuer_profiles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    nombre: Mapped[str] = mapped_column(String(200), default="")
+    nombre_comercial: Mapped[str] = mapped_column(String(200), default="")
+    tipo_id: Mapped[str] = mapped_column(String(2), default="02")
+    numero_id: Mapped[str] = mapped_column(String(20), default="")
+    codigo_actividad: Mapped[str] = mapped_column(String(10), default="")
+    correo: Mapped[str] = mapped_column(String(160), default="")
+    telefono: Mapped[str] = mapped_column(String(40), default="")
+    provincia: Mapped[str] = mapped_column(String(2), default="5")
+    canton: Mapped[str] = mapped_column(String(2), default="01")
+    distrito: Mapped[str] = mapped_column(String(2), default="01")
+    otras_senas: Mapped[str] = mapped_column(String(255), default="")
+    sucursal: Mapped[str] = mapped_column(String(3), default="001")
+    terminal: Mapped[str] = mapped_column(String(5), default="00001")
+    ambiente: Mapped[str] = mapped_column(String(20), default="sandbox")  # sandbox | production
+    hacienda_user: Mapped[str] = mapped_column(String(160), default="")
+    hacienda_password: Mapped[str] = mapped_column(String(255), default="")
+    pin_cert: Mapped[str] = mapped_column(String(120), default="")
+    cert_filename: Mapped[str] = mapped_column(String(255), default="")
+    cabys_default_servicio: Mapped[str] = mapped_column(String(20), default="8314100000000")
+    cabys_default_repuesto: Mapped[str] = mapped_column(String(20), default="4530000000000")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class InvoiceSequence(Base):
+    __tablename__ = "invoice_sequences"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    doc_type: Mapped[str] = mapped_column(String(2), index=True)
+    sucursal: Mapped[str] = mapped_column(String(3), default="001")
+    terminal: Mapped[str] = mapped_column(String(5), default="00001")
+    last_number: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class ElectronicInvoice(Base):
+    __tablename__ = "electronic_invoices"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    clave: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    numero_consecutivo: Mapped[str] = mapped_column(String(20), index=True)
+    tipo_documento: Mapped[str] = mapped_column(String(2), default="01")
+    status: Mapped[str] = mapped_column(String(40), default="borrador")
+    # borrador | xml_listo | enviado | aceptado | rechazado | error
+    work_order_id: Mapped[int | None] = mapped_column(ForeignKey("work_orders.id"), nullable=True)
+    reception_id: Mapped[int | None] = mapped_column(ForeignKey("receptions.id"), nullable=True)
+    receptor_nombre: Mapped[str] = mapped_column(String(200), default="")
+    receptor_tipo_id: Mapped[str] = mapped_column(String(2), default="01")
+    receptor_numero_id: Mapped[str] = mapped_column(String(20), default="")
+    receptor_correo: Mapped[str] = mapped_column(String(160), default="")
+    condicion_venta: Mapped[str] = mapped_column(String(2), default="01")
+    medio_pago: Mapped[str] = mapped_column(String(40), default="01")
+    moneda: Mapped[str] = mapped_column(String(3), default="CRC")
+    total_venta: Mapped[float] = mapped_column(Float, default=0)
+    total_impuesto: Mapped[float] = mapped_column(Float, default=0)
+    total_comprobante: Mapped[float] = mapped_column(Float, default=0)
+    xml_content: Mapped[str] = mapped_column(Text, default="")
+    hacienda_response: Mapped[str] = mapped_column(Text, default="")
+    hacienda_status: Mapped[str] = mapped_column(String(80), default="")
+    issued_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    lines: Mapped[list["ElectronicInvoiceLine"]] = relationship(
+        back_populates="invoice", cascade="all, delete-orphan"
+    )
+
+
+class ElectronicInvoiceLine(Base):
+    __tablename__ = "electronic_invoice_lines"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    invoice_id: Mapped[int] = mapped_column(ForeignKey("electronic_invoices.id"))
+    detalle: Mapped[str] = mapped_column(String(255))
+    cabys: Mapped[str] = mapped_column(String(20), default="")
+    cantidad: Mapped[float] = mapped_column(Float, default=1)
+    unidad: Mapped[str] = mapped_column(String(20), default="Sp")
+    precio_unitario: Mapped[float] = mapped_column(Float, default=0)
+    monto_descuento: Mapped[float] = mapped_column(Float, default=0)
+    tarifa_codigo: Mapped[str] = mapped_column(String(2), default="08")
+    tarifa: Mapped[float] = mapped_column(Float, default=13)
+    subtotal: Mapped[float] = mapped_column(Float, default=0)
+    impuesto_monto: Mapped[float] = mapped_column(Float, default=0)
+    monto_total_linea: Mapped[float] = mapped_column(Float, default=0)
+    es_servicio: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    invoice: Mapped["ElectronicInvoice"] = relationship(back_populates="lines")
