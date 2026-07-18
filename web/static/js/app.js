@@ -30,9 +30,24 @@ const esc = (s) =>
 
 const toast = (msg) => {
   const el = document.getElementById("toast");
+  if (!el) {
+    console.warn(msg);
+    return;
+  }
   el.textContent = msg;
   el.classList.add("show");
   setTimeout(() => el.classList.remove("show"), 3500);
+};
+
+const setHtml = (id, html) => {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = html;
+  return el;
+};
+const setText = (id, text) => {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+  return el;
 };
 
 const token = () => localStorage.getItem("tp_token");
@@ -133,8 +148,11 @@ async function loadFacturacion() {
   }
   await loadFeReadiness();
   const rows = await api("/api/fe/invoices");
-  document.getElementById("feBody").innerHTML = rows
-    .map((inv) => `<tr>
+  setHtml(
+    "feBody",
+    rows
+      .map(
+        (inv) => `<tr>
       <td><code style="font-size:0.72rem">${esc(inv.clave)}</code><br><span class="muted">${esc(inv.numero_consecutivo)}</span></td>
       <td>${esc(inv.tipo_documento)}</td>
       <td class="money">${money(inv.total_comprobante)}</td>
@@ -145,8 +163,11 @@ async function loadFacturacion() {
         <button class="btn btn-ok" data-send="${inv.id}">Enviar MH</button>
         <button class="btn btn-ghost" data-refresh="${inv.id}">Estado</button>
       </td>
-    </tr>`)
-    .join("") || `<tr><td colspan="5"><div class="empty-state"><strong>Sin comprobantes</strong>Emita desde una OT y envíe a Hacienda</div></td></tr>`;
+    </tr>`
+      )
+      .join("") ||
+      `<tr><td colspan="5"><div class="empty-state"><strong>Sin comprobantes</strong>Emita desde una OT y envíe a Hacienda</div></td></tr>`
+  );
 
   document.querySelectorAll("[data-xml]").forEach((btn) => {
     btn.onclick = async () => {
@@ -202,12 +223,17 @@ async function loadFacturacion() {
 }
 
 function openModal(html) {
-  document.getElementById("modalBody").innerHTML = html;
-  document.getElementById("modal").classList.add("show");
+  const body = document.getElementById("modalBody");
+  const modal = document.getElementById("modal");
+  if (!body || !modal) return;
+  body.innerHTML = html;
+  modal.classList.add("show");
 }
 function closeModal() {
-  document.getElementById("modal").classList.remove("show");
-  document.getElementById("modalBody").innerHTML = "";
+  const body = document.getElementById("modalBody");
+  const modal = document.getElementById("modal");
+  if (modal) modal.classList.remove("show");
+  if (body) body.innerHTML = "";
 }
 
 function initZones() {
@@ -354,32 +380,37 @@ async function uploadArrivalMedia(receptionId) {
 
 async function loadSettings() {
   const s = await api("/api/settings");
-  document.getElementById("shopSlogan").textContent =
-    s.slogan || "De la llave al XML.";
-  const nameLabel = document.getElementById("shopNameLabel");
-  if (nameLabel) nameLabel.textContent = s.shop_name || "Aitorepuestos";
+  setText("shopSlogan", s.slogan || "De la llave al XML.");
+  setText("shopNameLabel", s.shop_name || "Aitorepuestos");
   const form = document.getElementById("settingsForm");
   if (!form) return;
-  form.shop_name.value = s.shop_name || "Aitorepuestos";
-  form.slogan.value = s.slogan || "De la llave al XML.";
-  form.phone.value = s.phone || "+506 8870-8123";
-  form.whatsapp.value = s.whatsapp || "+506 8870-8123";
-  form.address.value = s.address || "Costa Rica";
-  form.labor_rate.value = s.labor_rate || 15000;
+  if (form.shop_name) form.shop_name.value = s.shop_name || "Aitorepuestos";
+  if (form.slogan) form.slogan.value = s.slogan || "De la llave al XML.";
+  if (form.phone) form.phone.value = s.phone || "+506 8870-8123";
+  if (form.whatsapp) form.whatsapp.value = s.whatsapp || "+506 8870-8123";
+  if (form.address) form.address.value = s.address || "Costa Rica";
+  if (form.labor_rate) form.labor_rate.value = s.labor_rate || 15000;
 
   try {
     const users = await api("/api/users");
-    document.getElementById("usersBody").innerHTML = users
-      .map((u) => `<tr><td>${u.name}</td><td>${u.username}</td><td>${u.role}</td></tr>`)
-      .join("") || `<tr><td colspan="3" class="muted">Sin usuarios adicionales</td></tr>`;
+    setHtml(
+      "usersBody",
+      users
+        .map((u) => `<tr><td>${u.name}</td><td>${u.username}</td><td>${u.role}</td></tr>`)
+        .join("") || `<tr><td colspan="3" class="muted">Sin usuarios adicionales</td></tr>`
+    );
   } catch (_) {
-    document.getElementById("usersBody").innerHTML = `<tr><td colspan="3" class="muted">Solo el administrador ve el equipo</td></tr>`;
+    setHtml("usersBody", `<tr><td colspan="3" class="muted">Solo el administrador ve el equipo</td></tr>`);
   }
 
   const services = await api("/api/services");
-  document.getElementById("servicesBody").innerHTML = services
-    .map((s) => `<tr><td>${s.name}</td><td>${s.category}</td><td>${s.hours}</td><td class="money">${money(s.price)}</td></tr>`)
-    .join("") || `<tr><td colspan="4"><div class="empty-state"><strong>Planilla vacía</strong>Agregue los servicios reales de su taller</div></td></tr>`;
+  setHtml(
+    "servicesBody",
+    services
+      .map((s) => `<tr><td>${s.name}</td><td>${s.category}</td><td>${s.hours}</td><td class="money">${money(s.price)}</td></tr>`)
+      .join("") ||
+      `<tr><td colspan="4"><div class="empty-state"><strong>Planilla vacía</strong>Agregue los servicios reales de su taller</div></td></tr>`
+  );
 }
 
 async function loadDashboard() {
@@ -389,53 +420,75 @@ async function loadDashboard() {
     const emptyCta = document.getElementById("patioEmptyCta");
     if (emptyCta) emptyCta.classList.toggle("hidden", inShop > 0 || (d.board || []).length > 0);
 
-    document.getElementById("metricsPro").innerHTML = `
+    setHtml(
+      "metricsPro",
+      `
       <div class="metric-card"><div class="k">Ingreso hoy</div><div class="v">${money(d.revenue_today)}</div><div class="s">Órdenes cerradas del día</div></div>
       <div class="metric-card"><div class="k">ARO</div><div class="v">${money(d.aro)}</div><div class="s">Ticket promedio</div></div>
       <div class="metric-card"><div class="k">Conversión cotización</div><div class="v">${d.estimate_conversion_pct || 0}%</div><div class="s">${d.estimate_approved || 0} aprobadas / ${d.estimate_declined || 0} rechazadas</div></div>
       <div class="metric-card"><div class="k">Margen repuestos</div><div class="v">${d.parts_margin_pct || 0}%</div><div class="s">${money(d.parts_margin)} esta temporada</div></div>
-    `;
-    document.getElementById("stats").innerHTML = `
+    `
+    );
+    setHtml(
+      "stats",
+      `
       <div class="stat"><div class="label">Entraron hoy</div><div class="value">${d.today_receptions}</div></div>
       <div class="stat"><div class="label">En el patio</div><div class="value">${d.in_shop}</div></div>
       <div class="stat"><div class="label">Listos</div><div class="value">${d.ready_for_delivery}</div></div>
       <div class="stat"><div class="label">Piezas en ruta</div><div class="value">${d.open_purchase_orders}</div></div>
       <div class="stat"><div class="label">Bajo mínimo</div><div class="value">${d.low_stock_count}</div></div>
-    `;
+    `
+    );
     const kanban = document.getElementById("kanban");
-    kanban.innerHTML = STATUS_COLS.map(([key, title]) => {
-      const list = (d.board || []).filter((r) => r.status === key);
-      const cards = list
-        .map((r) => {
-          const v = r.vehicle || {};
-          return `<div class="card-job" data-id="${r.id}">
+    if (kanban) {
+      kanban.innerHTML = STATUS_COLS.map(([key, title]) => {
+        const list = (d.board || []).filter((r) => r.status === key);
+        const cards =
+          list
+            .map((r) => {
+              const v = r.vehicle || {};
+              return `<div class="card-job" data-id="${r.id}">
             <strong>${v.plate || "—"}</strong>
             <div class="meta">${v.brand || ""} ${v.model || ""}<br>${r.code}<br>${(r.customer_complaint || "").slice(0, 60)}</div>
           </div>`;
-        })
-        .join("") || `<div class="empty-state" style="padding:14px;border:none"><strong>Vacío</strong>Nadie en esta estación</div>`;
-      return `<div class="kanban-col"><h4>${title}<span>${list.length}</span></h4>${cards}</div>`;
-    }).join("");
-    kanban.querySelectorAll(".card-job").forEach((el) => {
-      el.addEventListener("click", () => openReception(Number(el.dataset.id)));
-    });
-    document.getElementById("lowStockBody").innerHTML = (d.low_stock || [])
-      .map((p) => `<tr>
+            })
+            .join("") ||
+          `<div class="empty-state" style="padding:14px;border:none"><strong>Vacío</strong>Nadie en esta estación</div>`;
+        return `<div class="kanban-col"><h4>${title}<span>${list.length}</span></h4>${cards}</div>`;
+      }).join("");
+      kanban.querySelectorAll(".card-job").forEach((el) => {
+        el.addEventListener("click", () => openReception(Number(el.dataset.id)));
+      });
+    }
+    setHtml(
+      "lowStockBody",
+      (d.low_stock || [])
+        .map(
+          (p) => `<tr>
         <td>${p.sku}</td><td>${p.name}</td>
         <td><span class="badge badge-low">${p.stock_qty}</span></td>
         <td>${p.min_stock}</td><td>${p.preferred_supplier || "—"}</td>
-      </tr>`)
-      .join("") || `<tr><td colspan="5"><div class="empty-state"><strong>Estantería firme</strong>Nada bajo el mínimo ahora</div></td></tr>`;
+      </tr>`
+        )
+        .join("") ||
+        `<tr><td colspan="5"><div class="empty-state"><strong>Estantería firme</strong>Nada bajo el mínimo ahora</div></td></tr>`
+    );
 
-    document.getElementById("apptBody").innerHTML = (d.appointments || [])
-      .map((a) => `<tr>
+    setHtml(
+      "apptBody",
+      (d.appointments || [])
+        .map(
+          (a) => `<tr>
         <td>${new Date(a.starts_at).toLocaleString("es-CR")}</td>
         <td>${a.customer_name}<br><span class="muted">${a.phone || ""}</span></td>
         <td>${a.plate} ${a.vehicle_info || ""}</td>
         <td>${a.reason || "—"}</td>
         <td>${badge(a.status)}</td>
-      </tr>`)
-      .join("") || `<tr><td colspan="5"><div class="empty-state"><strong>Sin citas</strong>Planilla lista — agende la primera</div></td></tr>`;
+      </tr>`
+        )
+        .join("") ||
+        `<tr><td colspan="5"><div class="empty-state"><strong>Sin citas</strong>Planilla lista — agende la primera</div></td></tr>`
+    );
   } catch (err) {
     toast(err.message || "No se pudo cargar el patio");
   }
@@ -443,18 +496,22 @@ async function loadDashboard() {
 
 async function loadReceptions() {
   const rows = await api("/api/receptions");
-  document.getElementById("receptionList").innerHTML = rows
-    .slice(0, 20)
-    .map((r) => {
-      const v = r.vehicle || {};
-      return `<tr>
+  setHtml(
+    "receptionList",
+    rows
+      .slice(0, 20)
+      .map((r) => {
+        const v = r.vehicle || {};
+        return `<tr>
         <td>${r.code}</td>
         <td>${v.plate}<br><span class="muted">${v.brand} ${v.model}</span></td>
         <td>${badge(r.status)}</td>
         <td><button class="btn btn-ghost" data-id="${r.id}">Abrir</button></td>
       </tr>`;
-    })
-    .join("") || `<tr><td colspan="4"><div class="empty-state"><strong>Sin ingresos</strong>Planilla lista para el primer vehículo</div></td></tr>`;
+      })
+      .join("") ||
+      `<tr><td colspan="4"><div class="empty-state"><strong>Sin ingresos</strong>Planilla lista para el primer vehículo</div></td></tr>`
+  );
   document.querySelectorAll("#receptionList [data-id]").forEach((btn) => {
     btn.addEventListener("click", () => openReception(Number(btn.dataset.id)));
   });
@@ -806,10 +863,12 @@ async function openNewAllyJob(prefill = {}) {
 }
 
 async function loadParts() {
-  const q = document.getElementById("partSearch").value.trim();
-  const low = document.getElementById("onlyLow").checked;
+  const q = document.getElementById("partSearch")?.value?.trim() || "";
+  const low = !!document.getElementById("onlyLow")?.checked;
   const parts = await api(`/api/parts?q=${encodeURIComponent(q)}&low_stock=${low}`);
-  document.getElementById("partsBody").innerHTML = parts
+  const body = document.getElementById("partsBody");
+  if (!body) return;
+  body.innerHTML = parts
     .map((p) => `<tr>
       <td>${p.sku}</td>
       <td><strong>${p.name}</strong><br><span class="muted">${p.brand} · ${p.category}</span></td>
@@ -858,8 +917,11 @@ async function loadSuppliers() {
     api("/api/purchase-orders"),
   ]);
   const tiendas = suppliers.filter((s) => (s.kind || "tienda") !== "aliado");
-  document.getElementById("suppliersBody").innerHTML = tiendas
-    .map((s) => `<tr>
+  setHtml(
+    "suppliersBody",
+    tiendas
+      .map(
+        (s) => `<tr>
       <td><strong>${esc(s.name)}</strong><br><span class="muted">${esc(s.specialty || "")}</span></td>
       <td>${esc(s.kind || "tienda")}</td>
       <td>${esc(s.city || "")}</td>
@@ -867,11 +929,17 @@ async function loadSuppliers() {
       <td class="row-actions">
         ${s.website ? `<a class="btn btn-ghost" href="${esc(s.website)}" target="_blank" rel="noopener">Web</a>` : "—"}
       </td>
-    </tr>`)
-    .join("") || `<tr><td colspan="5"><div class="empty-state"><strong>Sin proveedores</strong>Agregue Gigante, Guacamaya u otros</div></td></tr>`;
+    </tr>`
+      )
+      .join("") ||
+      `<tr><td colspan="5"><div class="empty-state"><strong>Sin proveedores</strong>Agregue Gigante, Guacamaya u otros</div></td></tr>`
+  );
   runMarketSearch();
-  document.getElementById("poBody").innerHTML = orders
-    .map((po) => `<tr>
+  setHtml(
+    "poBody",
+    orders
+      .map(
+        (po) => `<tr>
       <td>${po.code}<br><span class="muted">${(po.lines || []).map((l) => l.part_name).join(", ")}</span></td>
       <td>${po.supplier?.name || ""}</td>
       <td class="money">${money(po.total)}</td>
@@ -880,8 +948,11 @@ async function loadSuppliers() {
         ${po.status !== "recibido" ? `<button class="btn btn-ok" data-receive="${po.id}">Marcar recibido</button>` : "—"}
         ${po.status === "solicitado" ? `<button class="btn btn-warn" data-ship="${po.id}">En camino</button>` : ""}
       </td>
-    </tr>`)
-    .join("") || `<tr><td colspan="5"><div class="empty-state"><strong>Sin pedidos</strong>Se crean solos cuando falte stock en una OT</div></td></tr>`;
+    </tr>`
+      )
+      .join("") ||
+      `<tr><td colspan="5"><div class="empty-state"><strong>Sin pedidos</strong>Se crean solos cuando falte stock en una OT</div></td></tr>`
+  );
   document.querySelectorAll("[data-receive]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       await api(`/api/purchase-orders/${btn.dataset.receive}/status`, {
@@ -911,17 +982,26 @@ async function loadAliados() {
       api("/api/suppliers?kind=aliado"),
       api("/api/ally-jobs"),
     ]);
-    document.getElementById("alliesList").innerHTML = allies
-      .map((s) => `<div class="shop-card">
+    setHtml(
+      "alliesList",
+      allies
+        .map(
+          (s) => `<div class="shop-card">
         <h3>${esc(s.name)}</h3>
         <div class="spec">${esc(s.specialty || "Trabajos externos")}</div>
         <div class="muted" style="font-size:0.82rem">${esc(s.city || "")} · ${esc(s.phone || "Sin teléfono")}</div>
         ${s.whatsapp ? `<div class="row-actions" style="margin-top:8px"><a class="btn btn-ok" target="_blank" rel="noopener" href="https://wa.me/${esc(String(s.whatsapp).replace(/\D/g, ""))}">WhatsApp</a></div>` : ""}
-      </div>`)
-      .join("") || `<div class="empty-state"><strong>Sin aliados</strong>Registre el taller donde manda cajas o motores</div>`;
+      </div>`
+        )
+        .join("") ||
+        `<div class="empty-state"><strong>Sin aliados</strong>Registre el taller donde manda cajas o motores</div>`
+    );
 
-    document.getElementById("allyJobsBody").innerHTML = jobs
-      .map((j) => `<tr>
+    setHtml(
+      "allyJobsBody",
+      jobs
+        .map(
+          (j) => `<tr>
         <td>${esc(j.code)}</td>
         <td>${esc(j.ally_name)}</td>
         <td>${esc(j.job_type)}</td>
@@ -932,8 +1012,11 @@ async function loadAliados() {
         <td class="row-actions">
           <button class="btn btn-ghost" data-ally-open="${j.id}">Seguimiento</button>
         </td>
-      </tr>`)
-      .join("") || `<tr><td colspan="8"><div class="empty-state"><strong>Sin envíos</strong>Cuando mande una caja o motor, regístrelo aquí</div></td></tr>`;
+      </tr>`
+        )
+        .join("") ||
+        `<tr><td colspan="8"><div class="empty-state"><strong>Sin envíos</strong>Cuando mande una caja o motor, regístrelo aquí</div></td></tr>`
+    );
 
     document.querySelectorAll("[data-ally-open]").forEach((btn) => {
       btn.onclick = () => openAllyJob(Number(btn.dataset.allyOpen), jobs);
@@ -1239,17 +1322,17 @@ function bindUI() {
   const userRoleEl = document.getElementById("userRole");
   if (userNameEl) userNameEl.textContent = u.name;
   if (userRoleEl) userRoleEl.textContent = u.role;
-  document.getElementById("logoutBtn").onclick = () => {
+  document.getElementById("logoutBtn")?.addEventListener("click", () => {
     localStorage.clear();
     location.href = "/login";
-  };
+  });
   document.querySelectorAll("#nav button").forEach((btn) => {
     btn.addEventListener("click", () => showSection(btn.dataset.section));
   });
   document.querySelectorAll("[data-go]").forEach((btn) => {
     btn.addEventListener("click", () => showSection(btn.dataset.go));
   });
-  document.getElementById("refreshBoard").onclick = loadDashboard;
+  document.getElementById("refreshBoard")?.addEventListener("click", () => loadDashboard().catch((e) => toast(e.message)));
   document.getElementById("refreshTallerBtn")?.addEventListener("click", () => loadTaller());
   document.getElementById("marketSearchBtn")?.addEventListener("click", () => runMarketSearch());
   document.getElementById("marketQuery")?.addEventListener("keydown", (e) => {
@@ -1272,7 +1355,7 @@ function bindUI() {
   const receivedBy = document.getElementById("receivedBy");
   if (receivedBy) receivedBy.value = u.name;
 
-  document.getElementById("receptionForm").onsubmit = async (e) => {
+  document.getElementById("receptionForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const btn = document.getElementById("submitIntakeBtn");
     try {
@@ -1342,17 +1425,21 @@ function bindUI() {
     }
   };
 
-  document.getElementById("settingsForm").onsubmit = async (e) => {
+  document.getElementById("settingsForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const fd = new FormData(e.target);
-    const body = Object.fromEntries(fd.entries());
-    body.labor_rate = Number(body.labor_rate || 0);
-    await api("/api/settings", { method: "PUT", body: JSON.stringify(body) });
-    toast("Configuración guardada");
-    loadSettings();
-  };
+    try {
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      body.labor_rate = Number(body.labor_rate || 0);
+      await api("/api/settings", { method: "PUT", body: JSON.stringify(body) });
+      toast("Configuración guardada");
+      loadSettings();
+    } catch (err) {
+      toast(err.message);
+    }
+  });
 
-  document.getElementById("newPartBtn").onclick = async () => {
+  document.getElementById("newPartBtn")?.addEventListener("click", async () => {
     openModal(`
       <h2>Nuevo repuesto</h2>
       <form id="partForm" class="form-grid">

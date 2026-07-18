@@ -422,7 +422,7 @@ th,td{{border-bottom:1px solid #ece4da;padding:8px;text-align:left}}
 </style></head><body>
 <p class="mark">Ka<span>tire</span></p>
 <p style="font-family:Syne,sans-serif;font-size:18px;letter-spacing:-0.03em;margin:6px 0 0">De la llave al XML.</p>
-<p class="muted">Comprobante electrónico · Hacienda Costa Rica v4.4 · {DOC_TYPES.get(doc.get('tipo_documento','01'),'')}</p>
+<p class="muted">Aitorepuestos · WhatsApp 8870-8123 · Hacienda CR v4.4 · {DOC_TYPES.get(doc.get('tipo_documento','01'),'')}</p>
 <div class="card">
 <strong>{doc['emisor']['nombre']}</strong><br/>
 <span class="muted">ID {doc['emisor']['numero_id']} · Actividad {doc['codigo_actividad']}</span><br/>
