@@ -239,6 +239,18 @@ def main() -> int:
                                 fail(f"mark-paid: {paid.status_code} {paid.text[:160]}")
                             else:
                                 ok("mark-paid")
+                            proof = client.get(
+                                f"/api/payments/cierre-proof?work_order_id={wo['id']}",
+                                headers=headers,
+                            )
+                            if proof.status_code != 200 or "Cierre en colones" not in proof.text:
+                                fail(f"cierre-proof: {proof.status_code}")
+                            else:
+                                ok("cierre-proof HTML")
+                            if not sp.get("promise"):
+                                fail("sinpe sin promise compartida")
+                            else:
+                                ok("promise Cierre en colones")
 
             # shops seeded
             shops = client.get("/api/suppliers?kind=tienda", headers=headers).json()

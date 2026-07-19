@@ -169,7 +169,7 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_us
 
 @app.post("/api/payments/sinpe-link")
 def payments_sinpe_link(payload: dict, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    """Genera mensaje WhatsApp con cobro SINPE (monto + teléfono taller + referencia OT/FE)."""
+    """Cierre en colones: WhatsApp SINPE + referencia OT/FE (prueba accionable)."""
     from app.sinpe_pay import create_sinpe_link
 
     wo_id = payload.get("work_order_id")
@@ -185,6 +185,27 @@ def payments_sinpe_link(payload: dict, db: Session = Depends(get_db), user: User
     return result
 
 
+@app.get("/api/payments/cierre-proof", response_class=HTMLResponse)
+def payments_cierre_proof(
+    work_order_id: int | None = None,
+    invoice_id: int | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Prueba imprimible del cierre de cobro (SINPE + estado + FE)."""
+    from app.sinpe_pay import cierre_proof_html, create_sinpe_link
+
+    result = create_sinpe_link(
+        db,
+        work_order_id=work_order_id,
+        invoice_id=invoice_id,
+        mark_sent=False,
+    )
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error") or "Sin datos de cierre")
+    return HTMLResponse(cierre_proof_html(result.get("proof") or result))
+
+
 @app.post("/api/work-orders/{work_order_id}/mark-paid")
 def work_order_mark_paid(work_order_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     wo = db.query(WorkOrder).filter(WorkOrder.id == work_order_id).first()
@@ -192,7 +213,13 @@ def work_order_mark_paid(work_order_id: int, db: Session = Depends(get_db), user
         raise HTTPException(status_code=404, detail="Orden no encontrada")
     wo.payment_status = "pagado"
     db.commit()
-    return {"ok": True, "id": wo.id, "code": wo.code, "payment_status": wo.payment_status}
+    return {
+        "ok": True,
+        "id": wo.id,
+        "code": wo.code,
+        "payment_status": wo.payment_status,
+        "promise": "Cierre en colones. Con prueba.",
+    }
 
 
 # ---------- Customers / Vehicles ----------
@@ -1270,7 +1297,7 @@ def health():
         "production": IS_PRODUCTION,
         "fe": "hacienda-cr-v4.4",
         "db": db_ok,
-        "build": "20260718f",
+        "build": "20260718g",
     }
 
 

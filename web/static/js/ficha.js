@@ -177,7 +177,7 @@ async function openReception(id) {
                 <button class="btn btn-warn" id="statusRepair">En reparación</button>
                 <button class="btn btn-ok" id="statusReady">Listo</button>
                 <button class="btn btn-primary" id="statusDeliver">Entregar</button>
-                <button class="btn btn-ok" id="btnSinpe">Cobrar por SINPE</button>
+                <button class="btn btn-ok" id="btnSinpe">Cierre en colones</button>
                 <button class="btn btn-ghost" id="btnMarkPaid">Marcar pagado</button>
                 <button class="btn btn-primary" id="btnFacturar">Facturar CR</button>
               </div>

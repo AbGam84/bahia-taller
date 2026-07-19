@@ -162,7 +162,7 @@ async function loadFacturacion() {
         <button class="btn btn-ghost" data-print="${inv.id}">PDF</button>
         <button class="btn btn-ok" data-send="${inv.id}">Enviar MH</button>
         <button class="btn btn-ghost" data-refresh="${inv.id}">Estado</button>
-        <button class="btn btn-primary" data-sinpe-inv="${inv.id}">Cobrar SINPE</button>
+        <button class="btn btn-primary" data-sinpe-inv="${inv.id}">Cierre colones</button>
       </td>
     </tr>`
       )
@@ -232,27 +232,41 @@ async function openSinpeCobro({ work_order_id, invoice_id } = {}) {
       method: "POST",
       body: JSON.stringify({ work_order_id, invoice_id, mark_sent: true }),
     });
-    if (res.wa_url) {
-      window.open(res.wa_url, "_blank");
-      toast(`SINPE ${res.reference} · ${money(res.amount)} — WhatsApp listo`);
-    } else {
-      openModal(`
-        <h2>Cobrar por SINPE</h2>
-        <p class="muted">No hay teléfono del cliente. Copie el mensaje o agréguelo en la ficha.</p>
-        <p><strong>${esc(res.reference)}</strong> · ${money(res.amount)}</p>
-        <p class="muted">SINPE: ${esc(res.sinpe_phone)} · ${esc(res.sinpe_name)}</p>
-        <textarea class="full" rows="8" readonly style="width:100%">${esc(res.message)}</textarea>
-        <div class="row-actions" style="margin-top:12px">
-          <button class="btn btn-primary" type="button" id="copySinpeMsg">Copiar mensaje</button>
-          <button class="btn btn-ghost" type="button" id="closeModalBtn">Cerrar</button>
-        </div>
-      `);
-      document.getElementById("closeModalBtn").onclick = closeModal;
-      document.getElementById("copySinpeMsg").onclick = async () => {
-        await navigator.clipboard.writeText(res.message);
-        toast("Mensaje copiado");
-      };
-    }
+    const q = work_order_id
+      ? `work_order_id=${work_order_id}`
+      : `invoice_id=${invoice_id}`;
+    openModal(`
+      <h2>Cierre en colones</h2>
+      <p class="muted"><strong>Con prueba.</strong> WhatsApp al cliente + comprobante imprimible (SINPE + referencia + FE).</p>
+      <p><strong>${esc(res.reference)}</strong> · ${money(res.amount)} · ${badge(res.payment_status || "sinpe_enviado")}</p>
+      <p class="muted">SINPE: ${esc(res.sinpe_phone)} · ${esc(res.sinpe_name)}</p>
+      ${res.fe_clave ? `<p class="muted">FE: <code>${esc(res.fe_clave)}</code></p>` : `<p class="muted">FE: pendiente de emitir</p>`}
+      <div class="row-actions" style="margin-top:12px">
+        ${res.wa_url ? `<a class="btn btn-ok" href="${esc(res.wa_url)}" target="_blank" rel="noopener">WhatsApp cobro</a>` : ""}
+        <button class="btn btn-primary" type="button" id="printCierre">Imprimir prueba</button>
+        <button class="btn btn-ghost" type="button" id="copySinpeMsg">Copiar mensaje</button>
+        <button class="btn btn-ghost" type="button" id="closeModalBtn">Cerrar</button>
+      </div>
+    `);
+    document.getElementById("closeModalBtn").onclick = closeModal;
+    document.getElementById("copySinpeMsg").onclick = async () => {
+      await navigator.clipboard.writeText(res.message);
+      toast("Mensaje copiado");
+    };
+    document.getElementById("printCierre").onclick = async () => {
+      const r = await fetch(`/api/payments/cierre-proof?${q}`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      const html = await r.text();
+      if (!r.ok) {
+        toast("No se pudo abrir la prueba");
+        return;
+      }
+      const w = window.open("", "_blank");
+      w.document.write(html);
+      w.document.close();
+    };
+    if (res.wa_url) toast(`Cierre ${res.reference} · ${money(res.amount)}`);
   } catch (err) {
     toast(err.message || "No se pudo generar cobro SINPE");
   }
