@@ -87,6 +87,7 @@ class WorkOrderUpdate(BaseModel):
     labor_hours: float | None = None
     labor_rate: float | None = None
     assigned_to: str | None = None
+    payment_status: str | None = None
 
 
 class PartIn(BaseModel):
@@ -160,3 +161,5 @@ class SettingsIn(BaseModel):
     whatsapp: str | None = None
     address: str | None = None
     labor_rate: float | None = None
+    sinpe_phone: str | None = None
+    sinpe_name: str | None = None

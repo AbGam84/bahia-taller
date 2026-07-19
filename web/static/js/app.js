@@ -162,6 +162,7 @@ async function loadFacturacion() {
         <button class="btn btn-ghost" data-print="${inv.id}">PDF</button>
         <button class="btn btn-ok" data-send="${inv.id}">Enviar MH</button>
         <button class="btn btn-ghost" data-refresh="${inv.id}">Estado</button>
+        <button class="btn btn-primary" data-sinpe-inv="${inv.id}">Cobrar SINPE</button>
       </td>
     </tr>`
       )
@@ -220,6 +221,41 @@ async function loadFacturacion() {
       }
     };
   });
+  document.querySelectorAll("[data-sinpe-inv]").forEach((btn) => {
+    btn.onclick = () => openSinpeCobro({ invoice_id: Number(btn.dataset.sinpeInv) });
+  });
+}
+
+async function openSinpeCobro({ work_order_id, invoice_id } = {}) {
+  try {
+    const res = await api("/api/payments/sinpe-link", {
+      method: "POST",
+      body: JSON.stringify({ work_order_id, invoice_id, mark_sent: true }),
+    });
+    if (res.wa_url) {
+      window.open(res.wa_url, "_blank");
+      toast(`SINPE ${res.reference} · ${money(res.amount)} — WhatsApp listo`);
+    } else {
+      openModal(`
+        <h2>Cobrar por SINPE</h2>
+        <p class="muted">No hay teléfono del cliente. Copie el mensaje o agréguelo en la ficha.</p>
+        <p><strong>${esc(res.reference)}</strong> · ${money(res.amount)}</p>
+        <p class="muted">SINPE: ${esc(res.sinpe_phone)} · ${esc(res.sinpe_name)}</p>
+        <textarea class="full" rows="8" readonly style="width:100%">${esc(res.message)}</textarea>
+        <div class="row-actions" style="margin-top:12px">
+          <button class="btn btn-primary" type="button" id="copySinpeMsg">Copiar mensaje</button>
+          <button class="btn btn-ghost" type="button" id="closeModalBtn">Cerrar</button>
+        </div>
+      `);
+      document.getElementById("closeModalBtn").onclick = closeModal;
+      document.getElementById("copySinpeMsg").onclick = async () => {
+        await navigator.clipboard.writeText(res.message);
+        toast("Mensaje copiado");
+      };
+    }
+  } catch (err) {
+    toast(err.message || "No se pudo generar cobro SINPE");
+  }
 }
 
 function openModal(html) {
@@ -390,6 +426,8 @@ async function loadSettings() {
   if (form.whatsapp) form.whatsapp.value = s.whatsapp || "+506 8870-8123";
   if (form.address) form.address.value = s.address || "Costa Rica";
   if (form.labor_rate) form.labor_rate.value = s.labor_rate || 15000;
+  if (form.sinpe_phone) form.sinpe_phone.value = s.sinpe_phone || s.whatsapp || "";
+  if (form.sinpe_name) form.sinpe_name.value = s.sinpe_name || s.shop_name || "";
 
   try {
     const users = await api("/api/users");

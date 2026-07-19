@@ -329,6 +329,8 @@ class ShopSettings(Base):
     address: Mapped[str] = mapped_column(String(255), default="Guanacaste, Costa Rica")
     labor_rate: Mapped[float] = mapped_column(Float, default=15000)
     currency: Mapped[str] = mapped_column(String(10), default="CRC")
+    sinpe_phone: Mapped[str] = mapped_column(String(40), default="")
+    sinpe_name: Mapped[str] = mapped_column(String(160), default="")
 
 
 class InspectionCheck(Base):

@@ -171,12 +171,14 @@ async function openReception(id) {
           ${wo ? `
             <div style="margin-top:14px">
               <h3>OT ${wo.code}</h3>
-              <p class="muted">MO ${money(wo.labor_total)} · Piezas ${money(wo.parts_total)} · <strong>Total ${money(wo.grand_total)}</strong></p>
+              <p class="muted">MO ${money(wo.labor_total)} · Piezas ${money(wo.parts_total)} · <strong>Total ${money(wo.grand_total)}</strong> · Cobro ${badge(wo.payment_status || "pendiente")}</p>
               <ul>${(wo.lines || []).map((l) => `<li>${l.description} × ${l.quantity} · ${badge(l.status)} · ${money(l.line_total)}</li>`).join("") || "<li class='muted'>Sin líneas</li>"}</ul>
               <div class="row-actions">
                 <button class="btn btn-warn" id="statusRepair">En reparación</button>
                 <button class="btn btn-ok" id="statusReady">Listo</button>
                 <button class="btn btn-primary" id="statusDeliver">Entregar</button>
+                <button class="btn btn-ok" id="btnSinpe">Cobrar por SINPE</button>
+                <button class="btn btn-ghost" id="btnMarkPaid">Marcar pagado</button>
                 <button class="btn btn-primary" id="btnFacturar">Facturar CR</button>
               </div>
             </div>` : ""}
@@ -320,7 +322,7 @@ async function openReception(id) {
           work_order_id: wo.id,
           tipo_documento: "01",
           condicion_venta: "01",
-          medio_pago: "01",
+          medio_pago: "06",
           tarifa_codigo: "08",
         }),
       });
@@ -332,6 +334,26 @@ async function openReception(id) {
       const w = window.open("", "_blank");
       w.document.write(html);
       w.document.close();
+    } catch (err) {
+      toast(err.message);
+    }
+  });
+  document.getElementById("btnSinpe")?.addEventListener("click", async () => {
+    if (!wo) return;
+    if (typeof openSinpeCobro === "function") {
+      await openSinpeCobro({ work_order_id: wo.id });
+      openReception(id);
+    } else {
+      toast("Recargue la página para cobro SINPE");
+    }
+  });
+  document.getElementById("btnMarkPaid")?.addEventListener("click", async () => {
+    if (!wo) return;
+    try {
+      await api(`/api/work-orders/${wo.id}/mark-paid`, { method: "POST", body: "{}" });
+      toast("Marcado como pagado");
+      openReception(id);
+      loadDashboard();
     } catch (err) {
       toast(err.message);
     }

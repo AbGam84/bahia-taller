@@ -20,6 +20,8 @@ SHOP = {
     "address": "Costa Rica",
     "labor_rate": 15000,  # tarifa hora sugerida; ajustable en Casa
     "currency": "CRC",
+    "sinpe_phone": "88708123",
+    "sinpe_name": "Aitorepuestos",
 }
 
 ISSUER = {
@@ -97,6 +99,10 @@ def ensure_settings(db: Session) -> None:
         settings.address = SHOP["address"]
         if not settings.labor_rate:
             settings.labor_rate = SHOP["labor_rate"]
+        if not getattr(settings, "sinpe_phone", None):
+            settings.sinpe_phone = SHOP.get("sinpe_phone") or settings.whatsapp or settings.phone
+        if not getattr(settings, "sinpe_name", None):
+            settings.sinpe_name = SHOP.get("sinpe_name") or settings.shop_name
     db.commit()
 
 

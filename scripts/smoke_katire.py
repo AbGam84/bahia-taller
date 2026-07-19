@@ -204,6 +204,42 @@ def main() -> int:
                             if len(clave) != 50:
                                 fail(f"clave debe ser 50, es {len(clave)}")
 
+                        # Cobro SINPE — asegurar monto en OT
+                        line = client.post(
+                            f"/api/work-orders/{wo['id']}/lines",
+                            json={
+                                "description": "Mano de obra smoke",
+                                "quantity": 1,
+                                "unit_price": 25000,
+                            },
+                            headers=headers,
+                        )
+                        if line.status_code != 200:
+                            fail(f"OT line: {line.status_code} {line.text[:180]}")
+                        else:
+                            ok("OT line monto")
+                        sinpe = client.post(
+                            "/api/payments/sinpe-link",
+                            json={"work_order_id": wo["id"]},
+                            headers=headers,
+                        )
+                        if sinpe.status_code != 200:
+                            fail(f"sinpe-link: {sinpe.status_code} {sinpe.text[:220]}")
+                        else:
+                            sp = sinpe.json()
+                            if not sp.get("message") or not sp.get("reference"):
+                                fail("sinpe-link sin mensaje/referencia")
+                            else:
+                                ok(f"sinpe {sp.get('reference')} amount={sp.get('amount')}")
+                            paid = client.post(
+                                f"/api/work-orders/{wo['id']}/mark-paid",
+                                headers=headers,
+                            )
+                            if paid.status_code != 200 or paid.json().get("payment_status") != "pagado":
+                                fail(f"mark-paid: {paid.status_code} {paid.text[:160]}")
+                            else:
+                                ok("mark-paid")
+
             # shops seeded
             shops = client.get("/api/suppliers?kind=tienda", headers=headers).json()
             names = " ".join(s.get("name", "") for s in shops).lower()

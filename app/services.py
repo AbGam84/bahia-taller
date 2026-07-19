@@ -179,6 +179,7 @@ def work_order_dict(wo: WorkOrder) -> dict:
         "parts_total": wo.parts_total,
         "grand_total": wo.grand_total,
         "assigned_to": wo.assigned_to,
+        "payment_status": getattr(wo, "payment_status", None) or "pendiente",
         "created_at": wo.created_at.isoformat() if wo.created_at else None,
         "lines": [
             {

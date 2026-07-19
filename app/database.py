@@ -43,6 +43,12 @@ def migrate_schema() -> None:
                 conn.execute(
                     text("ALTER TABLE work_orders ADD COLUMN payment_status VARCHAR(30) DEFAULT 'pendiente'")
                 )
+        if "shop_settings" in tables:
+            scols = {c["name"] for c in insp.get_columns("shop_settings")}
+            if "sinpe_phone" not in scols:
+                conn.execute(text("ALTER TABLE shop_settings ADD COLUMN sinpe_phone VARCHAR(40) DEFAULT ''"))
+            if "sinpe_name" not in scols:
+                conn.execute(text("ALTER TABLE shop_settings ADD COLUMN sinpe_name VARCHAR(160) DEFAULT ''"))
         if "suppliers" in tables:
             scols = {c["name"] for c in insp.get_columns("suppliers")}
             adds = {

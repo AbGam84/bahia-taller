@@ -146,6 +146,8 @@ def settings_get(db: Session = Depends(get_db), user: User = Depends(get_current
         "address": s.address,
         "labor_rate": s.labor_rate,
         "currency": s.currency,
+        "sinpe_phone": getattr(s, "sinpe_phone", None) or s.whatsapp or s.phone or "",
+        "sinpe_name": getattr(s, "sinpe_name", None) or s.shop_name or "",
     }
 
 
@@ -163,6 +165,34 @@ def settings_put(payload: SettingsIn, db: Session = Depends(get_db), user: User 
 @app.get("/api/dashboard")
 def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     return owner_analytics(db)
+
+
+@app.post("/api/payments/sinpe-link")
+def payments_sinpe_link(payload: dict, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Genera mensaje WhatsApp con cobro SINPE (monto + teléfono taller + referencia OT/FE)."""
+    from app.sinpe_pay import create_sinpe_link
+
+    wo_id = payload.get("work_order_id")
+    inv_id = payload.get("invoice_id")
+    result = create_sinpe_link(
+        db,
+        work_order_id=int(wo_id) if wo_id not in (None, "") else None,
+        invoice_id=int(inv_id) if inv_id not in (None, "") else None,
+        mark_sent=bool(payload.get("mark_sent", True)),
+    )
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error") or "No se pudo generar cobro SINPE")
+    return result
+
+
+@app.post("/api/work-orders/{work_order_id}/mark-paid")
+def work_order_mark_paid(work_order_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    wo = db.query(WorkOrder).filter(WorkOrder.id == work_order_id).first()
+    if not wo:
+        raise HTTPException(status_code=404, detail="Orden no encontrada")
+    wo.payment_status = "pagado"
+    db.commit()
+    return {"ok": True, "id": wo.id, "code": wo.code, "payment_status": wo.payment_status}
 
 
 # ---------- Customers / Vehicles ----------
@@ -523,8 +553,6 @@ def work_order_add_line(
             }
         db.commit()
         return {"mode": "reserved", "message": "Repuesto reservado desde bodega.", "work_order": work_order_get(work_order_id, db, user)}
-
-    from app.models import WorkOrderLine
 
     price = payload.unit_price or 0
     line = WorkOrderLine(
@@ -1242,7 +1270,7 @@ def health():
         "production": IS_PRODUCTION,
         "fe": "hacienda-cr-v4.4",
         "db": db_ok,
-        "build": "20260718e",
+        "build": "20260718f",
     }
 
 
