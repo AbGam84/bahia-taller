@@ -395,6 +395,17 @@ def public_payload(db: Session, token: str) -> dict | None:
     settings = get_settings(db)
     v = r.vehicle
     c = v.customer if v else None
+    # Avance por estado real: si el patio ya pasó de etapa sin cotizar,
+    # no dejamos el timeline trabado en "Cotización / Aprobación".
+    advanced_past_quote = r.status in (
+        "esperando_repuestos",
+        "en_reparacion",
+        "listo",
+        "entregado",
+    )
+    has_estimate = bool(r.estimate)
+    estimate_sent = has_estimate and r.estimate.status != "borrador"
+    estimate_approved = has_estimate and r.estimate.status == "aprobada"
     timeline = [
         {"key": "recibido", "label": "Ingresó al patio", "done": True},
         {
@@ -406,13 +417,15 @@ def public_payload(db: Session, token: str) -> dict | None:
         },
         {
             "key": "cotizacion",
-            "label": "Cotización",
-            "done": bool(r.estimate) and r.estimate.status != "borrador",
+            "label": "Cotización" if has_estimate or not advanced_past_quote else "Cotización (omitida)",
+            "done": estimate_sent or advanced_past_quote,
         },
         {
             "key": "aprobada",
-            "label": "Aprobación del cliente",
-            "done": bool(r.estimate) and r.estimate.status == "aprobada",
+            "label": "Aprobación del cliente"
+            if has_estimate or not advanced_past_quote
+            else "Aprobación (omitida)",
+            "done": estimate_approved or advanced_past_quote,
         },
         {
             "key": "en_reparacion",

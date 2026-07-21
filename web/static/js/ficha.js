@@ -174,14 +174,17 @@ async function openReception(id) {
               <p class="muted">MO ${money(wo.labor_total)} · Piezas ${money(wo.parts_total)} · <strong>Total ${money(wo.grand_total)}</strong> · Cobro ${badge(wo.payment_status || "pendiente")}</p>
               <ul>${(wo.lines || []).map((l) => `<li>${l.description} × ${l.quantity} · ${badge(l.status)} · ${money(l.line_total)}</li>`).join("") || "<li class='muted'>Sin líneas</li>"}</ul>
               <div class="row-actions">
-                <button class="btn btn-warn" id="statusRepair">En reparación</button>
-                <button class="btn btn-ok" id="statusReady">Listo</button>
-                <button class="btn btn-primary" id="statusDeliver">Entregar</button>
                 <button class="btn btn-ok" id="btnSinpe">Cierre en colones</button>
                 <button class="btn btn-ghost" id="btnMarkPaid">Marcar pagado</button>
                 <button class="btn btn-primary" id="btnFacturar">Facturar CR</button>
               </div>
-            </div>` : ""}
+            </div>` : `<p class="muted" style="margin-top:12px">Sin OT aún — puede avanzar el patio abajo o guardar el diagnóstico.</p>`}
+          ${typeof avanceControlsHtml === "function" ? avanceControlsHtml(r.status) : `
+            <div class="row-actions" style="margin-top:12px">
+              <button class="btn btn-warn" id="statusRepair">En reparación</button>
+              <button class="btn btn-ok" id="statusReady">Listo</button>
+              <button class="btn btn-primary" id="statusDeliver">Entregar</button>
+            </div>`}
           ${est ? `<div style="margin-top:14px"><h3>Cotización ${est.code}</h3><p>${badge(est.status)} · ${money(est.grand_total)}</p></div>` : ""}
         </div>
       </div>
@@ -304,12 +307,24 @@ async function openReception(id) {
   });
 
   const patchStatus = async (status) => {
-    await api(`/api/receptions/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
-    toast(`Estado: ${status.replaceAll("_", " ")}`);
-    openReception(id);
-    loadDashboard();
-    loadTaller();
+    try {
+      await api(`/api/receptions/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
+      const label = (typeof STATUS_LABELS !== "undefined" && STATUS_LABELS[status]) || status;
+      toast(`Estado: ${String(label).replaceAll("_", " ")}`);
+      openReception(id);
+      loadDashboard();
+      if (typeof loadTaller === "function") loadTaller();
+    } catch (err) {
+      toast(err.message || "No se pudo avanzar el estado");
+    }
   };
+  document.getElementById("btnAvanceNext")?.addEventListener("click", (ev) => {
+    const st = ev.currentTarget.dataset.status;
+    if (st) patchStatus(st);
+  });
+  document.querySelectorAll(".btn-avance").forEach((btn) => {
+    btn.addEventListener("click", () => patchStatus(btn.dataset.status));
+  });
   document.getElementById("statusRepair")?.addEventListener("click", () => patchStatus("en_reparacion"));
   document.getElementById("statusReady")?.addEventListener("click", () => patchStatus("listo"));
   document.getElementById("statusDeliver")?.addEventListener("click", () => patchStatus("entregado"));

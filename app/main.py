@@ -380,12 +380,20 @@ def reception_status(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    from app.services import STATUS_FLOW
+
     r = db.query(Reception).filter(Reception.id == reception_id).first()
     if not r:
         raise HTTPException(status_code=404, detail="Recepción no encontrada")
-    r.status = payload.status
+    status = (payload.status or "").strip()
+    if status not in STATUS_FLOW:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Estado inválido. Use: {', '.join(STATUS_FLOW)}",
+        )
+    r.status = status
     r.updated_at = datetime.utcnow()
-    if payload.status == "entregado" and r.work_order:
+    if status == "entregado" and r.work_order:
         r.work_order.status = "cerrada"
         r.work_order.closed_at = datetime.utcnow()
     db.commit()
@@ -1297,7 +1305,7 @@ def health():
         "production": IS_PRODUCTION,
         "fe": "hacienda-cr-v4.4",
         "db": db_ok,
-        "build": "20260721a",
+        "build": "20260721b",
     }
 
 

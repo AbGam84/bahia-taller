@@ -12,6 +12,64 @@ const STATUS_COLS = [
   ["listo", "Listo para salir"],
 ];
 
+const STATUS_FLOW = [
+  "recibido",
+  "en_diagnostico",
+  "esperando_repuestos",
+  "en_reparacion",
+  "listo",
+  "entregado",
+];
+
+const STATUS_LABELS = {
+  recibido: "Recibido",
+  en_diagnostico: "En diagnóstico",
+  esperando_repuestos: "Esperando repuestos",
+  en_reparacion: "En reparación",
+  listo: "Listo",
+  entregado: "Entregado",
+};
+
+function nextPatioStatus(current) {
+  const i = STATUS_FLOW.indexOf(current);
+  if (i < 0 || i >= STATUS_FLOW.length - 1) return null;
+  return STATUS_FLOW[i + 1];
+}
+
+function avanceControlsHtml(currentStatus) {
+  const next = nextPatioStatus(currentStatus);
+  const buttons = [
+    ["en_diagnostico", "Diagnóstico", "btn-ghost"],
+    ["esperando_repuestos", "Esperando pieza", "btn-ghost"],
+    ["en_reparacion", "En reparación", "btn-warn"],
+    ["listo", "Listo", "btn-ok"],
+    ["entregado", "Entregar", "btn-primary"],
+  ]
+    .filter(([st]) => st !== currentStatus)
+    .map(
+      ([st, label, cls]) =>
+        `<button type="button" class="btn ${cls} btn-avance" data-status="${st}">${label}</button>`
+    )
+    .join("");
+  return `
+    <div class="avance-box" style="margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:14px;background:rgba(0,0,0,0.18)">
+      <h3 style="margin:0 0 6px">Avance del patio</h3>
+      <p class="muted" style="margin:0 0 10px">Ahora: ${badge(currentStatus)}${
+        next
+          ? ` · Siguiente: <strong>${STATUS_LABELS[next] || next}</strong>`
+          : " · Ya entregado"
+      }</p>
+      <div class="row-actions">
+        ${
+          next
+            ? `<button type="button" class="btn btn-primary" id="btnAvanceNext" data-status="${next}">Avanzar a ${STATUS_LABELS[next] || next}</button>`
+            : ""
+        }
+        ${buttons}
+      </div>
+    </div>`;
+}
+
 const BRAND = "Katire";
 const arrivalPhotoFiles = [];
 let signaturePad = null;
@@ -683,12 +741,10 @@ async function openTallerJob(id) {
           <p>${esc(wo.labor_notes || d.recommended_work || "")}</p>
           <ul>${(wo.lines || []).map((l) => `<li>${esc(l.description)} × ${l.quantity} · ${badge(l.status)} · ${money(l.line_total)}</li>`).join("") || "<li class='muted'>Sin repuestos aún — agréguelos desde Bodega o la ficha</li>"}</ul>
           <div class="row-actions">
-            <button class="btn btn-warn" id="otRepair">En reparación</button>
-            <button class="btn btn-ok" id="otReady">Marcar listo</button>
-            <button class="btn btn-primary" id="otDeliver">Entregar</button>
             <button class="btn btn-ghost" id="otOpenFicha">Ver ficha completa</button>
           </div>
-        ` : `<p class="muted" style="margin-top:14px">Aún no hay OT. Complete el diagnóstico y pulse el botón verde.</p>`}
+        ` : `<p class="muted" style="margin-top:14px">Aún no hay OT. Complete el diagnóstico y pulse el botón verde — o avance el estado abajo.</p>`}
+        ${avanceControlsHtml(r.status)}
       </div>
     `;
 
@@ -759,7 +815,7 @@ async function openTallerJob(id) {
     const patch = async (status) => {
       try {
         await api(`/api/receptions/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) });
-        toast(`Estado: ${status.replaceAll("_", " ")}`);
+        toast(`Estado: ${(STATUS_LABELS[status] || status).replaceAll("_", " ")}`);
         loadDashboard();
         await loadTaller();
         await openTallerJob(id);
@@ -767,9 +823,13 @@ async function openTallerJob(id) {
         toast(err.message);
       }
     };
-    document.getElementById("otRepair")?.addEventListener("click", () => patch("en_reparacion"));
-    document.getElementById("otReady")?.addEventListener("click", () => patch("listo"));
-    document.getElementById("otDeliver")?.addEventListener("click", () => patch("entregado"));
+    document.getElementById("btnAvanceNext")?.addEventListener("click", (ev) => {
+      const st = ev.currentTarget.dataset.status;
+      if (st) patch(st);
+    });
+    ws.querySelectorAll(".btn-avance").forEach((btn) => {
+      btn.addEventListener("click", () => patch(btn.dataset.status));
+    });
     document.getElementById("otOpenFicha")?.addEventListener("click", () => openReception(id));
     document.getElementById("printDiagBtn")?.addEventListener("click", async () => {
       try {
