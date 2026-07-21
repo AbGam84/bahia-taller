@@ -1,0 +1,29 @@
+================================================
+KATIRE — ACCESO PARA EL CLIENTE
+================================================
+
+OPCION A — NUBE (mas facil, sin instalar nada)
+  1. Abra Chrome o Edge
+  2. Entre a: https://katire.onrender.com
+  3. Espere 40-60 segundos la PRIMERA vez (se enciende el servidor)
+  4. Si sale error, pulse F5 / Recargar
+
+  Usuario:  cliente
+  Clave:    VerKatire2026
+
+  Dueño:    admin
+  Clave:    DuenoKatire2026
+
+OPCION B — EN ESTA COMPUTADORA
+  1. Doble clic: INSTALAR-Y-ABRIR-KATIRE.bat
+  2. Si pide Python, instalelo y marque "Add to PATH"
+  3. Espere el mensaje LISTO
+  4. Entra solo el navegador a http://127.0.0.1:8096/login
+  5. NO cierre la ventana negra "Katire-Server"
+
+SI NO FUNCIONA NADA
+  Ejecute: Diagnostico-PC-Cliente.bat
+  Y envienos una foto de la pantalla.
+
+NO use la clave admin123 — esa NO existe.
+================================================

@@ -1297,7 +1297,7 @@ def health():
         "production": IS_PRODUCTION,
         "fe": "hacienda-cr-v4.4",
         "db": db_ok,
-        "build": "20260718g",
+        "build": "20260721a",
     }
 
 

@@ -1,24 +1,22 @@
 Copie y pegue esto al cliente (WhatsApp / correo):
 
 ------------------------------------------------
-Buenas. Le dejo el acceso para que mire Katire
-(el sistema del taller + bodega + facturación CR)
-y nos vaya diciendo qué necesita exactamente.
+Buenas. Acceso a Katire (taller + bodega + facturación CR).
 
-Enlace:
+NUBE (sin instalar):
 https://katire.onrender.com
+Primera vez: espere 40–60 segundos y recargue (F5).
 
 Usuario: cliente
 Clave: VerKatire2026
 
-Puede entrar, explorar menús y anotarnos:
-1) Qué usa todos los días
-2) Qué le falta
-3) Qué sobra o le complica
-4) Prioridad: recepción, diagnóstico, bodega, pedidos o facturas
+Dueño (usted): admin / DuenoKatire2026
 
-Nota: la primera vez puede tardar 30–50 segundos en abrir
-(servidor en la nube). Si no abre, espere e intente de nuevo.
+Si no abre: espere un minuto y F5. No use admin123.
 
-Quedamos atentos a su feedback para dejarlo a su medida.
+En la PC del taller (opcional):
+doble clic INSTALAR-Y-ABRIR-KATIRE.bat
+(requiere Python 3.10+ con PATH).
+
+Si algo falla: Diagnostico-PC-Cliente.bat y mándenos foto.
 ------------------------------------------------
