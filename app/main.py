@@ -21,7 +21,6 @@ from app.pro import (
     owner_analytics,
     public_payload,
     seed_inspection,
-    seed_services,
     vehicle_history,
 )
 from app.models import (
@@ -103,14 +102,8 @@ def on_startup():
     migrate_schema()
     db = next(get_db())
     try:
-        try:
-            seed_if_empty(db)
-        except Exception as exc:  # noqa: BLE001 — no tumbar el servidor por seed
-            print(f"[katire] seed warning: {exc}")
-        try:
-            seed_services(db)
-        except Exception as exc:  # noqa: BLE001
-            print(f"[katire] services seed warning: {exc}")
+        # Si el seed falla, el patio queda vacío: mejor tumbar el arranque que fingir que sirve.
+        seed_if_empty(db)
     finally:
         db.close()
 
@@ -1318,13 +1311,13 @@ def health():
         db_ok = False
 
     return {
-        "ok": True,
+        "ok": db_ok,
         "service": "katire",
         "environment": ENVIRONMENT,
         "production": IS_PRODUCTION,
         "fe": "hacienda-cr-v4.4",
         "db": db_ok,
-        "build": "20260722a",
+        "build": "20260722c",
     }
 
 
@@ -1404,8 +1397,8 @@ def fe_issuer_get(db: Session = Depends(get_db), user: User = Depends(get_curren
 
 @app.put("/api/fe/issuer")
 def fe_issuer_put(payload: IssuerIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Solo administrador")
+    if user.role not in ("admin", "recepcion"):
+        raise HTTPException(status_code=403, detail="Sin permiso para editar emisor FE")
     issuer = get_issuer(db)
     data = payload.model_dump()
     pwd = data.pop("hacienda_password", "")
@@ -1427,8 +1420,8 @@ async def fe_cert_upload(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Solo administrador")
+    if user.role not in ("admin", "recepcion"):
+        raise HTTPException(status_code=403, detail="Sin permiso para subir certificado FE")
     name = Path(file.filename or "cert.p12").name
     ext = Path(name).suffix.lower()
     if ext not in {".p12", ".pfx"}:

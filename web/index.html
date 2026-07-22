@@ -10,9 +10,9 @@
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
-        <img src="/static/brand/logo.png" alt="Katire" style="width:52px;height:52px;border-radius:14px;margin-bottom:10px;object-fit:cover" />
+        <img src="/static/brand/logo.png?v=20260722c" alt="Katire · Aitorepuestos" style="width:64px;height:64px;border-radius:16px;margin-bottom:10px;object-fit:cover" />
         <div class="brand-mark"><span class="k">K</span>atire</div>
-        <small id="shopNameLabel" style="display:block;margin-top:6px;color:var(--foam);font-weight:700">Aitorepuestos</small>
+        <strong id="shopNameLabel" style="display:block;margin-top:8px;color:var(--foam);font-weight:800;letter-spacing:0.02em">Aitorepuestos</strong>
         <small id="shopSlogan">De la llave al XML.</small>
       </div>
       <nav class="nav" id="nav">
@@ -141,16 +141,50 @@
                 <input name="plate" required placeholder="GAA-123" style="text-transform:uppercase" />
               </label>
               <label>Marca
-                <input name="brand" required placeholder="Toyota" />
+                <select name="brand" id="intakeBrand" required>
+                  <option value="">Seleccione marca…</option>
+                  <option>Toyota</option>
+                  <option>Nissan</option>
+                  <option>Hyundai</option>
+                  <option>Kia</option>
+                  <option>Suzuki</option>
+                  <option>Honda</option>
+                  <option>Mazda</option>
+                  <option>Mitsubishi</option>
+                  <option>Chevrolet</option>
+                  <option>Ford</option>
+                  <option>Volkswagen</option>
+                  <option>Isuzu</option>
+                  <option>Great Wall</option>
+                  <option>BYD</option>
+                  <option>Otra</option>
+                </select>
               </label>
               <label>Modelo
-                <input name="model" required placeholder="Corolla" />
+                <select name="model" id="intakeModel" required>
+                  <option value="">Primero elija marca…</option>
+                </select>
+                <input name="model_other" id="intakeModelOther" placeholder="Escriba el modelo" style="display:none;margin-top:8px" />
               </label>
               <label>Año
-                <input name="year" type="number" placeholder="2018" />
+                <select name="year" id="intakeYear">
+                  <option value="">Año…</option>
+                </select>
               </label>
               <label>Color
-                <input name="color" />
+                <select name="color" id="intakeColor">
+                  <option value="">Color…</option>
+                  <option>Blanco</option>
+                  <option>Negro</option>
+                  <option>Gris</option>
+                  <option>Plata</option>
+                  <option>Rojo</option>
+                  <option>Azul</option>
+                  <option>Verde</option>
+                  <option>Beige</option>
+                  <option>Dorado</option>
+                  <option>Otro</option>
+                </select>
               </label>
               <label>Kilometraje
                 <input name="odometer_km" type="number" value="0" />
@@ -504,7 +538,7 @@
     <div class="modal" id="modalBody"></div>
   </div>
   <div class="toast" id="toast"></div>
-  <script src="/static/js/app.js?v=20260722a"></script>
-  <script src="/static/js/ficha.js?v=20260722a"></script>
+  <script src="/static/js/app.js?v=20260722c"></script>
+  <script src="/static/js/ficha.js?v=20260722c"></script>
 </body>
 </html>

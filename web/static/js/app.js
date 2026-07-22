@@ -359,15 +359,75 @@ function closeModal() {
   if (body) body.innerHTML = "";
 }
 
+const VEHICLE_MODELS = {
+  Toyota: ["Corolla", "Yaris", "Hilux", "Rav4", "Fortuner", "Prado", "Rush", "Agya", "Otro"],
+  Nissan: ["Versa", "Sentra", "Frontier", "X-Trail", "March", "Navara", "Otro"],
+  Hyundai: ["Accent", "Tucson", "Santa Fe", "Elantra", "Creta", "i10", "Otro"],
+  Kia: ["Rio", "Sportage", "Sorento", "Picanto", "Seltos", "Otro"],
+  Suzuki: ["Swift", "Vitara", "Jimny", "Alto", "Dzire", "Otro"],
+  Honda: ["Civic", "CR-V", "Fit", "HR-V", "City", "Otro"],
+  Mazda: ["Mazda3", "CX-5", "CX-30", "BT-50", "Otro"],
+  Mitsubishi: ["L200", "Montero", "Outlander", "ASX", "Otro"],
+  Chevrolet: ["Spark", "Aveo", "Sail", "Colorado", "Tracker", "Otro"],
+  Ford: ["Ranger", "Escape", "Explorer", "Fiesta", "Otro"],
+  Volkswagen: ["Jetta", "Gol", "Tiguan", "Polo", "Otro"],
+  Isuzu: ["D-Max", "mu-X", "Otro"],
+  "Great Wall": ["Wingle", "Poer", "Otro"],
+  BYD: ["Yuan", "Song", "Dolphin", "Otro"],
+  Otra: ["Otro"],
+};
+
 function initZones() {
   const grid = document.getElementById("zoneGrid");
   if (!grid) return;
+  if (grid.dataset.bound === "1") return;
+  grid.dataset.bound = "1";
   grid.innerHTML = ZONES.map(
     (z) => `<button type="button" class="zone-chip" data-zone="${z}">${z}</button>`
   ).join("");
   grid.addEventListener("click", (e) => {
     const btn = e.target.closest(".zone-chip");
     if (btn) btn.classList.toggle("active");
+  });
+}
+
+function initIntakeVehicleOptions() {
+  const brand = document.getElementById("intakeBrand");
+  const model = document.getElementById("intakeModel");
+  const modelOther = document.getElementById("intakeModelOther");
+  const year = document.getElementById("intakeYear");
+  if (!brand || !model || brand.dataset.bound === "1") return;
+  brand.dataset.bound = "1";
+
+  if (year && year.options.length <= 1) {
+    const yNow = new Date().getFullYear() + 1;
+    for (let y = yNow; y >= 1990; y -= 1) {
+      const opt = document.createElement("option");
+      opt.value = String(y);
+      opt.textContent = String(y);
+      year.appendChild(opt);
+    }
+  }
+
+  const fillModels = () => {
+    const list = VEHICLE_MODELS[brand.value] || ["Otro"];
+    model.innerHTML = `<option value="">Seleccione modelo…</option>${list
+      .map((m) => `<option value="${m}">${m}</option>`)
+      .join("")}`;
+    if (modelOther) {
+      modelOther.style.display = "none";
+      modelOther.required = false;
+      modelOther.value = "";
+    }
+  };
+
+  brand.addEventListener("change", fillModels);
+  model.addEventListener("change", () => {
+    if (!modelOther) return;
+    const needsOther = model.value === "Otro" || brand.value === "Otra";
+    modelOther.style.display = needsOther ? "block" : "none";
+    modelOther.required = needsOther;
+    if (!needsOther) modelOther.value = "";
   });
 }
 
@@ -564,7 +624,11 @@ async function uploadArrivalMedia(receptionId) {
 async function loadSettings() {
   const s = await api("/api/settings");
   setText("shopSlogan", s.slogan || "De la llave al XML.");
-  setText("shopNameLabel", s.shop_name || "Aitorepuestos");
+  // Marca del negocio: Aitorepuestos (nunca “Autorespuesto”)
+  let shopName = String(s.shop_name || "Aitorepuestos");
+  shopName = shopName.replace(/autorespuestos?/gi, "Aitorepuestos");
+  if (!/aitorepuestos/i.test(shopName)) shopName = "Aitorepuestos";
+  setText("shopNameLabel", shopName);
   const form = document.getElementById("settingsForm");
   if (!form) return;
   if (form.shop_name) form.shop_name.value = s.shop_name || "Aitorepuestos";
@@ -1563,11 +1627,11 @@ function bindUI() {
           phone: fd.get("customer_phone"),
           id_number: fd.get("customer_id_number"),
         },
-        plate: String(fd.get("plate") || "").toUpperCase(),
-        brand: fd.get("brand"),
-        model: fd.get("model"),
+        plate: String(fd.get("plate") || "").toUpperCase().trim(),
+        brand: String(fd.get("brand") || "").trim(),
+        model: String(fd.get("model_other") || fd.get("model") || "").trim(),
         year: Number(fd.get("year") || 0),
-        color: fd.get("color"),
+        color: String(fd.get("color") || "").trim(),
         odometer_km: Number(fd.get("odometer_km") || 0),
         fuel_level: fd.get("fuel_level"),
         promised_hours: Number(fd.get("promised_hours") || 24),
@@ -1674,12 +1738,16 @@ function bindUI() {
 
   document.getElementById("issuerForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const body = Object.fromEntries(new FormData(e.target).entries());
-    if (!body.hacienda_password) delete body.hacienda_password;
-    if (!body.pin_cert) delete body.pin_cert;
-    await api("/api/fe/issuer", { method: "PUT", body: JSON.stringify(body) });
-    toast("Emisor Hacienda guardado");
-    loadFacturacion();
+    try {
+      const body = Object.fromEntries(new FormData(e.target).entries());
+      if (!body.hacienda_password) delete body.hacienda_password;
+      if (!body.pin_cert) delete body.pin_cert;
+      await api("/api/fe/issuer", { method: "PUT", body: JSON.stringify(body) });
+      toast("Emisor Hacienda guardado");
+      loadFacturacion();
+    } catch (err) {
+      toast(err.message || "No se pudo guardar el emisor");
+    }
   });
 
   document.getElementById("testHaciendaBtn")?.addEventListener("click", async () => {
@@ -1713,15 +1781,26 @@ function bindUI() {
   });
 
   document.getElementById("issueFeBtn")?.addEventListener("click", async () => {
+    try {
+    let ready = null;
+    try {
+      ready = await api("/api/fe/readiness");
+    } catch (_) {}
+    if (ready && !ready.ready) {
+      const missing = (ready.missing || []).join(", ") || "ATV / certificado .p12";
+      toast(`Factura incompleta: falta ${missing}. Complete Emisor y suba el .p12`);
+      return;
+    }
     const taller = await api("/api/receptions");
     const withOt = taller.filter((r) => r.work_order);
     if (!withOt.length) {
-      toast("Primero cree una OT en Diagnóstico");
+      toast("Primero cree una OT en Diagnóstico & OT");
+      showSection("taller");
       return;
     }
     openModal(`
       <h2>Emitir y enviar a Hacienda</h2>
-      <p class="muted">Katire firma con su .p12, transmite a ATV y consulta aceptación.</p>
+      <p class="muted">Aitorepuestos · Katire firma con su .p12, transmite a ATV y consulta aceptación.</p>
       <form id="feIssueForm" class="form-grid">
         <label class="full">Orden de trabajo
           <select name="work_order_id" required>
@@ -1790,6 +1869,9 @@ function bindUI() {
         toast(err.message);
       }
     };
+    } catch (err) {
+      toast(err.message || "No se pudo abrir facturación");
+    }
   });
 
   document.getElementById("newUserBtn")?.addEventListener("click", () => {
@@ -1882,6 +1964,7 @@ function bindUI() {
   document.getElementById("newSupplierBtn")?.addEventListener("click", () => openNewSupplier("tienda"));
 
   initZones();
+  initIntakeVehicleOptions();
   initArrivalPhotos();
   initSignaturePad();
   loadSettings().catch((err) => toast(err.message || "No se pudo cargar identidad"));

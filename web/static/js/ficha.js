@@ -43,9 +43,19 @@ async function openReception(id) {
   let history = [];
   try {
     parts = await api(`/api/parts/lookup?brand=${encodeURIComponent(v.brand || "")}&model=${encodeURIComponent(v.model || "")}`);
-  } catch (_) {}
-  try { services = await api("/api/services"); } catch (_) {}
-  try { if (v.id) history = await api(`/api/vehicles/${v.id}/history`); } catch (_) {}
+  } catch (err) {
+    toast(err.message || "No se pudo cargar bodega en la ficha");
+  }
+  try {
+    services = await api("/api/services");
+  } catch (err) {
+    toast(err.message || "No se pudo cargar servicios");
+  }
+  try {
+    if (v.id) history = await api(`/api/vehicles/${v.id}/history`);
+  } catch (err) {
+    toast(err.message || "No se pudo cargar historial");
+  }
 
   openModal(`
     <div class="panel-head">
