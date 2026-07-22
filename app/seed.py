@@ -251,9 +251,11 @@ def ensure_demo_catalog(db: Session) -> None:
 
 
 def ensure_demo_workspace(db: Session) -> None:
-    """Datos vivos para que cada menú tenga algo usable desde el primer clic."""
+    """Datos vivos: siempre hay al menos un carro ABIERTO en el patio."""
+    open_statuses = ("recibido", "en_diagnostico", "esperando_repuestos", "en_reparacion", "listo")
+
     # Cita de ejemplo
-    if not db.query(Appointment).first():
+    if not db.query(Appointment).filter(Appointment.status == "agendada").first():
         db.add(
             Appointment(
                 customer_name="Cliente demo",
@@ -267,8 +269,8 @@ def ensure_demo_workspace(db: Session) -> None:
             )
         )
 
-    # Un carro en el patio si aún no hay ingresos
-    if not db.query(Reception).first():
+    open_n = db.query(Reception).filter(Reception.status.in_(open_statuses)).count()
+    if open_n == 0:
         cust = db.query(Customer).filter(Customer.phone == "88881122").first()
         if not cust:
             cust = Customer(name="Demo Patio", phone="88881122", id_number="")
@@ -286,22 +288,39 @@ def ensure_demo_workspace(db: Session) -> None:
             )
             db.add(veh)
             db.flush()
-        rec = Reception(
-            code=next_code(db, "REC", Reception),
-            vehicle_id=veh.id,
-            received_by="Katire",
-            odometer_km=72000,
-            fuel_level="1/2",
-            customer_complaint="Chillido al frenar — carro demo del patio",
-            accessories="",
-            status="recibido",
-            customer_accepted=True,
-            customer_signature_name="Demo Patio",
+        # Reabrir el último ingreso del demo si existe; si no, crear uno nuevo
+        rec = (
+            db.query(Reception)
+            .filter(Reception.vehicle_id == veh.id)
+            .order_by(Reception.id.desc())
+            .first()
         )
-        db.add(rec)
-        db.flush()
-        ensure_public_token(rec)
-        seed_inspection(db, rec)
+        if rec and rec.status in ("entregado", "cancelado"):
+            rec.status = "recibido"
+            rec.customer_complaint = rec.customer_complaint or "Chillido al frenar — carro demo del patio"
+            ensure_public_token(rec)
+            seed_inspection(db, rec)
+        elif not rec:
+            rec = Reception(
+                code=next_code(db, "REC", Reception),
+                vehicle_id=veh.id,
+                received_by="Katire",
+                odometer_km=72000,
+                fuel_level="1/2",
+                customer_complaint="Chillido al frenar — carro demo del patio",
+                accessories="",
+                status="recibido",
+                customer_accepted=True,
+                customer_signature_name="Demo Patio",
+            )
+            db.add(rec)
+            db.flush()
+            ensure_public_token(rec)
+            seed_inspection(db, rec)
+        else:
+            # Hay recepción pero no abierta (estado raro) → forzar en patio
+            rec.status = "recibido"
+            ensure_public_token(rec)
     db.commit()
 
 

@@ -31,7 +31,13 @@ body {
 }
 
 button, input, select, textarea { font: inherit; color: inherit; }
-button { cursor: pointer; border: 0; }
+button {
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+}
 a { color: inherit; text-decoration: none; }
 img { max-width: 100%; display: block; }
 
@@ -605,47 +611,38 @@ tr:hover td { background: rgba(30, 201, 167, 0.04); }
 .photo-grid img { width: 100%; height: 100px; object-fit: cover; }
 .photo-grid figcaption { padding: 6px 8px; font-size: 0.74rem; color: var(--mist); }
 
-.intake-cta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  margin-bottom: 18px;
-  background: linear-gradient(135deg, rgba(255, 77, 46, 0.18), rgba(30, 201, 167, 0.12));
-  border: 1px solid rgba(255, 138, 51, 0.35);
-}
-.intake-cta.hidden { display: none; }
-.module-hub {
+.quick-actions {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
+  margin: 16px 0 4px;
 }
-.module-card {
+.quick-action {
   text-align: left;
   padding: 14px 14px 12px;
   border-radius: 14px;
   border: 1px solid var(--line);
-  background: rgba(0,0,0,0.22);
+  background: var(--panel);
   color: var(--foam);
-  cursor: pointer;
-  transition: 0.15s ease;
+  transition: border-color 0.15s ease, transform 0.15s ease;
 }
-.module-card:hover {
-  border-color: rgba(30,201,167,0.45);
-  background: var(--lagoon-dim);
+.quick-action:hover {
+  border-color: rgba(255, 77, 46, 0.45);
+  transform: translateY(-1px);
 }
-.module-card b {
+.quick-action b {
   display: block;
   font-family: var(--display);
   font-size: 0.95rem;
-  margin-bottom: 6px;
-  letter-spacing: -0.02em;
+  margin-bottom: 4px;
 }
-.module-card span {
+.quick-action span {
   display: block;
   color: var(--mist);
-  font-size: 0.8rem;
-  line-height: 1.35;
+  font-size: 0.78rem;
+}
+@media (max-width: 900px) {
+  .quick-actions { grid-template-columns: 1fr 1fr; }
 }
 
 .intake-block {

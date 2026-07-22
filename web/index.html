@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Katire — taller + factura electrónica CR</title>
-  <link rel="stylesheet" href="/static/css/app.css?v=20260722i" />
+  <link rel="stylesheet" href="/static/css/app.css?v=20260722j" />
 </head>
 <body>
   <div class="app-shell">
@@ -63,44 +63,29 @@
         <div class="topbar">
           <div>
             <h1>Patio en vivo</h1>
-            <p>Vehículos en el taller ahora. Para meter un carro nuevo use Ingreso.</p>
+            <p>Carros en el taller ahora. Toque una placa para abrir la ficha.</p>
           </div>
-          <button class="btn btn-primary" data-go="recepcion">+ Recibir vehículo</button>
-        </div>
-        <div class="panel intake-cta" id="patioEmptyCta">
-          <div>
-            <h2 style="margin:0 0 8px;font-family:var(--display)">¿Llegó un carro?</h2>
-            <p class="muted" style="margin:0">Aquí verá el patio cuando haya ingresos. Primero registre llegada con fotos, daños y firma.</p>
-          </div>
-          <button class="btn btn-primary" data-go="recepcion" style="white-space:nowrap">Ir a Ingreso</button>
-        </div>
-        <div class="panel" id="moduleHub">
-          <h2 style="margin:0 0 8px">Cada menú hace esto</h2>
-          <p class="muted" style="margin:0 0 12px">Toque un módulo: abre la sección y carga sus datos.</p>
-          <div class="module-hub" id="moduleHubGrid">
-            <button type="button" class="module-card" data-go="recepcion"><b>02 Ingreso</b><span>Metar carro: datos, fotos, daños, firma</span></button>
-            <button type="button" class="module-card" data-go="taller"><b>03 Diagnóstico & OT</b><span>Mapa del carro, fallas, imprimir firma, OT</span></button>
-            <button type="button" class="module-card" data-go="bodega"><b>04 Estantería</b><span>Stock, ajuste y nuevas piezas</span></button>
-            <button type="button" class="module-card" data-go="proveedores"><b>05 Tiendas</b><span>Buscar/pedir en Gigante y Guacamaya</span></button>
-            <button type="button" class="module-card" data-go="aliados"><b>06 Aliados</b><span>Enviar caja/motor y seguimiento</span></button>
-            <button type="button" class="module-card" data-go="facturacion"><b>07 Facturación CR</b><span>Emisor ATV, .p12 y comprobantes</span></button>
-            <button type="button" class="module-card" data-go="config"><b>Casa</b><span>Identidad Autorespuesto, equipo, servicios</span></button>
+          <div class="row-actions">
+            <button class="btn btn-ghost" id="refreshBoard" type="button">Actualizar</button>
+            <button class="btn btn-primary" data-go="recepcion" type="button">+ Recibir vehículo</button>
           </div>
         </div>
-        <div class="journey">
-          <div class="journey-step"><b>Ingreso</b><span>Foto, daños y firma al llegar</span></div>
-          <div class="journey-step"><b>Lectura</b><span>Diagnóstico que habla claro</span></div>
-          <div class="journey-step"><b>Pieza</b><span>Bodega o pedido al instante</span></div>
-          <div class="journey-step"><b>Salida</b><span>Listo, cobrado, entregado</span></div>
+        <div class="stats" id="stats"></div>
+        <div class="panel" style="margin-top:14px">
+          <div class="panel-head">
+            <h2>Estaciones del patio</h2>
+            <button class="btn btn-ghost" data-go="taller" type="button">Ir a Diagnóstico</button>
+          </div>
+          <div class="kanban" id="kanban">
+            <div class="empty-state"><strong>Cargando patio…</strong>Un momento</div>
+          </div>
         </div>
         <div class="metrics-pro" id="metricsPro"></div>
-        <div class="stats" id="stats"></div>
-        <div class="panel">
-          <div class="panel-head">
-            <h2>Corriente del patio</h2>
-            <button class="btn btn-ghost" id="refreshBoard">Refrescar</button>
-          </div>
-          <div class="kanban" id="kanban"></div>
+        <div class="quick-actions" id="moduleHubGrid">
+          <button type="button" class="quick-action" data-go="recepcion"><b>Ingreso</b><span>Meter carro</span></button>
+          <button type="button" class="quick-action" data-go="taller"><b>Diagnóstico</b><span>Mapa y OT</span></button>
+          <button type="button" class="quick-action" data-go="bodega"><b>Estantería</b><span>Pistola / stock</span></button>
+          <button type="button" class="quick-action" data-go="facturacion"><b>Factura</b><span>Hacienda CR</span></button>
         </div>
         <div class="panel">
           <div class="panel-head">
@@ -597,13 +582,14 @@
         const r = document.getElementById("userRole");
         if (n) n.textContent = u.name || u.username || "Usuario";
         if (r) r.textContent = u.role || "";
+        document.body.dataset.booted = "1";
       } catch (e) {
         location.href = "/login";
       }
     })();
   </script>
-  <script src="/static/js/app.js?v=20260722i"></script>
-  <script src="/static/js/ficha.js?v=20260722i"></script>
-  <script src="/static/js/taller-dvi.js?v=20260722i"></script>
+  <script src="/static/js/app.js?v=20260722j"></script>
+  <script src="/static/js/ficha.js?v=20260722j"></script>
+  <script src="/static/js/taller-dvi.js?v=20260722j"></script>
 </body>
 </html>

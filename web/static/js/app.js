@@ -665,24 +665,27 @@ async function loadSettings() {
   );
 }
 
+function paintUser(u) {
+  if (!u) return;
+  try {
+    localStorage.setItem("tp_user", JSON.stringify(u));
+  } catch (_) {}
+  const name = u.name || u.username || "Usuario";
+  const role = u.role || "";
+  setText("userName", name);
+  setText("userRole", role);
+}
+
 async function loadDashboard() {
   try {
     let d = await api("/api/dashboard");
-    const bare =
-      Number(d.in_shop || 0) === 0 &&
-      !(d.board || []).length &&
-      !(d.appointments || []).length &&
-      Number(d.low_stock_count || 0) === 0;
-    if (bare) {
+    // Patio vacío = no sirve al cliente: sembrar / reabrir carro abierto
+    if (Number(d.in_shop || 0) === 0 || !(d.board || []).length) {
       try {
         await api("/api/bootstrap/workspace", { method: "POST", body: "{}" });
         d = await api("/api/dashboard");
-        toast("Patio preparado: carro demo, citas y bodega listos");
       } catch (_) {}
     }
-    const inShop = Number(d.in_shop || 0);
-    const emptyCta = document.getElementById("patioEmptyCta");
-    if (emptyCta) emptyCta.classList.toggle("hidden", inShop > 0 || (d.board || []).length > 0);
 
     setHtml(
       "metricsPro",
@@ -705,24 +708,34 @@ async function loadDashboard() {
     );
     const kanban = document.getElementById("kanban");
     if (kanban) {
-      kanban.innerHTML = STATUS_COLS.map(([key, title]) => {
-        const list = (d.board || []).filter((r) => r.status === key);
-        const cards =
-          list
-            .map((r) => {
-              const v = r.vehicle || {};
-              return `<div class="card-job" data-id="${r.id}">
-            <strong>${v.plate || "—"}</strong>
-            <div class="meta">${v.brand || ""} ${v.model || ""}<br>${r.code}<br>${(r.customer_complaint || "").slice(0, 60)}</div>
-          </div>`;
-            })
-            .join("") ||
-          `<div class="empty-state" style="padding:14px;border:none"><strong>Vacío</strong>Nadie en esta estación</div>`;
-        return `<div class="kanban-col"><h4>${title}<span>${list.length}</span></h4>${cards}</div>`;
-      }).join("");
-      kanban.querySelectorAll(".card-job").forEach((el) => {
-        el.addEventListener("click", () => openReception(Number(el.dataset.id)));
-      });
+      const board = d.board || [];
+      if (!board.length) {
+        kanban.innerHTML = `<div class="empty-state"><strong>Patio libre</strong>
+          Pulse «+ Recibir vehículo» para el primer ingreso real.
+          <div class="row-actions" style="margin-top:12px;justify-content:center">
+            <button type="button" class="btn btn-primary" data-go="recepcion">Ir a Ingreso</button>
+          </div></div>`;
+        kanban.querySelector("[data-go]")?.addEventListener("click", () => showSection("recepcion"));
+      } else {
+        kanban.innerHTML = STATUS_COLS.map(([key, title]) => {
+          const list = board.filter((r) => r.status === key);
+          const cards =
+            list
+              .map((r) => {
+                const v = r.vehicle || {};
+                return `<div class="card-job" data-id="${r.id}" role="button" tabindex="0">
+              <strong>${esc(v.plate || "—")}</strong>
+              <div class="meta">${esc(v.brand || "")} ${esc(v.model || "")}<br>${esc(r.code)}<br>${esc((r.customer_complaint || "").slice(0, 60))}</div>
+            </div>`;
+              })
+              .join("") ||
+            `<div class="muted" style="padding:10px;font-size:0.82rem">Sin carros</div>`;
+          return `<div class="kanban-col"><h4>${title}<span>${list.length}</span></h4>${cards}</div>`;
+        }).join("");
+        kanban.querySelectorAll(".card-job").forEach((el) => {
+          el.addEventListener("click", () => openReception(Number(el.dataset.id)));
+        });
+      }
     }
     setHtml(
       "lowStockBody",
@@ -1704,10 +1717,10 @@ function bindUI() {
     location.href = "/login";
     return;
   }
-  const userNameEl = document.getElementById("userName");
-  const userRoleEl = document.getElementById("userRole");
-  if (userNameEl) userNameEl.textContent = u.name;
-  if (userRoleEl) userRoleEl.textContent = u.role;
+  paintUser(u);
+  api("/api/me")
+    .then((me) => paintUser(me))
+    .catch(() => {});
   document.getElementById("logoutBtn")?.addEventListener("click", () => {
     localStorage.clear();
     location.href = "/login";
@@ -2135,8 +2148,8 @@ function bindUI() {
   safeInit(initArrivalPhotos, "Fotos");
   safeInit(initSignaturePad, "Firma");
   loadSettings().catch((err) => toast(err.message || "No se pudo cargar identidad"));
-  // Arranca en Ingreso para meter el carro de una vez
-  showSection("recepcion");
+  // Patio primero: el cliente ve carros y estaciones, no una pantalla de marketing
+  showSection("tablero");
   setTimeout(() => resizeSignaturePad(false), 80);
 }
 
