@@ -253,6 +253,7 @@ class Part(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     sku: Mapped[str] = mapped_column(String(60), unique=True, index=True)
+    barcode: Mapped[str] = mapped_column(String(80), default="", index=True)  # pistola / EAN
     name: Mapped[str] = mapped_column(String(200))
     brand: Mapped[str] = mapped_column(String(80), default="")
     category: Mapped[str] = mapped_column(String(80), default="General")

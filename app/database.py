@@ -67,3 +67,9 @@ def migrate_schema() -> None:
             for name, ddl in adds.items():
                 if name not in scols:
                     conn.execute(text(f"ALTER TABLE suppliers ADD COLUMN {name} {ddl}"))
+        if "parts" in tables:
+            pcols = {c["name"] for c in insp.get_columns("parts")}
+            if "barcode" not in pcols:
+                conn.execute(text("ALTER TABLE parts ADD COLUMN barcode VARCHAR(80) DEFAULT ''"))
+                # Copia SKU a barcode en filas existentes
+                conn.execute(text("UPDATE parts SET barcode = sku WHERE barcode IS NULL OR barcode = ''"))

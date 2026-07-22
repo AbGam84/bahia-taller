@@ -92,6 +92,7 @@ class WorkOrderUpdate(BaseModel):
 
 class PartIn(BaseModel):
     sku: str
+    barcode: str = ""
     name: str
     brand: str = ""
     category: str = "General"
@@ -109,6 +110,21 @@ class StockAdjustIn(BaseModel):
     quantity: float
     movement_type: str = "ajuste"
     note: str = ""
+
+
+class PartScanIn(BaseModel):
+    """Pistola / teclado: código + Enter. action=lookup|add|create."""
+
+    barcode: str
+    quantity: float = 1
+    action: str = "lookup"  # lookup | add | create
+    name: str = ""
+    brand: str = ""
+    category: str = "General"
+    sale_price: float = 0
+    cost_price: float = 0
+    location: str = ""
+    min_stock: float = 1
 
 
 class SupplierIn(BaseModel):

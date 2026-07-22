@@ -133,6 +133,7 @@ def ensure_issuer(db: Session) -> None:
 DEMO_PARTS = [
     {
         "sku": "PAD-FR-GEN",
+        "barcode": "7501000000001",
         "name": "Pastillas de freno delanteras",
         "brand": "Generic",
         "category": "Frenos",
@@ -145,6 +146,7 @@ DEMO_PARTS = [
     },
     {
         "sku": "FIL-ACE-01",
+        "barcode": "7501000000002",
         "name": "Filtro de aceite",
         "brand": "Wix",
         "category": "Motor",
@@ -157,6 +159,7 @@ DEMO_PARTS = [
     },
     {
         "sku": "ACE-5W30",
+        "barcode": "7501000000003",
         "name": "Aceite 5W-30 sintético 4L",
         "brand": "Mobil",
         "category": "Lubricantes",
@@ -169,6 +172,7 @@ DEMO_PARTS = [
     },
     {
         "sku": "BAT-12V",
+        "barcode": "7501000000004",
         "name": "Batería 12V 500CCA",
         "brand": "LTH",
         "category": "Eléctrico",
@@ -181,6 +185,7 @@ DEMO_PARTS = [
     },
     {
         "sku": "AMP-TRAS",
+        "barcode": "7501000000005",
         "name": "Amortiguador trasero",
         "brand": "KYB",
         "category": "Suspensión",
@@ -228,11 +233,20 @@ DEMO_SERVICES = [
 def ensure_demo_catalog(db: Session) -> None:
     """Catálogo base para que Bodega, Lectura y ficha tengan opciones usables."""
     for row in DEMO_PARTS:
-        if not db.query(Part).filter(Part.sku == row["sku"]).first():
+        existing = db.query(Part).filter(Part.sku == row["sku"]).first()
+        if not existing:
             db.add(Part(**row))
+        else:
+            want = (row.get("barcode") or "").strip()
+            have = (getattr(existing, "barcode", None) or "").strip()
+            # Demo: fuerza EAN conocido; o backfill si vacío / igual al SKU viejo
+            if want and (not have or have == existing.sku):
+                existing.barcode = want
     for row in DEMO_SERVICES:
         if not db.query(ServiceCatalog).filter(ServiceCatalog.name == row["name"]).first():
             db.add(ServiceCatalog(**row))
+    for p in db.query(Part).filter((Part.barcode.is_(None)) | (Part.barcode == "")).all():
+        p.barcode = p.sku
     db.commit()
 
 

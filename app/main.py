@@ -50,6 +50,7 @@ from app.schemas import (
     DiagnosisIn,
     LoginIn,
     PartIn,
+    PartScanIn,
     PurchaseOrderIn,
     ReceptionIn,
     SettingsIn,
@@ -637,6 +638,26 @@ def work_order_request_part(
 
 
 # ---------- Inventory ----------
+def _find_part_by_code(db: Session, code: str) -> Part | None:
+    code = (code or "").strip()
+    if not code:
+        return None
+    p = (
+        db.query(Part)
+        .options(joinedload(Part.preferred_supplier))
+        .filter(Part.active.is_(True), Part.barcode == code)
+        .first()
+    )
+    if p:
+        return p
+    return (
+        db.query(Part)
+        .options(joinedload(Part.preferred_supplier))
+        .filter(Part.active.is_(True), Part.sku == code)
+        .first()
+    )
+
+
 @app.get("/api/parts")
 def parts_list(
     q: str = "",
@@ -649,6 +670,7 @@ def parts_list(
         like = f"%{q}%"
         query = query.filter(
             (Part.sku.ilike(like))
+            | (Part.barcode.ilike(like))
             | (Part.name.ilike(like))
             | (Part.brand.ilike(like))
             | (Part.compatible_with.ilike(like))
@@ -661,11 +683,141 @@ def parts_list(
     return result
 
 
+@app.get("/api/parts/by-barcode")
+def parts_by_barcode(
+    code: str = "",
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    code = (code or "").strip()
+    if not code:
+        raise HTTPException(status_code=400, detail="Código vacío")
+    p = _find_part_by_code(db, code)
+    if not p:
+        return {"found": False, "barcode": code, "part": None}
+    return {"found": True, "barcode": code, "part": part_dict(p)}
+
+
+@app.post("/api/parts/scan")
+def parts_scan(
+    payload: PartScanIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Pistola de códigos: lookup, +stock o alta rápida si no existe."""
+    from app.services import apply_stock_change
+
+    code = (payload.barcode or "").strip()
+    if not code:
+        raise HTTPException(status_code=400, detail="Código vacío")
+    action = (payload.action or "lookup").lower().strip()
+    qty = float(payload.quantity or 1)
+    if qty == 0:
+        qty = 1
+
+    p = _find_part_by_code(db, code)
+    if action == "lookup":
+        if not p:
+            return {"found": False, "created": False, "barcode": code, "part": None, "message": "No está en bodega"}
+        return {"found": True, "created": False, "barcode": code, "part": part_dict(p), "message": p.name}
+
+    if action == "add":
+        if not p:
+            return {
+                "found": False,
+                "created": False,
+                "barcode": code,
+                "part": None,
+                "message": "Código desconocido — escanee de nuevo con alta o cree la pieza",
+            }
+        apply_stock_change(
+            db,
+            p,
+            abs(qty),
+            "entrada",
+            reference="scan",
+            note=f"Pistola {code}",
+            created_by=user.name,
+        )
+        db.commit()
+        p = db.query(Part).options(joinedload(Part.preferred_supplier)).filter(Part.id == p.id).first()
+        return {
+            "found": True,
+            "created": False,
+            "barcode": code,
+            "part": part_dict(p),
+            "message": f"+{abs(qty)} · stock {p.stock_qty}",
+        }
+
+    if action == "create":
+        if p:
+            apply_stock_change(
+                db,
+                p,
+                abs(qty),
+                "entrada",
+                reference="scan",
+                note=f"Pistola {code}",
+                created_by=user.name,
+            )
+            db.commit()
+            p = db.query(Part).options(joinedload(Part.preferred_supplier)).filter(Part.id == p.id).first()
+            return {
+                "found": True,
+                "created": False,
+                "barcode": code,
+                "part": part_dict(p),
+                "message": f"Ya existía · +{abs(qty)}",
+            }
+        sku = code[:60]
+        if db.query(Part).filter(Part.sku == sku).first():
+            sku = f"BC-{code[:50]}"
+        name = (payload.name or "").strip() or f"Pieza {code}"
+        p = Part(
+            sku=sku,
+            barcode=code,
+            name=name,
+            brand=(payload.brand or "").strip(),
+            category=(payload.category or "General").strip() or "General",
+            location=(payload.location or "").strip(),
+            cost_price=float(payload.cost_price or 0),
+            sale_price=float(payload.sale_price or 0),
+            stock_qty=0,
+            min_stock=float(payload.min_stock or 1),
+        )
+        db.add(p)
+        db.flush()
+        apply_stock_change(
+            db,
+            p,
+            abs(qty),
+            "entrada",
+            reference="scan-alta",
+            note=f"Alta por pistola {code}",
+            created_by=user.name,
+        )
+        db.commit()
+        p = db.query(Part).options(joinedload(Part.preferred_supplier)).filter(Part.id == p.id).first()
+        return {
+            "found": True,
+            "created": True,
+            "barcode": code,
+            "part": part_dict(p),
+            "message": f"Alta {name} · stock {p.stock_qty}",
+        }
+
+    raise HTTPException(status_code=400, detail="action debe ser lookup, add o create")
+
+
 @app.post("/api/parts")
 def parts_create(payload: PartIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     if db.query(Part).filter(Part.sku == payload.sku).first():
         raise HTTPException(status_code=400, detail="SKU ya existe")
-    p = Part(**payload.model_dump())
+    data = payload.model_dump()
+    data["barcode"] = (data.get("barcode") or "").strip() or data["sku"]
+    if data["barcode"] and db.query(Part).filter(Part.barcode == data["barcode"]).first():
+        raise HTTPException(status_code=400, detail="Código de barras ya existe")
+    p = Part(**data)
     db.add(p)
     db.commit()
     db.refresh(p)
@@ -678,7 +830,12 @@ def parts_update(part_id: int, payload: PartIn, db: Session = Depends(get_db), u
     p = db.query(Part).filter(Part.id == part_id).first()
     if not p:
         raise HTTPException(status_code=404, detail="Repuesto no encontrado")
-    for field, value in payload.model_dump().items():
+    data = payload.model_dump()
+    data["barcode"] = (data.get("barcode") or "").strip() or data["sku"]
+    other = db.query(Part).filter(Part.barcode == data["barcode"], Part.id != part_id).first()
+    if other:
+        raise HTTPException(status_code=400, detail="Código de barras ya existe en otra pieza")
+    for field, value in data.items():
         setattr(p, field, value)
     db.commit()
     p = db.query(Part).options(joinedload(Part.preferred_supplier)).filter(Part.id == part_id).first()
@@ -1317,7 +1474,7 @@ def health():
         "production": IS_PRODUCTION,
         "fe": "hacienda-cr-v4.4",
         "db": db_ok,
-        "build": "20260722h",
+        "build": "20260722i",
     }
 
 

@@ -156,7 +156,10 @@ function showSection(name) {
     requestAnimationFrame(() => resizeSignaturePad(true));
   }
   if (name === "taller") run(loadTaller);
-  if (name === "bodega") run(loadParts);
+  if (name === "bodega") {
+    run(loadParts);
+    setTimeout(() => document.getElementById("barcodeScan")?.focus(), 60);
+  }
   if (name === "proveedores") run(loadSuppliers);
   if (name === "aliados") run(loadAliados);
   if (name === "config") run(loadSettings);
@@ -1125,7 +1128,7 @@ async function openNewAllyJob(prefill = {}) {
   };
 }
 
-async function loadParts() {
+async function loadParts(highlightId) {
   try {
     const q = document.getElementById("partSearch")?.value?.trim() || "";
     const low = !!document.getElementById("onlyLow")?.checked;
@@ -1137,26 +1140,137 @@ async function loadParts() {
     const body = document.getElementById("partsBody");
     if (!body) return;
     body.innerHTML = parts
-      .map((p) => `<tr>
-      <td>${p.sku}</td>
-      <td><strong>${p.name}</strong><br><span class="muted">${p.brand} · ${p.category}</span></td>
-      <td>${p.compatible_with || "—"}</td>
-      <td>${p.location || "—"}</td>
+      .map((p) => `<tr class="${highlightId && p.id === highlightId ? "row-hit" : ""}" data-part-id="${p.id}">
+      <td><code>${esc(p.barcode || p.sku)}</code></td>
+      <td>${esc(p.sku)}</td>
+      <td><strong>${esc(p.name)}</strong><br><span class="muted">${esc(p.brand)} · ${esc(p.category)}</span></td>
+      <td>${esc(p.location || "—")}</td>
       <td>${p.low_stock ? `<span class="badge badge-low">${p.stock_qty}</span>` : `<span class="badge badge-ok">${p.stock_qty}</span>`}</td>
       <td class="money">${money(p.sale_price)}</td>
-      <td>${p.preferred_supplier || "—"}</td>
+      <td>${esc(p.preferred_supplier || "—")}</td>
       <td class="row-actions">
         <button class="btn btn-ghost" data-adjust="${p.id}">Ajuste</button>
       </td>
     </tr>`)
       .join("") ||
-      `<tr><td colspan="8"><div class="empty-state"><strong>Estantería vacía</strong>Pulse «Nueva pieza» para registrar stock</div></td></tr>`;
+      `<tr><td colspan="8"><div class="empty-state"><strong>Estantería vacía</strong>Escanee con la pistola o pulse «Nueva pieza»</div></td></tr>`;
     document.querySelectorAll("[data-adjust]").forEach((btn) => {
       btn.addEventListener("click", () => adjustPart(Number(btn.dataset.adjust)));
     });
+    if (highlightId) {
+      body.querySelector(`[data-part-id="${highlightId}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
   } catch (err) {
     toast(err.message || "No se pudo cargar bodega");
   }
+}
+
+function paintScanResult(res) {
+  const box = document.getElementById("scanResult");
+  if (!box) return;
+  if (!res) {
+    box.hidden = true;
+    box.innerHTML = "";
+    return;
+  }
+  box.hidden = false;
+  if (!res.found || !res.part) {
+    box.className = "scan-result scan-miss";
+    box.innerHTML = `<strong>Sin coincidencia</strong><span>${esc(res.barcode || "")} — cambie a «Alta si no existe» o cree la pieza</span>`;
+    return;
+  }
+  const p = res.part;
+  box.className = "scan-result scan-hit";
+  box.innerHTML = `<strong>${esc(p.name)}</strong>
+    <span>Barras ${esc(p.barcode || "")} · SKU ${esc(p.sku)} · Stock <b>${p.stock_qty}</b> · ${money(p.sale_price)}</span>
+    <span class="muted">${esc(res.message || "")}</span>`;
+}
+
+async function runBarcodeScan() {
+  const input = document.getElementById("barcodeScan");
+  const code = (input?.value || "").trim();
+  if (!code) {
+    toast("Escanee o escriba un código de barras");
+    input?.focus();
+    return;
+  }
+  const action = document.getElementById("scanAction")?.value || "add";
+  const quantity = Number(document.getElementById("scanQty")?.value || 1) || 1;
+  try {
+    let res = await api("/api/parts/scan", {
+      method: "POST",
+      body: JSON.stringify({ barcode: code, action, quantity }),
+    });
+    if (!res.found && action === "add") {
+      const create = confirm(`Código ${code} no está en bodega.\n¿Dar de alta y sumar ${quantity}?`);
+      if (!create) {
+        paintScanResult(res);
+        return;
+      }
+      openModal(`
+        <h2>Alta por pistola</h2>
+        <p class="muted">Código <strong>${esc(code)}</strong></p>
+        <form id="scanCreateForm" class="form-grid">
+          <label class="full">Nombre<input name="name" required placeholder="Nombre de la pieza" /></label>
+          <label>Marca<input name="brand" /></label>
+          <label>Categoría<input name="category" value="General" /></label>
+          <label>Ubicación<input name="location" /></label>
+          <label>Costo<input name="cost_price" type="number" value="0" /></label>
+          <label>Precio venta<input name="sale_price" type="number" value="0" /></label>
+          <div class="full row-actions">
+            <button class="btn btn-primary" type="submit">Guardar y sumar stock</button>
+            <button class="btn btn-ghost" type="button" id="closeModalBtn">Cancelar</button>
+          </div>
+        </form>
+      `);
+      document.getElementById("closeModalBtn").onclick = closeModal;
+      document.getElementById("scanCreateForm").onsubmit = async (ev) => {
+        ev.preventDefault();
+        const fd = Object.fromEntries(new FormData(ev.target).entries());
+        res = await api("/api/parts/scan", {
+          method: "POST",
+          body: JSON.stringify({
+            barcode: code,
+            action: "create",
+            quantity,
+            name: fd.name,
+            brand: fd.brand || "",
+            category: fd.category || "General",
+            location: fd.location || "",
+            cost_price: Number(fd.cost_price || 0),
+            sale_price: Number(fd.sale_price || 0),
+          }),
+        });
+        closeModal();
+        paintScanResult(res);
+        toast(res.message || "Pieza lista");
+        if (input) input.value = "";
+        await loadParts(res.part?.id);
+        input?.focus();
+      };
+      return;
+    }
+    paintScanResult(res);
+    toast(res.message || (res.found ? "OK" : "No encontrado"));
+    if (input) input.value = "";
+    await loadParts(res.part?.id);
+    input?.focus();
+  } catch (err) {
+    toast(err.message || "Error al escanear");
+  }
+}
+
+function bindBarcodeScanner() {
+  const input = document.getElementById("barcodeScan");
+  if (!input || input.dataset.bound === "1") return;
+  input.dataset.bound = "1";
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      runBarcodeScan();
+    }
+  });
+  document.getElementById("scanGoBtn")?.addEventListener("click", () => runBarcodeScan());
 }
 
 async function runMarketSearch() {
@@ -1724,7 +1838,7 @@ function bindUI() {
         btn.textContent = "Cerrar ingreso y meter al patio";
       }
     }
-  };
+  });
 
   document.getElementById("settingsForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -1744,8 +1858,9 @@ function bindUI() {
     openModal(`
       <h2>Nuevo repuesto</h2>
       <form id="partForm" class="form-grid">
-        <label>SKU<input name="sku" required /></label>
-        <label>Nombre<input name="name" required /></label>
+        <label>SKU<input name="sku" required placeholder="Interno" /></label>
+        <label>Código de barras<input name="barcode" placeholder="Escanee aquí con la pistola" /></label>
+        <label class="full">Nombre<input name="name" required /></label>
         <label>Marca<input name="brand" /></label>
         <label>Categoría<input name="category" value="General" /></label>
         <label class="full">Compatibilidad<input name="compatible_with" placeholder="Toyota Corolla, Yaris..." /></label>
@@ -1762,18 +1877,21 @@ function bindUI() {
       </form>
     `);
     document.getElementById("closeModalBtn").onclick = closeModal;
+    const bar = document.querySelector('#partForm [name="barcode"]');
+    bar?.focus();
     document.getElementById("partForm").onsubmit = async (ev) => {
       ev.preventDefault();
       const fd = new FormData(ev.target);
       const body = Object.fromEntries(fd.entries());
       ["stock_qty", "min_stock", "cost_price", "sale_price"].forEach((k) => (body[k] = Number(body[k] || 0)));
       body.preferred_supplier_id = body.preferred_supplier_id ? Number(body.preferred_supplier_id) : null;
+      body.barcode = (body.barcode || "").trim() || body.sku;
       await api("/api/parts", { method: "POST", body: JSON.stringify(body) });
       toast("Repuesto creado");
       closeModal();
       loadParts();
     };
-  };
+  });
 
   document.getElementById("issuerForm")?.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -1825,10 +1943,10 @@ function bindUI() {
     try {
       ready = await api("/api/fe/readiness");
     } catch (_) {}
-    if (ready && !ready.ready) {
-      const missing = (ready.missing || []).join(", ") || "ATV / certificado .p12";
-      toast(`Factura incompleta: falta ${missing}. Complete Emisor y suba el .p12`);
-      return;
+    const feReady = !!(ready && ready.ready);
+    if (!feReady) {
+      const missing = (ready?.missing || []).join(", ") || "ATV / certificado .p12";
+      toast(`Puede armar el comprobante; para Hacienda falta: ${missing}`);
     }
     const taller = await api("/api/receptions");
     const withOt = taller.filter((r) => r.work_order);
@@ -1838,8 +1956,8 @@ function bindUI() {
       return;
     }
     openModal(`
-      <h2>Emitir y enviar a Hacienda</h2>
-      <p class="muted">Autorespuesto · Katire firma con su .p12, transmite a ATV y consulta aceptación.</p>
+      <h2>Emitir factura / tiquete</h2>
+      <p class="muted">${feReady ? "Listo para firmar y enviar a Hacienda." : "Sin certificado ATV completo: genere el XML (sin enviar) o complete Emisor + .p12."}</p>
       <form id="feIssueForm" class="form-grid">
         <label class="full">Orden de trabajo
           <select name="work_order_id" required>
@@ -1877,8 +1995,8 @@ function bindUI() {
           </select>
         </label>
         <label class="full" style="flex-direction:row;align-items:center;gap:8px">
-          <input type="checkbox" name="send_now" checked style="width:auto" />
-          Firmar y enviar a Hacienda ahora (esperar aceptación)
+          <input type="checkbox" name="send_now" ${feReady ? "checked" : ""} style="width:auto" ${feReady ? "" : "disabled"} />
+          Firmar y enviar a Hacienda ahora ${feReady ? "" : "(requiere ATV + .p12)"}
         </label>
         <div class="full row-actions">
           <button class="btn btn-primary" type="submit">Procesar comprobante</button>
@@ -2002,10 +2120,20 @@ function bindUI() {
 
   document.getElementById("newSupplierBtn")?.addEventListener("click", () => openNewSupplier("tienda"));
 
-  initZones();
-  initIntakeVehicleOptions();
-  initArrivalPhotos();
-  initSignaturePad();
+  bindBarcodeScanner();
+
+  const safeInit = (fn, label) => {
+    try {
+      fn();
+    } catch (err) {
+      console.error(label, err);
+      toast(`${label}: ${err.message || "falló el arranque"}`);
+    }
+  };
+  safeInit(initZones, "Zonas");
+  safeInit(initIntakeVehicleOptions, "Marcas");
+  safeInit(initArrivalPhotos, "Fotos");
+  safeInit(initSignaturePad, "Firma");
   loadSettings().catch((err) => toast(err.message || "No se pudo cargar identidad"));
   // Arranca en Ingreso para meter el carro de una vez
   showSection("recepcion");

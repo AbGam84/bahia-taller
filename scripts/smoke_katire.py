@@ -151,6 +151,50 @@ def main() -> int:
         else:
             ok(f"bodega con {len(parts)} piezas")
 
+        # Código de barras / pistola
+        bc = "7501000000001"
+        look = client.get(f"/api/parts/by-barcode?code={bc}", headers=admin_h)
+        look_data = expect(look, 200, "parts by-barcode")
+        if look_data and not look_data.get("found"):
+            fail("demo barcode pastillas no encontrado")
+        else:
+            ok(f"barcode lookup {bc}")
+        before = (look_data or {}).get("part") or {}
+        stock0 = float(before.get("stock_qty") or 0)
+        scan = client.post(
+            "/api/parts/scan",
+            headers=admin_h,
+            json={"barcode": bc, "action": "add", "quantity": 1},
+        )
+        scan_data = expect(scan, 200, "parts scan +1")
+        if scan_data and scan_data.get("part"):
+            stock1 = float(scan_data["part"].get("stock_qty") or 0)
+            if stock1 != stock0 + 1:
+                fail(f"scan stock {stock0} -> {stock1}")
+            else:
+                ok(f"scan stock {stock0} -> {stock1}")
+        import time
+
+        new_bc = f"99{int(time.time()) % 10_000_000_000:010d}"
+        create_scan = client.post(
+            "/api/parts/scan",
+            headers=admin_h,
+            json={
+                "barcode": new_bc,
+                "action": "create",
+                "quantity": 2,
+                "name": "Pieza pistola smoke",
+                "sale_price": 1000,
+            },
+        )
+        created = expect(create_scan, 200, "parts scan create")
+        if not created or not created.get("created"):
+            fail(f"scan create inválido: {created}")
+        elif float((created.get("part") or {}).get("stock_qty") or 0) != 2:
+            fail(f"scan create stock esperaba 2: {created}")
+        else:
+            ok("scan create con stock 2")
+
         # --- Demo recepcion: camino feliz completo ---
         dlogin = client.post("/api/auth/login", json={"username": DEMO_USERNAME, "password": DEMO_PASSWORD})
         if dlogin.status_code != 200:

@@ -989,6 +989,56 @@ tr:hover td { background: rgba(30, 201, 167, 0.04); }
   color: #9ef0dc;
 }
 
+/* Bodega / pistola de códigos */
+.scan-panel { margin-bottom: 14px; padding: 16px 18px; }
+.scan-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.scan-label {
+  width: 100%;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mist);
+}
+.scan-input {
+  flex: 1 1 220px;
+  min-width: 200px;
+  font-size: 1.15rem;
+  letter-spacing: 0.04em;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 179, 71, 0.45);
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 12px;
+}
+.scan-input:focus {
+  outline: none;
+  border-color: var(--ember);
+  box-shadow: 0 0 0 3px rgba(255, 179, 71, 0.18);
+}
+.scan-hint { margin: 10px 0 0; font-size: 0.85rem; }
+.scan-result {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+}
+.scan-hit {
+  background: rgba(61, 214, 140, 0.12);
+  border: 1px solid rgba(61, 214, 140, 0.35);
+}
+.scan-miss {
+  background: rgba(255, 107, 122, 0.12);
+  border: 1px solid rgba(255, 107, 122, 0.35);
+}
+tr.row-hit td {
+  background: rgba(255, 179, 71, 0.12);
+}
+
 @media (max-width: 900px) {
   .login-page { grid-template-columns: 1fr; }
   .login-hero { min-height: 42vh; }

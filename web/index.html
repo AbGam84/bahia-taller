@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Katire — taller + factura electrónica CR</title>
-  <link rel="stylesheet" href="/static/css/app.css" />
+  <link rel="stylesheet" href="/static/css/app.css?v=20260722i" />
 </head>
 <body>
   <div class="app-shell">
@@ -322,13 +322,36 @@
         <div class="topbar">
           <div>
             <h1>Estantería viva</h1>
-            <p>Si está aquí, se reserva. Si no está, se pide. El patio no espera a que alguien “revise el inventario”.</p>
+            <p>Pistola al campo de barras → Enter. Suma stock o da de alta la pieza si no existe.</p>
           </div>
+        </div>
+        <div class="panel scan-panel">
+          <div class="scan-row">
+            <label class="scan-label" for="barcodeScan">Código de barras / pistola</label>
+            <input
+              id="barcodeScan"
+              class="scan-input"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+              placeholder="Apunte la pistola aquí y dispare…"
+              inputmode="none"
+            />
+            <select id="scanAction" title="Qué hace al escanear">
+              <option value="add">+1 stock</option>
+              <option value="lookup">Solo buscar</option>
+              <option value="create">Alta si no existe</option>
+            </select>
+            <input id="scanQty" type="number" min="1" step="1" value="1" title="Cantidad" style="width:72px" />
+            <button class="btn btn-primary" type="button" id="scanGoBtn">Escanear</button>
+          </div>
+          <p class="muted scan-hint" id="scanHint">Modo USB/HID: la pistola escribe el código y manda Enter. Deje el cursor en este campo.</p>
+          <div id="scanResult" class="scan-result" hidden></div>
         </div>
         <div class="panel">
           <div class="panel-head">
             <div class="row-actions" style="flex:1">
-              <input id="partSearch" placeholder="SKU, nombre, marca o compatibilidad..." style="max-width:420px" />
+              <input id="partSearch" placeholder="Barras, SKU, nombre, marca…" style="max-width:420px" />
               <button class="btn btn-ghost" id="partSearchBtn">Buscar</button>
               <label style="flex-direction:row;align-items:center;gap:8px;color:var(--foam)">
                 <input type="checkbox" id="onlyLow" style="width:auto" /> Solo bajo mínimo
@@ -340,7 +363,7 @@
             <table>
               <thead>
                 <tr>
-                  <th>SKU</th><th>Pieza</th><th>Compatibilidad</th><th>Ubicación</th>
+                  <th>Barras</th><th>SKU</th><th>Pieza</th><th>Ubicación</th>
                   <th>Stock</th><th>Precio</th><th>Proveedor</th><th></th>
                 </tr>
               </thead>
@@ -579,8 +602,8 @@
       }
     })();
   </script>
-  <script src="/static/js/app.js?v=20260722h"></script>
-  <script src="/static/js/ficha.js?v=20260722h"></script>
-  <script src="/static/js/taller-dvi.js?v=20260722h"></script>
+  <script src="/static/js/app.js?v=20260722i"></script>
+  <script src="/static/js/ficha.js?v=20260722i"></script>
+  <script src="/static/js/taller-dvi.js?v=20260722i"></script>
 </body>
 </html>

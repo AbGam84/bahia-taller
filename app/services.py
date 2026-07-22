@@ -83,9 +83,11 @@ def vehicle_dict(v: Vehicle) -> dict:
 
 def part_dict(p: Part) -> dict:
     low = p.stock_qty <= p.min_stock
+    barcode = (getattr(p, "barcode", None) or "").strip() or p.sku
     return {
         "id": p.id,
         "sku": p.sku,
+        "barcode": barcode,
         "name": p.name,
         "brand": p.brand,
         "category": p.category,
