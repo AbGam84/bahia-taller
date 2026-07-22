@@ -1643,27 +1643,33 @@ function bindUI() {
         const ok = confirm("No hay firma dibujada. ¿Continuar solo con el nombre?");
         if (!ok) return;
       }
+      if (!e.target.checkValidity()) {
+        e.target.reportValidity();
+        toast("Complete los campos obligatorios (nombre, placa, marca, modelo, queja, firma y aceptación)");
+        return;
+      }
       const fd = new FormData(e.target);
       const zones = [...document.querySelectorAll("#zoneGrid .zone-chip.active")].map((el) => el.dataset.zone);
-      const damageNotes = fd.get("damage_notes") || "";
+      const damageNotes = String(fd.get("damage_notes") || "");
+      const modelVal = String(fd.get("model_other") || fd.get("model") || "").trim();
       const body = {
         customer: {
-          name: fd.get("customer_name"),
-          phone: fd.get("customer_phone"),
-          id_number: fd.get("customer_id_number"),
+          name: String(fd.get("customer_name") || "").trim(),
+          phone: String(fd.get("customer_phone") || "").trim(),
+          id_number: String(fd.get("customer_id_number") || "").trim(),
         },
         plate: String(fd.get("plate") || "").toUpperCase().trim(),
         brand: String(fd.get("brand") || "").trim(),
-        model: String(fd.get("model_other") || fd.get("model") || "").trim(),
+        model: modelVal === "Otro" ? String(fd.get("model_other") || "").trim() : modelVal,
         year: Number(fd.get("year") || 0),
         color: String(fd.get("color") || "").trim(),
         odometer_km: Number(fd.get("odometer_km") || 0),
-        fuel_level: fd.get("fuel_level"),
+        fuel_level: String(fd.get("fuel_level") || "1/2"),
         promised_hours: Number(fd.get("promised_hours") || 24),
-        customer_complaint: fd.get("customer_complaint"),
-        accessories: fd.get("accessories"),
-        received_by: fd.get("received_by"),
-        customer_signature_name: fd.get("customer_signature_name"),
+        customer_complaint: String(fd.get("customer_complaint") || "").trim(),
+        accessories: String(fd.get("accessories") || "").trim(),
+        received_by: String(fd.get("received_by") || user()?.name || "").trim(),
+        customer_signature_name: String(fd.get("customer_signature_name") || "").trim(),
         customer_accepted: fd.get("customer_accepted") === "on",
         damages: zones.map((zone) => ({
           zone,
@@ -1672,6 +1678,14 @@ function bindUI() {
           present_on_arrival: true,
         })),
       };
+      if (!body.customer.name || !body.plate || !body.brand || !body.model || !body.customer_complaint) {
+        toast("Falta nombre, placa, marca, modelo o qué trae el carro");
+        return;
+      }
+      if (!body.customer_accepted) {
+        toast("Marque que el cliente acepta el estado de ingreso");
+        return;
+      }
       if (!body.damages.length && damageNotes) {
         body.damages = [{ zone: "Otro", severity: "leve", description: damageNotes, present_on_arrival: true }];
       }
@@ -1993,8 +2007,8 @@ function bindUI() {
   initArrivalPhotos();
   initSignaturePad();
   loadSettings().catch((err) => toast(err.message || "No se pudo cargar identidad"));
-  // Patio primero: hub de módulos + datos vivos; cada menú carga al tocarlo
-  showSection("tablero");
+  // Arranca en Ingreso para meter el carro de una vez
+  showSection("recepcion");
   setTimeout(() => resizeSignaturePad(false), 80);
 }
 
