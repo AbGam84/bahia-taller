@@ -885,6 +885,19 @@ tr:hover td { background: rgba(30, 201, 167, 0.04); }
   gap: 16px;
   align-items: start;
 }
+.taller-dvi-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) 1fr;
+  gap: 18px;
+  align-items: start;
+  margin-bottom: 18px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(0,0,0,0.16);
+}
+.taller-dvi-list { max-height: 420px; }
+.taller-car-svg { max-width: 260px; }
 .car-svg {
   width: 100%;
   max-width: 220px;
@@ -958,4 +971,5 @@ tr:hover td { background: rgba(30, 201, 167, 0.04); }
   .zone-grid, .form-grid { grid-template-columns: 1fr 1fr; }
   .metrics-pro { grid-template-columns: 1fr 1fr; }
   .dvi-map { grid-template-columns: 1fr; }
+  .taller-dvi-layout { grid-template-columns: 1fr; }
 }
