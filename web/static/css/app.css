@@ -256,22 +256,31 @@ input:focus, select:focus, textarea:focus {
   position: sticky;
   top: 0;
   height: 100vh;
-  padding: 22px 16px;
+  max-height: 100vh;
+  padding: 14px 12px;
   border-right: 1px solid var(--line);
   background: linear-gradient(180deg, rgba(13, 31, 45, 0.92), rgba(5, 9, 16, 0.96));
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 10px;
+  overflow: hidden; /* el scroll vive en .nav */
 }
 
 .brand {
-  padding: 10px 12px 18px;
+  flex-shrink: 0;
+  padding: 6px 10px 12px;
   border-bottom: 1px solid var(--line);
+}
+
+.brand img {
+  width: 48px !important;
+  height: 48px !important;
+  margin-bottom: 6px !important;
 }
 
 .brand-mark {
   font-family: var(--display);
-  font-size: 2.1rem;
+  font-size: 1.7rem;
   font-weight: 800;
   letter-spacing: -0.07em;
   line-height: 1;
@@ -279,42 +288,60 @@ input:focus, select:focus, textarea:focus {
 
 .brand small {
   display: block;
-  margin-top: 10px;
+  margin-top: 6px;
   color: var(--mist);
-  font-size: 0.8rem;
-  line-height: 1.4;
+  font-size: 0.75rem;
+  line-height: 1.35;
 }
 
 .nav {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  flex: 1;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-height: 0; /* clave: permite scroll dentro del flex */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
 }
+
+.nav::-webkit-scrollbar { width: 8px; }
+.nav::-webkit-scrollbar-thumb {
+  background: rgba(247, 241, 234, 0.22);
+  border-radius: 8px;
+}
+.nav::-webkit-scrollbar-track { background: transparent; }
 
 .nav button {
   text-align: left;
   background: transparent;
   color: var(--foam);
-  padding: 12px 12px;
-  border-radius: 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
   border: 1px solid transparent;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 10px;
+  flex-shrink: 0;
   transition: 0.18s ease;
 }
 
 .nav button .n {
   font-size: 0.68rem;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--mist);
+  min-width: 1.6rem;
 }
 
 .nav button .t {
   font-weight: 700;
-  font-size: 0.98rem;
+  font-size: 0.9rem;
+  line-height: 1.2;
 }
 
 .nav button:hover,
@@ -326,7 +353,8 @@ input:focus, select:focus, textarea:focus {
 .nav button.active .t { color: #fff; }
 
 .user-box {
-  padding: 14px;
+  flex-shrink: 0;
+  padding: 12px;
   border-radius: 14px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.02);
@@ -1043,10 +1071,20 @@ tr.row-hit td {
   .sidebar {
     position: relative;
     height: auto;
+    max-height: none;
+    overflow: visible;
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
-  .nav { flex-direction: row; flex-wrap: wrap; }
+  .nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    overflow: visible;
+    max-height: none;
+  }
+  .nav button {
+    flex: 1 1 140px;
+  }
   .zone-grid, .form-grid { grid-template-columns: 1fr 1fr; }
   .metrics-pro { grid-template-columns: 1fr 1fr; }
   .dvi-map { grid-template-columns: 1fr; }
