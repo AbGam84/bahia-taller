@@ -1790,7 +1790,7 @@ def health():
         "db": db_ok,
         "license_ok": lic.get("ok"),
         "license_shop": lic.get("shop"),
-        "build": "20260722q",
+        "build": "20260722r",
         "copyright": COPYRIGHT,
     }
 

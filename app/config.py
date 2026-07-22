@@ -61,7 +61,7 @@ SHOP_LICENSE_NAME = _env("KATIRE_SHOP_NAME", "Autorespuesto")
 SHOW_DEMO_HINTS = _env("KATIRE_SHOW_DEMO_HINTS", "0" if IS_PRODUCTION else "1") in {"1", "true", "yes"}
 COPYRIGHT = "© Katire Software. Uso exclusivo bajo licencia. Prohibida la reventa o redistribución."
 PRODUCT_NAME = "Katire"
-VENDOR_CONTACT = _env("KATIRE_VENDOR_CONTACT", "WhatsApp +506 8870-8123")
+VENDOR_CONTACT = _env("KATIRE_VENDOR_CONTACT", "WhatsApp +506 6370-6546")
 VENDOR_SUPPORT = _env("KATIRE_VENDOR_SUPPORT", VENDOR_CONTACT)
 
 # Panel del dueño del software (NO es el admin del taller)

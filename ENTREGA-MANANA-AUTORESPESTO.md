@@ -91,5 +91,5 @@ Incluya en el contrato: “Software Katire bajo licencia; prohibida la reventa a
 
 ## Soporte
 
-WhatsApp vendor: +506 8870-8123  
+WhatsApp vendor: +506 6370-6546  
 Producto: Katire — De la llave al XML.
