@@ -60,7 +60,7 @@ async function openReception(id) {
   openModal(`
     <div class="panel-head">
       <div>
-        <p class="muted" style="margin:0 0 6px;letter-spacing:0.14em;text-transform:uppercase;font-size:0.7rem;color:var(--lagoon)">Katire · expediente digital</p>
+        <p class="muted" style="margin:0 0 6px;letter-spacing:0.14em;text-transform:uppercase;font-size:0.7rem;color:var(--lagoon)">Aitorepuestos · expediente digital</p>
         <h2 style="margin:0;font-family:var(--display);letter-spacing:-0.03em">${ex(v.plate)} · ${ex(v.brand)} ${ex(v.model)}</h2>
         <p class="muted" style="margin:6px 0 0">${ex(r.code)} · ${ex(c.name || "")} · ${ex(c.phone || "")} · ${badge(r.status)}
           · DVI <span class="badge badge-ok">${dvi.ok || 0} ok</span>

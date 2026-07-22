@@ -70,7 +70,7 @@ function avanceControlsHtml(currentStatus) {
     </div>`;
 }
 
-const BRAND = "Katire";
+const BRAND = "Aitorepuestos";
 const arrivalPhotoFiles = [];
 let signaturePad = null;
 let tallerActiveId = null;
@@ -1825,7 +1825,7 @@ function bindUI() {
     }
     openModal(`
       <h2>Emitir y enviar a Hacienda</h2>
-      <p class="muted">Aitorepuestos · Katire firma con su .p12, transmite a ATV y consulta aceptación.</p>
+      <p class="muted">Aitorepuestos firma con su .p12, transmite a ATV y consulta aceptación.</p>
       <form id="feIssueForm" class="form-grid">
         <label class="full">Orden de trabajo
           <select name="work_order_id" required>
@@ -2004,7 +2004,7 @@ try {
   console.error(err);
   const el = document.getElementById("toast");
   if (el) {
-    el.textContent = "Error al iniciar Katire. Recargue la página (Ctrl+F5).";
+    el.textContent = "Error al iniciar. Recargue la página (Ctrl+F5).";
     el.classList.add("show");
   }
 }
