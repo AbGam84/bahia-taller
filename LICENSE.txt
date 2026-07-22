@@ -1,0 +1,33 @@
+LICENCIA DE SOFTWARE KATIRE
+===========================
+
+Copyright (c) 2026 Katire Software / propietarios del producto.
+Todos los derechos reservados.
+
+1. OBJETO
+Katire es un software para la operación de talleres mecánicos y facturación
+electrónica en Costa Rica. Este programa se entrega bajo LICENCIA DE USO,
+no se vende la propiedad intelectual.
+
+2. LO QUE SE PERMITE
+- Usar Katire en el taller licenciado (nombre y clave emitida).
+- Crear usuarios internos (admin, recepción, mecánico) dentro de esa licencia.
+- Recibir actualizaciones y soporte según el plan contratado.
+
+3. LO QUE ESTÁ PROHIBIDO
+- Revender, sublicenciar, alquilar o redistribuir Katire a otros talleres.
+- Copiar el código, la API o la documentación interna para crear un producto rival.
+- Quitar avisos de copyright o el sistema de licencia.
+- Publicar o compartir la clave de licencia.
+
+4. PROPIEDAD
+El código, marcas, diseños, flujos y documentación de Katire pertenecen a sus
+titulares. El taller solo obtiene un derecho de uso limitado y no exclusivo.
+
+5. TERMINACIÓN
+Si la licencia vence, se invalida o se incumple este acuerdo, el acceso puede
+suspenderse. Los datos del taller siguen siendo del taller; el software sigue
+siendo de Katire.
+
+6. CONTACTO VENDOR
+WhatsApp +506 8870-8123 — activaciones y nuevos talleres solo a través del vendor.

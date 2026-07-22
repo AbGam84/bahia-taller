@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Katire — taller + factura electrónica CR</title>
-  <link rel="stylesheet" href="/static/css/app.css?v=20260722m" />
+  <link rel="stylesheet" href="/static/css/app.css?v=20260722n" />
 </head>
 <body>
   <div class="app-shell">
@@ -44,17 +44,19 @@
           <span class="n">07</span>
           <span class="t">Facturación CR</span>
         </button>
-        <button data-section="config">
+        <button data-section="config" data-admin-only="1">
           <span class="n">Casa</span>
-          <span class="t">Identidad Katire</span>
+          <span class="t">Administración</span>
         </button>
       </nav>
       <div class="user-box">
         <strong id="userName">—</strong>
         <span id="userRole">—</span>
+        <small id="licenseTag" class="muted" style="display:block;margin-top:6px;font-size:0.72rem"></small>
         <div style="margin-top:10px">
           <button class="btn btn-ghost" id="logoutBtn" style="width:100%">Salir del patio</button>
         </div>
+        <p class="muted" style="margin:10px 0 0;font-size:0.68rem;line-height:1.35" id="copyFoot">© Katire · Licencia</p>
       </div>
     </aside>
 
@@ -449,11 +451,12 @@
           <div id="feReadyBody" class="muted">Cargando checklist…</div>
         </div>
         <div class="grid-2">
-          <div class="panel">
+          <div class="panel" data-admin-panel="1">
             <div class="panel-head">
               <h2>Emisor ATV / Hacienda</h2>
               <button class="btn btn-ghost" id="testHaciendaBtn">Probar auth ATV</button>
             </div>
+            <p class="muted">Solo administración del taller</p>
             <form id="issuerForm" class="form-grid">
               <label>Nombre legal<input name="nombre" required placeholder="Razón social" /></label>
               <label>Nombre comercial<input name="nombre_comercial" /></label>
@@ -588,8 +591,8 @@
       }
     })();
   </script>
-  <script src="/static/js/app.js?v=20260722m"></script>
-  <script src="/static/js/ficha.js?v=20260722m"></script>
-  <script src="/static/js/taller-dvi.js?v=20260722m"></script>
+  <script src="/static/js/app.js?v=20260722n"></script>
+  <script src="/static/js/ficha.js?v=20260722n"></script>
+  <script src="/static/js/taller-dvi.js?v=20260722n"></script>
 </body>
 </html>

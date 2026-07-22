@@ -10,8 +10,17 @@ from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session, joinedload
 
-from app.auth import create_access_token, get_current_user, verify_password
+from app.auth import create_access_token, get_current_user, require_admin, verify_password
+from app.config import (
+    COPYRIGHT,
+    IS_PRODUCTION,
+    PRODUCT_NAME,
+    PUBLIC_BASE_URL,
+    SHOW_DEMO_HINTS,
+    VENDOR_SUPPORT,
+)
 from app.database import UPLOADS_DIR, Base, engine, get_db, migrate_schema
+from app.license import license_status, require_license_ok, save_license
 from app.pro import (
     approve_estimate,
     build_estimate_from_reception,
@@ -82,28 +91,82 @@ from app.services import (
 ROOT = Path(__file__).resolve().parent.parent
 WEB_DIR = ROOT / "web"
 
+# En producción: sin Swagger / OpenAPI (el taller no ve la API)
 app = FastAPI(
-    title="Katire",
-    description="Katire — patio del taller + facturación electrónica Hacienda Costa Rica v4.4",
-    version="2.0.0",
+    title=PRODUCT_NAME,
+    description="Katire — software licenciado para talleres",
+    version="2.1.0",
+    docs_url=None if IS_PRODUCTION else "/docs",
+    redoc_url=None if IS_PRODUCTION else "/redoc",
+    openapi_url=None if IS_PRODUCTION else "/openapi.json",
 )
 
+_cors_origins = [PUBLIC_BASE_URL] if (IS_PRODUCTION and PUBLIC_BASE_URL) else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
+@app.middleware("http")
+async def license_and_docs_guard(request, call_next):
+    path = request.url.path or ""
+    # Bloquear docs aunque alguien fuerce la URL
+    if path in ("/docs", "/redoc", "/openapi.json") or path.startswith("/docs/") or path.startswith("/redoc/"):
+        if IS_PRODUCTION:
+            return Response(content="Not Found", status_code=404)
+    # Licencia: permitir health, login, activación, estáticos y portal público
+    free = (
+        path.startswith("/static")
+        or path.startswith("/uploads")
+        or path.startswith("/t/")
+        or path.startswith("/api/health")
+        or path.startswith("/api/license")
+        or path.startswith("/api/auth/login")
+        or path.startswith("/api/public")
+        or path in ("/", "/login", "/admin", "/favicon.ico")
+    )
+    if not free and path.startswith("/api/"):
+        st = license_status()
+        if not st.get("ok"):
+            from fastapi.responses import JSONResponse
+
+            return JSONResponse({"detail": st.get("message") or "Licencia requerida"}, status_code=402)
+    return await call_next(request)
+
+
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
     migrate_schema()
+    # Activar licencia desde env si existe y aún no hay archivo
+    from app.config import LICENSE_KEY
+    from app.license import LICENSE_FILE, load_stored_key
+
+    if LICENSE_KEY and not load_stored_key():
+        try:
+            save_license(LICENSE_KEY)
+        except Exception:
+            pass
+    # Primer cliente Autorespuesto: si producción aún sin licencia, emitir la de lanzamiento
+    if IS_PRODUCTION and not load_stored_key():
+        try:
+            from app.license import issue_license
+
+            key = issue_license(
+                "Autorespuesto",
+                "2027-07-21",
+                seats=8,
+                note="Cliente 1 — Katire / Autorespuesto",
+            )
+            save_license(key)
+        except Exception:
+            pass
     db = next(get_db())
     try:
-        # Si el seed falla, el patio queda vacío: mejor tumbar el arranque que fingir que sirve.
         seed_if_empty(db)
     finally:
         db.close()
@@ -112,6 +175,7 @@ def on_startup():
 # ---------- Auth ----------
 @app.post("/api/auth/login")
 def login(payload: LoginIn, db: Session = Depends(get_db)):
+    require_license_ok()
     user = db.query(User).filter(User.username == payload.username, User.active.is_(True)).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
@@ -120,12 +184,53 @@ def login(payload: LoginIn, db: Session = Depends(get_db)):
         "access_token": token,
         "token_type": "bearer",
         "user": {"id": user.id, "name": user.name, "username": user.username, "role": user.role},
+        "license": license_status(),
+        "copyright": COPYRIGHT,
     }
 
 
 @app.get("/api/auth/me")
 def me(user: Annotated[User, Depends(get_current_user)]):
-    return {"id": user.id, "name": user.name, "username": user.username, "role": user.role}
+    return {
+        "id": user.id,
+        "name": user.name,
+        "username": user.username,
+        "role": user.role,
+        "license": license_status(),
+        "copyright": COPYRIGHT,
+        "admin_ui": user.role == "admin",
+    }
+
+
+@app.get("/api/license/status")
+def api_license_status():
+    return license_status()
+
+
+@app.post("/api/license/activate")
+def api_license_activate(payload: dict):
+    """Activa la licencia del taller (clave emitida solo por Katire vendor)."""
+    key = (payload.get("key") or payload.get("license_key") or "").strip()
+    if not key:
+        raise HTTPException(status_code=400, detail="Falta la clave de licencia")
+    try:
+        data = save_license(key)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "message": "Licencia activada", "license": license_status(), "parsed": data}
+
+
+@app.get("/api/product")
+def api_product():
+    """Info pública del producto (sin secretos ni docs de API)."""
+    return {
+        "name": PRODUCT_NAME,
+        "copyright": COPYRIGHT,
+        "support": VENDOR_SUPPORT,
+        "show_demo_hints": SHOW_DEMO_HINTS,
+        "license": license_status(),
+        "production": IS_PRODUCTION,
+    }
 
 
 # ---------- Settings / Dashboard ----------
@@ -146,9 +251,7 @@ def settings_get(db: Session = Depends(get_db), user: User = Depends(get_current
 
 
 @app.put("/api/settings")
-def settings_put(payload: SettingsIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    if user.role not in ("admin", "recepcion", "mecanico"):
-        raise HTTPException(status_code=403, detail="Sin permiso para editar la configuración")
+def settings_put(payload: SettingsIn, db: Session = Depends(get_db), user: User = Depends(require_admin)):
     s = get_settings(db)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(s, field, value)
@@ -1320,28 +1423,31 @@ def services_list(db: Session = Depends(get_db), user: User = Depends(get_curren
 
 
 @app.post("/api/services")
-def services_create(payload: ServiceIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def services_create(payload: ServiceIn, db: Session = Depends(get_db), user: User = Depends(require_admin)):
     s = ServiceCatalog(**payload.model_dump())
     db.add(s)
     db.commit()
     db.refresh(s)
-    return {"id": s.id, "name": s.name, "category": s.category, "hours": s.hours, "price": s.price}
+    return {
+        "id": s.id,
+        "name": s.name,
+        "category": s.category,
+        "hours": s.hours,
+        "price": s.price,
+        "description": s.description,
+    }
 
 
 @app.get("/api/users")
-def users_list(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Solo administrador")
+def users_list(db: Session = Depends(get_db), user: User = Depends(require_admin)):
     rows = db.query(User).order_by(User.name).all()
     return [{"id": u.id, "name": u.name, "username": u.username, "role": u.role, "active": u.active} for u in rows]
 
 
 @app.post("/api/users")
-def users_create(payload: UserCreateIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def users_create(payload: UserCreateIn, db: Session = Depends(get_db), user: User = Depends(require_admin)):
     from app.auth import hash_password
 
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Solo administrador")
     if payload.role not in ("admin", "recepcion", "mecanico"):
         raise HTTPException(status_code=400, detail="Rol inválido")
     if db.query(User).filter(User.username == payload.username).first():
@@ -1491,20 +1597,24 @@ def health():
     except Exception:  # noqa: BLE001
         db_ok = False
 
+    lic = license_status()
     return {
-        "ok": db_ok,
+        "ok": db_ok and lic.get("ok", False),
         "service": "katire",
         "environment": ENVIRONMENT,
         "production": IS_PRODUCTION,
         "fe": "hacienda-cr-v4.4",
         "db": db_ok,
-        "build": "20260722m",
+        "license_ok": lic.get("ok"),
+        "license_shop": lic.get("shop"),
+        "build": "20260722n",
+        "copyright": COPYRIGHT,
     }
 
 
 @app.post("/api/bootstrap/workspace")
 def bootstrap_workspace(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    """Asegura catálogo + cita + carro demo para que todos los menús tengan datos."""
+    """Rellena patio/bodega si está vacío (operación del taller)."""
     from app.seed import ensure_demo_catalog, ensure_demo_workspace
     from app.part_shops import ensure_default_shops
 
@@ -1589,9 +1699,7 @@ def fe_issuer_get(db: Session = Depends(get_db), user: User = Depends(get_curren
 
 
 @app.put("/api/fe/issuer")
-def fe_issuer_put(payload: IssuerIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    if user.role not in ("admin", "recepcion"):
-        raise HTTPException(status_code=403, detail="Sin permiso para editar emisor FE")
+def fe_issuer_put(payload: IssuerIn, db: Session = Depends(get_db), user: User = Depends(require_admin)):
     issuer = get_issuer(db)
     data = payload.model_dump()
     pwd = data.pop("hacienda_password", "")
@@ -1611,10 +1719,8 @@ async def fe_cert_upload(
     file: UploadFile = File(...),
     pin: str = Form(""),
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
 ):
-    if user.role not in ("admin", "recepcion"):
-        raise HTTPException(status_code=403, detail="Sin permiso para subir certificado FE")
     name = Path(file.filename or "cert.p12").name
     ext = Path(name).suffix.lower()
     if ext not in {".p12", ".pfx"}:

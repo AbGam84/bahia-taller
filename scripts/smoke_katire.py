@@ -205,7 +205,7 @@ def main() -> int:
 
         put_set = client.put(
             "/api/settings",
-            headers=demo_h,
+            headers=admin_h,
             json={
                 "shop_name": "Autorespuesto",
                 "slogan": "De la llave al XML.",
@@ -217,7 +217,17 @@ def main() -> int:
                 "sinpe_name": "Autorespuesto",
             },
         )
-        expect(put_set, 200, "settings PUT recepcion")
+        expect(put_set, 200, "settings PUT admin")
+
+        denied = client.put(
+            "/api/settings",
+            headers=demo_h,
+            json={"shop_name": "Hack"},
+        )
+        if denied.status_code == 403:
+            ok("settings bloqueado a recepción")
+        else:
+            fail(f"settings debía ser 403 para recepción: {denied.status_code}")
 
         body = {
             "customer": {"name": "Contrato Cliente", "phone": "88880011"},

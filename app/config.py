@@ -52,3 +52,14 @@ if PUBLIC_BASE_URL and not PUBLIC_BASE_URL.startswith("http"):
     PUBLIC_BASE_URL = f"https://{PUBLIC_BASE_URL}"
 ENVIRONMENT = _env("ENVIRONMENT", "development")
 IS_PRODUCTION = ENVIRONMENT.lower() in {"production", "prod", "cloud"}
+
+# Licencia comercial (solo el vendor conoce el secreto)
+LICENSE_SECRET = _env("KATIRE_LICENSE_SECRET", "katire-vendor-secret-change-in-prod")
+LICENSE_KEY = _env("KATIRE_LICENSE_KEY", "")  # clave emitida para este taller
+SHOP_LICENSE_NAME = _env("KATIRE_SHOP_NAME", "Autorespuesto")
+# Mostrar pistas de demo solo fuera de producción
+SHOW_DEMO_HINTS = _env("KATIRE_SHOW_DEMO_HINTS", "0" if IS_PRODUCTION else "1") in {"1", "true", "yes"}
+COPYRIGHT = "© Katire Software. Uso exclusivo bajo licencia. Prohibida la reventa o redistribución."
+PRODUCT_NAME = "Katire"
+VENDOR_CONTACT = _env("KATIRE_VENDOR_CONTACT", "WhatsApp +506 8870-8123")
+VENDOR_SUPPORT = _env("KATIRE_VENDOR_SUPPORT", VENDOR_CONTACT)

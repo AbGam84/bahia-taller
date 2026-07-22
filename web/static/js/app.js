@@ -673,7 +673,22 @@ function paintUser(u) {
   const name = u.name || u.username || "Usuario";
   const role = u.role || "";
   setText("userName", name);
-  setText("userRole", role);
+  setText("userRole", role === "admin" ? "Administración" : role === "mecanico" ? "Mecánico" : "Recepción");
+  applyRoleGates(role);
+}
+
+function applyRoleGates(role) {
+  const isAdmin = role === "admin";
+  document.querySelectorAll("[data-admin-only]").forEach((el) => {
+    el.style.display = isAdmin ? "" : "none";
+  });
+  document.querySelectorAll("[data-admin-panel]").forEach((el) => {
+    el.hidden = !isAdmin;
+  });
+  // Si está en Casa sin ser admin, volver al patio
+  if (!isAdmin && document.getElementById("sec-config")?.classList.contains("active")) {
+    showSection("tablero");
+  }
 }
 
 async function loadDashboard() {
@@ -1719,7 +1734,13 @@ function bindUI() {
   }
   paintUser(u);
   api("/api/me")
-    .then((me) => paintUser(me))
+    .then((me) => {
+      paintUser(me);
+      if (me.copyright) setText("copyFoot", me.copyright);
+      if (me.license?.shop) {
+        setText("licenseTag", `Licencia · ${me.license.shop}` + (me.license.expires ? ` · vence ${me.license.expires}` : ""));
+      }
+    })
     .catch(() => {});
   document.getElementById("logoutBtn")?.addEventListener("click", () => {
     localStorage.clear();

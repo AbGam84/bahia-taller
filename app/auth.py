@@ -57,9 +57,18 @@ def get_current_user(
 
 
 def require_roles(*roles: str):
+    """Exige uno de los roles indicados. Admin del taller siempre pasa si 'admin' está en la lista;
+    para endpoints solo-admin use require_roles('admin')."""
+
     def checker(user: Annotated[User, Depends(get_current_user)]) -> User:
-        if user.role not in roles and user.role != "admin":
+        if user.role not in roles:
             raise HTTPException(status_code=403, detail="Sin permiso para esta acción")
         return user
 
     return checker
+
+
+def require_admin(user: Annotated[User, Depends(get_current_user)]) -> User:
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Solo el administrador del taller")
+    return user

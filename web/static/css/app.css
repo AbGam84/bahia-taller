@@ -1140,3 +1140,18 @@ tr.row-hit td {
   .dvi-map { grid-template-columns: 1fr; }
   .taller-dvi-layout { grid-template-columns: 1fr; }
 }
+
+.license-box {
+  margin-bottom: 16px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 179, 71, 0.35);
+  background: rgba(255, 179, 71, 0.08);
+}
+.license-box textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(0,0,0,0.35);
+  padding: 10px;
+}
