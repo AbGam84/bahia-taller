@@ -1317,8 +1317,20 @@ def health():
         "production": IS_PRODUCTION,
         "fe": "hacienda-cr-v4.4",
         "db": db_ok,
-        "build": "20260722d",
+        "build": "20260722e",
     }
+
+
+@app.post("/api/bootstrap/workspace")
+def bootstrap_workspace(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Asegura catálogo + cita + carro demo para que todos los menús tengan datos."""
+    from app.seed import ensure_demo_catalog, ensure_demo_workspace
+    from app.part_shops import ensure_default_shops
+
+    ensure_default_shops(db)
+    ensure_demo_catalog(db)
+    ensure_demo_workspace(db)
+    return {"ok": True, "message": "Patio, bodega, tiendas y citas listos"}
 
 
 # ---------- Katire Facturación Electrónica CR ----------

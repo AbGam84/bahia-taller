@@ -664,7 +664,19 @@ async function loadSettings() {
 
 async function loadDashboard() {
   try {
-    const d = await api("/api/dashboard");
+    let d = await api("/api/dashboard");
+    const bare =
+      Number(d.in_shop || 0) === 0 &&
+      !(d.board || []).length &&
+      !(d.appointments || []).length &&
+      Number(d.low_stock_count || 0) === 0;
+    if (bare) {
+      try {
+        await api("/api/bootstrap/workspace", { method: "POST", body: "{}" });
+        d = await api("/api/dashboard");
+        toast("Patio preparado: carro demo, citas y bodega listos");
+      } catch (_) {}
+    }
     const inShop = Number(d.in_shop || 0);
     const emptyCta = document.getElementById("patioEmptyCta");
     if (emptyCta) emptyCta.classList.toggle("hidden", inShop > 0 || (d.board || []).length > 0);
@@ -1114,13 +1126,18 @@ async function openNewAllyJob(prefill = {}) {
 }
 
 async function loadParts() {
-  const q = document.getElementById("partSearch")?.value?.trim() || "";
-  const low = !!document.getElementById("onlyLow")?.checked;
-  const parts = await api(`/api/parts?q=${encodeURIComponent(q)}&low_stock=${low}`);
-  const body = document.getElementById("partsBody");
-  if (!body) return;
-  body.innerHTML = parts
-    .map((p) => `<tr>
+  try {
+    const q = document.getElementById("partSearch")?.value?.trim() || "";
+    const low = !!document.getElementById("onlyLow")?.checked;
+    let parts = await api(`/api/parts?q=${encodeURIComponent(q)}&low_stock=${low}`);
+    if (!parts.length && !q && !low) {
+      await api("/api/bootstrap/workspace", { method: "POST", body: "{}" });
+      parts = await api(`/api/parts?q=&low_stock=false`);
+    }
+    const body = document.getElementById("partsBody");
+    if (!body) return;
+    body.innerHTML = parts
+      .map((p) => `<tr>
       <td>${p.sku}</td>
       <td><strong>${p.name}</strong><br><span class="muted">${p.brand} · ${p.category}</span></td>
       <td>${p.compatible_with || "—"}</td>
@@ -1132,10 +1149,14 @@ async function loadParts() {
         <button class="btn btn-ghost" data-adjust="${p.id}">Ajuste</button>
       </td>
     </tr>`)
-    .join("") || `<tr><td colspan="8"><div class="empty-state"><strong>Estantería vacía</strong>Registre sus repuestos reales (SKU, stock, proveedor)</div></td></tr>`;
-  document.querySelectorAll("[data-adjust]").forEach((btn) => {
-    btn.addEventListener("click", () => adjustPart(Number(btn.dataset.adjust)));
-  });
+      .join("") ||
+      `<tr><td colspan="8"><div class="empty-state"><strong>Estantería vacía</strong>Pulse «Nueva pieza» para registrar stock</div></td></tr>`;
+    document.querySelectorAll("[data-adjust]").forEach((btn) => {
+      btn.addEventListener("click", () => adjustPart(Number(btn.dataset.adjust)));
+    });
+  } catch (err) {
+    toast(err.message || "No se pudo cargar bodega");
+  }
 }
 
 async function runMarketSearch() {
@@ -1583,6 +1604,10 @@ function bindUI() {
   document.querySelectorAll("[data-go]").forEach((btn) => {
     btn.addEventListener("click", () => showSection(btn.dataset.go));
   });
+  document.getElementById("moduleHubGrid")?.addEventListener("click", (e) => {
+    const card = e.target.closest("[data-go]");
+    if (card) showSection(card.dataset.go);
+  });
   document.getElementById("refreshBoard")?.addEventListener("click", () => loadDashboard().catch((e) => toast(e.message)));
   document.getElementById("refreshTallerBtn")?.addEventListener("click", () => loadTaller());
   document.getElementById("marketSearchBtn")?.addEventListener("click", () => runMarketSearch());
@@ -1968,7 +1993,8 @@ function bindUI() {
   initArrivalPhotos();
   initSignaturePad();
   loadSettings().catch((err) => toast(err.message || "No se pudo cargar identidad"));
-  showSection("recepcion");
+  // Patio primero: hub de módulos + datos vivos; cada menú carga al tocarlo
+  showSection("tablero");
   setTimeout(() => resizeSignaturePad(false), 80);
 }
 

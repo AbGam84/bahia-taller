@@ -74,6 +74,19 @@
           </div>
           <button class="btn btn-primary" data-go="recepcion" style="white-space:nowrap">Ir a Ingreso</button>
         </div>
+        <div class="panel" id="moduleHub">
+          <h2 style="margin:0 0 8px">Cada menú hace esto</h2>
+          <p class="muted" style="margin:0 0 12px">Toque un módulo: abre la sección y carga sus datos.</p>
+          <div class="module-hub" id="moduleHubGrid">
+            <button type="button" class="module-card" data-go="recepcion"><b>02 Ingreso</b><span>Metar carro: datos, fotos, daños, firma</span></button>
+            <button type="button" class="module-card" data-go="taller"><b>03 Diagnóstico & OT</b><span>Mapa del carro, fallas, imprimir firma, OT</span></button>
+            <button type="button" class="module-card" data-go="bodega"><b>04 Estantería</b><span>Stock, ajuste y nuevas piezas</span></button>
+            <button type="button" class="module-card" data-go="proveedores"><b>05 Tiendas</b><span>Buscar/pedir en Gigante y Guacamaya</span></button>
+            <button type="button" class="module-card" data-go="aliados"><b>06 Aliados</b><span>Enviar caja/motor y seguimiento</span></button>
+            <button type="button" class="module-card" data-go="facturacion"><b>07 Facturación CR</b><span>Emisor ATV, .p12 y comprobantes</span></button>
+            <button type="button" class="module-card" data-go="config"><b>Casa</b><span>Identidad Aitorepuestos, equipo, servicios</span></button>
+          </div>
+        </div>
         <div class="journey">
           <div class="journey-step"><b>Ingreso</b><span>Foto, daños y firma al llegar</span></div>
           <div class="journey-step"><b>Lectura</b><span>Diagnóstico que habla claro</span></div>
@@ -538,8 +551,27 @@
     <div class="modal" id="modalBody"></div>
   </div>
   <div class="toast" id="toast"></div>
-  <script src="/static/js/app.js?v=20260722d"></script>
-  <script src="/static/js/ficha.js?v=20260722d"></script>
-  <script src="/static/js/taller-dvi.js?v=20260722d"></script>
+  <script>
+    /* Pinta usuario al instante; si el JS grande falla, al menos se ve quién entró */
+    (function bootUser() {
+      try {
+        const u = JSON.parse(localStorage.getItem("tp_user") || "null");
+        const t = localStorage.getItem("tp_token");
+        if (!t || !u) {
+          location.href = "/login";
+          return;
+        }
+        const n = document.getElementById("userName");
+        const r = document.getElementById("userRole");
+        if (n) n.textContent = u.name || u.username || "Usuario";
+        if (r) r.textContent = u.role || "";
+      } catch (e) {
+        location.href = "/login";
+      }
+    })();
+  </script>
+  <script src="/static/js/app.js?v=20260722e"></script>
+  <script src="/static/js/ficha.js?v=20260722e"></script>
+  <script src="/static/js/taller-dvi.js?v=20260722e"></script>
 </body>
 </html>

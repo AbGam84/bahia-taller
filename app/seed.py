@@ -9,7 +9,21 @@ from app.config import (
     DEMO_PASSWORD,
     DEMO_USERNAME,
 )
-from app.models import IssuerProfile, Part, ServiceCatalog, ShopSettings, User
+from datetime import datetime, timedelta
+
+from app.models import (
+    Appointment,
+    Customer,
+    IssuerProfile,
+    Part,
+    Reception,
+    ServiceCatalog,
+    ShopSettings,
+    User,
+    Vehicle,
+)
+from app.pro import ensure_public_token, seed_inspection
+from app.services import next_code
 
 # Identidad del negocio (Aitorepuestos) + producto (Katire)
 SHOP = {
@@ -224,8 +238,63 @@ def ensure_demo_catalog(db: Session) -> None:
     db.commit()
 
 
+def ensure_demo_workspace(db: Session) -> None:
+    """Datos vivos para que cada menú tenga algo usable desde el primer clic."""
+    # Cita de ejemplo
+    if not db.query(Appointment).first():
+        db.add(
+            Appointment(
+                customer_name="Cliente demo",
+                phone="88880000",
+                plate="CIT-01",
+                vehicle_info="Toyota Yaris",
+                reason="Frenos / revisión",
+                starts_at=datetime.utcnow() + timedelta(hours=26),
+                status="agendada",
+                notes="Cita sembrada para mostrar el módulo",
+            )
+        )
+
+    # Un carro en el patio si aún no hay ingresos
+    if not db.query(Reception).first():
+        cust = db.query(Customer).filter(Customer.phone == "88881122").first()
+        if not cust:
+            cust = Customer(name="Demo Patio", phone="88881122", id_number="")
+            db.add(cust)
+            db.flush()
+        veh = db.query(Vehicle).filter(Vehicle.plate == "DEMO-01").first()
+        if not veh:
+            veh = Vehicle(
+                customer_id=cust.id,
+                plate="DEMO-01",
+                brand="Toyota",
+                model="Yaris",
+                year=2018,
+                color="Blanco",
+            )
+            db.add(veh)
+            db.flush()
+        rec = Reception(
+            code=next_code(db, "REC", Reception),
+            vehicle_id=veh.id,
+            received_by="Katire",
+            odometer_km=72000,
+            fuel_level="1/2",
+            customer_complaint="Chillido al frenar — carro demo del patio",
+            accessories="",
+            status="recibido",
+            customer_accepted=True,
+            customer_signature_name="Demo Patio",
+        )
+        db.add(rec)
+        db.flush()
+        ensure_public_token(rec)
+        seed_inspection(db, rec)
+    db.commit()
+
+
 def seed_if_empty(db: Session) -> None:
-    """Admin + demo cliente + identidad Aitorepuestos + emisor FE + tiendas + catálogo."""
+    """Admin + demo + identidad + FE + tiendas + catálogo + patio usable."""
     from app.part_shops import ensure_default_shops
 
     ensure_admin(db)
@@ -234,3 +303,4 @@ def seed_if_empty(db: Session) -> None:
     ensure_issuer(db)
     ensure_default_shops(db)
     ensure_demo_catalog(db)
+    ensure_demo_workspace(db)

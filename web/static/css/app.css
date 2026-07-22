@@ -615,6 +615,38 @@ tr:hover td { background: rgba(30, 201, 167, 0.04); }
   border: 1px solid rgba(255, 138, 51, 0.35);
 }
 .intake-cta.hidden { display: none; }
+.module-hub {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+.module-card {
+  text-align: left;
+  padding: 14px 14px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(0,0,0,0.22);
+  color: var(--foam);
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+.module-card:hover {
+  border-color: rgba(30,201,167,0.45);
+  background: var(--lagoon-dim);
+}
+.module-card b {
+  display: block;
+  font-family: var(--display);
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+  letter-spacing: -0.02em;
+}
+.module-card span {
+  display: block;
+  color: var(--mist);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
 
 .intake-block {
   margin-top: 8px;
