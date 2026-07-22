@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Katire — activar taller</title>
+  <link rel="stylesheet" href="/static/css/app.css?v=20260722p" />
+</head>
+<body class="login-page">
+  <section class="login-hero" aria-label="Katire">
+    <div class="login-hero-top">Instalación por licencia · Costa Rica</div>
+    <div class="login-hero-copy">
+      <img src="/static/brand/logo.png?v=20260722p" alt="Katire" style="width:min(120px,28vw);margin-bottom:18px;border-radius:22px;box-shadow:0 18px 50px rgba(0,0,0,0.45)" />
+      <h1 class="wordmark"><span class="k">K</span><span class="rest">atire</span></h1>
+      <p style="font-weight:800;letter-spacing:0.04em;margin:8px 0 0;color:var(--foam)">Nuevo taller</p>
+      <p>Su patio queda aislado: inventario, trabajos y logo propios. No afecta a otros clientes.</p>
+    </div>
+  </section>
+
+  <section class="login-panel">
+    <div class="login-card">
+      <p class="kicker">Activación</p>
+      <h2>Crear su taller</h2>
+      <p class="sub">Pegue la licencia que le envió Katire, cree el administrador y guarde el código del taller.</p>
+
+      <form id="actForm" class="stack">
+        <label>Clave de licencia
+          <textarea name="license_key" id="licKey" required rows="3" placeholder="KT1...." style="resize:vertical"></textarea>
+        </label>
+        <label>Nombre del taller
+          <input name="shop_name" required placeholder="Ej. Taller El Valle" />
+        </label>
+        <label>Nombre del administrador
+          <input name="admin_name" required placeholder="Su nombre" />
+        </label>
+        <label>Usuario (para entrar)
+          <input name="admin_username" required autocomplete="username" placeholder="ej. dueño" />
+        </label>
+        <label>Clave (mín. 6)
+          <input name="admin_password" type="password" required minlength="6" autocomplete="new-password" />
+        </label>
+        <button class="btn btn-primary" type="submit">Activar e instalar</button>
+      </form>
+
+      <div id="okBox" class="license-box" hidden style="margin-top:16px">
+        <h3 style="margin:0 0 8px;font-size:1rem">Listo</h3>
+        <p id="okMsg" class="muted" style="margin:0 0 10px"></p>
+        <p><strong>Código del taller:</strong> <code id="okCode"></code></p>
+        <p><strong>Usuario:</strong> <code id="okUser"></code></p>
+        <a class="btn btn-primary" href="/login" style="margin-top:10px;display:inline-flex">Ir a entrar</a>
+      </div>
+      <p class="hint" style="margin-top:14px"><a href="/login">Ya tengo taller → entrar</a></p>
+    </div>
+  </section>
+  <div class="toast" id="toast"></div>
+  <script>
+    const toast = (msg) => {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.classList.add("show");
+      setTimeout(() => el.classList.remove("show"), 4000);
+    };
+    const params = new URLSearchParams(location.search);
+    if (params.get("key")) document.getElementById("licKey").value = params.get("key");
+
+    document.getElementById("actForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const body = Object.fromEntries(new FormData(e.target).entries());
+      try {
+        const res = await fetch("/api/onboard/activate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "No se pudo activar");
+        document.getElementById("actForm").hidden = true;
+        document.getElementById("okBox").hidden = false;
+        document.getElementById("okMsg").textContent = data.message || "Activado";
+        document.getElementById("okCode").textContent = data.login_hint?.tenant_code || data.tenant?.code || "";
+        document.getElementById("okUser").textContent = data.login_hint?.username || "";
+        localStorage.setItem("tp_tenant_code", data.login_hint?.tenant_code || "");
+        toast("Taller creado");
+      } catch (err) {
+        toast(err.message);
+      }
+    };
+  </script>
+</body>
+</html>

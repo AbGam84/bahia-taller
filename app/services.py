@@ -45,10 +45,15 @@ def next_code(db: Session, prefix: str, model, field: str = "code") -> str:
     return f"{base}{seq:03d}"
 
 
-def get_settings(db: Session) -> ShopSettings:
-    settings = db.query(ShopSettings).first()
+def get_settings(db: Session, tenant_id: int | None = None) -> ShopSettings:
+    from app.tenancy import get_settings_for_tenant
+
+    if tenant_id:
+        return get_settings_for_tenant(db, tenant_id)
+    # Compat: primer settings (tenant 1 / legado)
+    settings = db.query(ShopSettings).order_by(ShopSettings.id.asc()).first()
     if not settings:
-        settings = ShopSettings()
+        settings = ShopSettings(tenant_id=1)
         db.add(settings)
         db.commit()
         db.refresh(settings)
@@ -366,18 +371,24 @@ def receive_purchase_order(db: Session, po: PurchaseOrder, user_name: str = "") 
     return po
 
 
-def dashboard_stats(db: Session) -> dict:
-    receptions = db.query(Reception).all()
+def dashboard_stats(db: Session, tenant_id: int | None = None) -> dict:
+    rq = db.query(Reception)
+    pq = db.query(Part).filter(Part.active.is_(True))
+    if tenant_id:
+        rq = rq.filter(Reception.tenant_id == tenant_id)
+        pq = pq.filter(Part.tenant_id == tenant_id)
+    receptions = rq.all()
     by_status: dict[str, int] = {}
     for r in receptions:
         by_status[r.status] = by_status.get(r.status, 0) + 1
-    low_stock = db.query(Part).filter(Part.active.is_(True)).all()
+    low_stock = pq.all()
     low = [part_dict(p) for p in low_stock if p.stock_qty <= p.min_stock]
-    open_pos = (
-        db.query(PurchaseOrder)
-        .filter(PurchaseOrder.status.in_(["solicitado", "confirmado", "en_camino"]))
-        .count()
-    )
+    poq = db.query(PurchaseOrder).filter(PurchaseOrder.status.in_(["solicitado", "confirmado", "en_camino"]))
+    if tenant_id:
+        from app.models import Supplier
+
+        poq = poq.join(Supplier).filter(Supplier.tenant_id == tenant_id)
+    open_pos = poq.count()
     today = datetime.utcnow().date()
     today_count = sum(1 for r in receptions if r.created_at and r.created_at.date() == today)
     ready = by_status.get("listo", 0)

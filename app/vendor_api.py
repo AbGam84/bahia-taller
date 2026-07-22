@@ -30,7 +30,7 @@ from app.license import (
     parse_license,
     save_license,
 )
-from app.models import IssuedLicense, LicenseDevice, User
+from app.models import IssuedLicense, LicenseDevice, Tenant, User
 
 router = APIRouter(prefix="/api/vendor", tags=["vendor"])
 
@@ -96,24 +96,20 @@ def vendor_me(vendor=Depends(get_vendor)):
 
 @router.get("/overview")
 def vendor_overview(db: Session = Depends(get_db), vendor=Depends(get_vendor)):
+    from app.tenancy import tenant_dict
+
     licenses = db.query(IssuedLicense).order_by(IssuedLicense.id.desc()).limit(100).all()
+    tenants = db.query(Tenant).order_by(Tenant.id.desc()).limit(100).all()
     users = db.query(User).order_by(User.name).all()
-    key = load_stored_key()
-    fp = license_fingerprint(key) if key else ""
-    devices = []
-    if fp:
-        devices = (
-            db.query(LicenseDevice)
-            .filter(LicenseDevice.license_fp == fp)
-            .order_by(LicenseDevice.last_seen.desc())
-            .all()
-        )
+    devices = db.query(LicenseDevice).order_by(LicenseDevice.last_seen.desc()).limit(200).all()
     return {
         "instance_license": license_status(),
         "licenses_issued": len(licenses),
+        "tenants_count": len(tenants),
         "shop_users": len(users),
         "devices_active": sum(1 for d in devices if d.active),
         "seats": current_seats() or DEFAULT_LICENSE_SEATS,
+        "tenants": [tenant_dict(t) for t in tenants],
         "licenses": [
             {
                 "id": x.id,
@@ -127,11 +123,19 @@ def vendor_overview(db: Session = Depends(get_db), vendor=Depends(get_vendor)):
                 "created_at": x.created_at.isoformat() if x.created_at else None,
                 "key_preview": (x.license_key[:18] + "…") if x.license_key else "",
                 "license_key": x.license_key,
+                "activation_url": f"/activar?key={x.license_key}" if x.license_key else "",
             }
             for x in licenses
         ],
         "users": [
-            {"id": u.id, "name": u.name, "username": u.username, "role": u.role, "active": u.active}
+            {
+                "id": u.id,
+                "name": u.name,
+                "username": u.username,
+                "role": u.role,
+                "active": u.active,
+                "tenant_id": u.tenant_id,
+            }
             for u in users
         ],
         "devices": [
@@ -142,6 +146,7 @@ def vendor_overview(db: Session = Depends(get_db), vendor=Depends(get_vendor)):
                 "last_user": d.last_user,
                 "active": d.active,
                 "last_seen": d.last_seen.isoformat() if d.last_seen else None,
+                "license_fp": d.license_fp,
             }
             for d in devices
         ],
@@ -180,8 +185,9 @@ def vendor_create_license(payload: LicenseCreateIn, db: Session = Depends(get_db
         "seats": row.seats,
         "expires": row.expires,
         "license_key": key,
+        "activation_url": f"/activar?key={key}",
         "activated_here": activated,
-        "message": "Licencia creada. Entréguele la clave al taller (2 dispositivos por defecto).",
+        "message": "Licencia creada. Envíe el link de activación al taller (crea su usuario y no toca otros clientes).",
     }
 
 
@@ -191,7 +197,11 @@ def vendor_create_shop_user(payload: ShopUserIn, db: Session = Depends(get_db), 
         raise HTTPException(status_code=400, detail="Rol inválido")
     if db.query(User).filter(User.username == payload.username.strip().lower()).first():
         raise HTTPException(status_code=400, detail="Usuario ya existe")
+    # Por defecto al primer tenant (Autorespuesto); preferir /activar para talleres nuevos
+    tenant = db.query(Tenant).order_by(Tenant.id.asc()).first()
+    tid = tenant.id if tenant else 1
     u = User(
+        tenant_id=tid,
         name=payload.name.strip(),
         username=payload.username.strip().lower(),
         password_hash=hash_password(payload.password),
@@ -201,7 +211,7 @@ def vendor_create_shop_user(payload: ShopUserIn, db: Session = Depends(get_db), 
     db.add(u)
     db.commit()
     db.refresh(u)
-    return {"ok": True, "id": u.id, "username": u.username, "role": u.role, "name": u.name}
+    return {"ok": True, "id": u.id, "username": u.username, "role": u.role, "name": u.name, "tenant_id": u.tenant_id}
 
 
 @router.post("/users/{user_id}/password")

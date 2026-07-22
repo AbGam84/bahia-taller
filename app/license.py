@@ -149,21 +149,30 @@ def current_seats() -> int:
         return 2
 
 
-def register_device(db, device_id: str, device_name: str = "", username: str = "") -> dict:
-    """Registra o actualiza un dispositivo. Máximo `seats` activos por licencia."""
+def register_device(
+    db,
+    device_id: str,
+    device_name: str = "",
+    username: str = "",
+    *,
+    license_key: str | None = None,
+    seats: int | None = None,
+) -> dict:
+    """Registra o actualiza un dispositivo. Máximo `seats` activos por licencia (por taller)."""
     from app.models import LicenseDevice
 
     device_id = (device_id or "").strip()
     if not device_id:
         raise ValueError("Falta identificador de dispositivo")
-    key = load_stored_key()
+    key = (license_key or "").strip() or load_stored_key()
     if not key:
-        # desarrollo sin licencia: no limitar
         if not IS_PRODUCTION:
             return {"ok": True, "mode": "development", "seats": 99, "used": 0}
         raise ValueError("Sin licencia activa")
     fp = license_fingerprint(key)
-    seats = current_seats() or 2
+    if seats is None:
+        seats = current_seats() or 2
+    seats = int(seats or 2)
     existing = (
         db.query(LicenseDevice)
         .filter(LicenseDevice.license_fp == fp, LicenseDevice.device_id == device_id)

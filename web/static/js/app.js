@@ -627,21 +627,29 @@ async function uploadArrivalMedia(receptionId) {
 async function loadSettings() {
   const s = await api("/api/settings");
   setText("shopSlogan", s.slogan || "De la llave al XML.");
-  // Negocio: Autorespuesto (no Aitorepuestos)
-  let shopName = String(s.shop_name || "Autorespuesto");
-  shopName = shopName.replace(/aitorepuestos?/gi, "Autorespuesto");
-  if (!/autorespuesto/i.test(shopName)) shopName = "Autorespuesto";
+  let shopName = String(s.shop_name || "Taller");
+  // Solo fuerza Autorespuesto en el tenant default legado
+  if ((s.tenant?.code || "") === "autorespuesto") {
+    shopName = shopName.replace(/aitorepuestos?/gi, "Autorespuesto");
+    if (!/autorespuesto/i.test(shopName)) shopName = "Autorespuesto";
+  }
   setText("shopNameLabel", shopName);
   const form = document.getElementById("settingsForm");
   if (!form) return;
-  if (form.shop_name) form.shop_name.value = s.shop_name || "Autorespuesto";
+  if (form.shop_name) form.shop_name.value = s.shop_name || "";
   if (form.slogan) form.slogan.value = s.slogan || "De la llave al XML.";
-  if (form.phone) form.phone.value = s.phone || "+506 8870-8123";
-  if (form.whatsapp) form.whatsapp.value = s.whatsapp || "+506 8870-8123";
-  if (form.address) form.address.value = s.address || "Costa Rica";
-  if (form.labor_rate) form.labor_rate.value = s.labor_rate || 15000;
+  if (form.phone) form.phone.value = s.phone || "";
+  if (form.whatsapp) form.whatsapp.value = s.whatsapp || "";
+  if (form.address) form.address.value = s.address || "";
+  if (form.labor_rate) form.labor_rate.value = s.labor_rate || 0;
   if (form.sinpe_phone) form.sinpe_phone.value = s.sinpe_phone || s.whatsapp || "";
   if (form.sinpe_name) form.sinpe_name.value = s.sinpe_name || s.shop_name || "";
+
+  if (s.logo_url) {
+    const img = document.getElementById("brandLogo");
+    if (img) img.src = s.logo_url + (s.logo_url.includes("?") ? "&" : "?") + "t=" + Date.now();
+    localStorage.setItem("tp_logo", s.logo_url);
+  }
 
   try {
     const users = await api("/api/users");
@@ -659,7 +667,7 @@ async function loadSettings() {
   setHtml(
     "servicesBody",
     services
-      .map((s) => `<tr><td>${s.name}</td><td>${s.category}</td><td>${s.hours}</td><td class="money">${money(s.price)}</td></tr>`)
+      .map((svc) => `<tr><td>${svc.name}</td><td>${svc.category}</td><td>${svc.hours}</td><td class="money">${money(svc.price)}</td></tr>`)
       .join("") ||
       `<tr><td colspan="4"><div class="empty-state"><strong>Planilla vacía</strong>Agregue los servicios reales de su taller</div></td></tr>`
   );
@@ -1740,6 +1748,11 @@ function bindUI() {
       if (me.license?.shop) {
         setText("licenseTag", `Licencia · ${me.license.shop}` + (me.license.expires ? ` · vence ${me.license.expires}` : ""));
       }
+      if (me.tenant?.logo_url) {
+        const img = document.getElementById("brandLogo");
+        if (img) img.src = me.tenant.logo_url + "?t=" + Date.now();
+      }
+      if (me.tenant_code) localStorage.setItem("tp_tenant_code", me.tenant_code);
     })
     .catch(() => {});
   document.getElementById("logoutBtn")?.addEventListener("click", () => {
@@ -1878,10 +1891,34 @@ function bindUI() {
     e.preventDefault();
     try {
       const fd = new FormData(e.target);
+      fd.delete("logoFile");
       const body = Object.fromEntries(fd.entries());
       body.labor_rate = Number(body.labor_rate || 0);
       await api("/api/settings", { method: "PUT", body: JSON.stringify(body) });
       toast("Configuración guardada");
+      loadSettings();
+    } catch (err) {
+      toast(err.message);
+    }
+  });
+
+  document.getElementById("logoUploadBtn")?.addEventListener("click", async () => {
+    const input = document.getElementById("logoFile");
+    if (!input?.files?.length) {
+      toast("Elija una imagen primero");
+      return;
+    }
+    try {
+      const fd = new FormData();
+      fd.append("file", input.files[0]);
+      const res = await fetch("/api/branding/logo", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + token() },
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "No se pudo subir");
+      toast("Logo actualizado (solo este taller)");
       loadSettings();
     } catch (err) {
       toast(err.message);

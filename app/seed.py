@@ -59,15 +59,20 @@ ISSUER = {
 
 
 def ensure_admin(db: Session) -> None:
+    from app.tenancy import ensure_default_tenant
+
+    tenant = ensure_default_tenant(db)
     user = db.query(User).filter(User.username == ADMIN_USERNAME).first()
     if user:
         user.active = True
         user.name = ADMIN_NAME or user.name
         user.role = "admin"
         user.password_hash = hash_password(ADMIN_PASSWORD)
+        user.tenant_id = tenant.id
     else:
         db.add(
             User(
+                tenant_id=tenant.id,
                 name=ADMIN_NAME,
                 username=ADMIN_USERNAME,
                 password_hash=hash_password(ADMIN_PASSWORD),
@@ -81,15 +86,20 @@ def ensure_demo_client(db: Session) -> None:
     """Usuario para que el cliente mire el sistema y oriente el desarrollo."""
     if not DEMO_USERNAME or not DEMO_PASSWORD:
         return
+    from app.tenancy import ensure_default_tenant
+
+    tenant = ensure_default_tenant(db)
     user = db.query(User).filter(User.username == DEMO_USERNAME).first()
     if user:
         user.active = True
         user.name = DEMO_NAME or user.name
         user.role = "recepcion"
         user.password_hash = hash_password(DEMO_PASSWORD)
+        user.tenant_id = tenant.id
     else:
         db.add(
             User(
+                tenant_id=tenant.id,
                 name=DEMO_NAME,
                 username=DEMO_USERNAME,
                 password_hash=hash_password(DEMO_PASSWORD),
@@ -100,31 +110,36 @@ def ensure_demo_client(db: Session) -> None:
 
 
 def ensure_settings(db: Session) -> None:
-    """Aplica identidad Autorespuesto (datos del dueño)."""
-    settings = db.query(ShopSettings).first()
-    if not settings:
-        settings = ShopSettings(**SHOP)
-        db.add(settings)
-    else:
-        settings.shop_name = SHOP["shop_name"]
-        settings.slogan = SHOP["slogan"]
-        settings.phone = SHOP["phone"]
-        settings.whatsapp = SHOP["whatsapp"]
-        settings.address = SHOP["address"]
-        if not settings.labor_rate:
-            settings.labor_rate = SHOP["labor_rate"]
-        settings.sinpe_phone = SHOP.get("sinpe_phone") or settings.whatsapp or settings.phone or settings.sinpe_phone
-        settings.sinpe_name = SHOP.get("sinpe_name") or settings.shop_name
+    """Aplica identidad Autorespuesto (datos del dueño) solo al tenant default."""
+    from app.tenancy import ensure_default_tenant, get_settings_for_tenant
+
+    tenant = ensure_default_tenant(db)
+    settings = get_settings_for_tenant(db, tenant.id)
+    settings.shop_name = SHOP["shop_name"]
+    settings.slogan = SHOP["slogan"]
+    settings.phone = SHOP["phone"]
+    settings.whatsapp = SHOP["whatsapp"]
+    settings.address = SHOP["address"]
+    if not settings.labor_rate:
+        settings.labor_rate = SHOP["labor_rate"]
+    settings.sinpe_phone = SHOP.get("sinpe_phone") or settings.whatsapp or settings.phone or settings.sinpe_phone
+    settings.sinpe_name = SHOP.get("sinpe_name") or settings.shop_name
     db.commit()
 
 
 def ensure_issuer(db: Session) -> None:
     """Emisor Hacienda: cédula y actividad de Autorespuesto."""
-    issuer = db.query(IssuerProfile).first()
+    from app.tenancy import ensure_default_tenant
+
+    tenant = ensure_default_tenant(db)
+    issuer = db.query(IssuerProfile).filter(IssuerProfile.tenant_id == tenant.id).first()
     if not issuer:
-        issuer = IssuerProfile(**ISSUER)
+        issuer = db.query(IssuerProfile).first()
+    if not issuer:
+        issuer = IssuerProfile(tenant_id=tenant.id, **ISSUER)
         db.add(issuer)
     else:
+        issuer.tenant_id = tenant.id
         for key, value in ISSUER.items():
             setattr(issuer, key, value)
     db.commit()
@@ -232,32 +247,45 @@ DEMO_SERVICES = [
 
 def ensure_demo_catalog(db: Session) -> None:
     """Catálogo base para que Bodega, Lectura y ficha tengan opciones usables."""
+    from app.tenancy import ensure_default_tenant
+
+    tenant = ensure_default_tenant(db)
     for row in DEMO_PARTS:
-        existing = db.query(Part).filter(Part.sku == row["sku"]).first()
+        existing = db.query(Part).filter(Part.sku == row["sku"], Part.tenant_id == tenant.id).first()
         if not existing:
-            db.add(Part(**row))
+            db.add(Part(tenant_id=tenant.id, **row))
         else:
             want = (row.get("barcode") or "").strip()
             have = (getattr(existing, "barcode", None) or "").strip()
-            # Demo: fuerza EAN conocido; o backfill si vacío / igual al SKU viejo
             if want and (not have or have == existing.sku):
                 existing.barcode = want
     for row in DEMO_SERVICES:
-        if not db.query(ServiceCatalog).filter(ServiceCatalog.name == row["name"]).first():
-            db.add(ServiceCatalog(**row))
-    for p in db.query(Part).filter((Part.barcode.is_(None)) | (Part.barcode == "")).all():
+        if not db.query(ServiceCatalog).filter(
+            ServiceCatalog.name == row["name"], ServiceCatalog.tenant_id == tenant.id
+        ).first():
+            db.add(ServiceCatalog(tenant_id=tenant.id, **row))
+    for p in (
+        db.query(Part)
+        .filter(Part.tenant_id == tenant.id, (Part.barcode.is_(None)) | (Part.barcode == ""))
+        .all()
+    ):
         p.barcode = p.sku
     db.commit()
 
 
 def ensure_demo_workspace(db: Session) -> None:
     """Datos vivos: siempre hay al menos un carro ABIERTO en el patio."""
+    from app.tenancy import ensure_default_tenant
+
+    tenant = ensure_default_tenant(db)
     open_statuses = ("recibido", "en_diagnostico", "esperando_repuestos", "en_reparacion", "listo")
 
-    # Cita de ejemplo
-    if not db.query(Appointment).filter(Appointment.status == "agendada").first():
+    if not db.query(Appointment).filter(
+        Appointment.status == "agendada", Appointment.tenant_id == tenant.id
+    ).first():
         db.add(
             Appointment(
+                tenant_id=tenant.id,
                 customer_name="Cliente demo",
                 phone="88880000",
                 plate="CIT-01",
@@ -269,11 +297,19 @@ def ensure_demo_workspace(db: Session) -> None:
             )
         )
 
-    open_n = db.query(Reception).filter(Reception.status.in_(open_statuses)).count()
+    open_n = (
+        db.query(Reception)
+        .filter(Reception.tenant_id == tenant.id, Reception.status.in_(open_statuses))
+        .count()
+    )
     if open_n == 0:
-        cust = db.query(Customer).filter(Customer.phone == "88881122").first()
+        cust = (
+            db.query(Customer)
+            .filter(Customer.phone == "88881122", Customer.tenant_id == tenant.id)
+            .first()
+        )
         if not cust:
-            cust = Customer(name="Demo Patio", phone="88881122", id_number="")
+            cust = Customer(tenant_id=tenant.id, name="Demo Patio", phone="88881122", id_number="")
             db.add(cust)
             db.flush()
         veh = db.query(Vehicle).filter(Vehicle.plate == "DEMO-01").first()
@@ -288,10 +324,9 @@ def ensure_demo_workspace(db: Session) -> None:
             )
             db.add(veh)
             db.flush()
-        # Reabrir el último ingreso del demo si existe; si no, crear uno nuevo
         rec = (
             db.query(Reception)
-            .filter(Reception.vehicle_id == veh.id)
+            .filter(Reception.vehicle_id == veh.id, Reception.tenant_id == tenant.id)
             .order_by(Reception.id.desc())
             .first()
         )
@@ -302,6 +337,7 @@ def ensure_demo_workspace(db: Session) -> None:
             seed_inspection(db, rec)
         elif not rec:
             rec = Reception(
+                tenant_id=tenant.id,
                 code=next_code(db, "REC", Reception),
                 vehicle_id=veh.id,
                 received_by="Katire",
@@ -318,7 +354,6 @@ def ensure_demo_workspace(db: Session) -> None:
             ensure_public_token(rec)
             seed_inspection(db, rec)
         else:
-            # Hay recepción pero no abierta (estado raro) → forzar en patio
             rec.status = "recibido"
             ensure_public_token(rec)
     db.commit()

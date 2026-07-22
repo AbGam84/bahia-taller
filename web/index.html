@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Katire — taller + factura electrónica CR</title>
-  <link rel="stylesheet" href="/static/css/app.css?v=20260722n" />
+  <link rel="stylesheet" href="/static/css/app.css?v=20260722p" />
 </head>
 <body>
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
-        <img src="/static/brand/logo.png?v=20260722g" alt="Katire · Autorespuesto" style="width:64px;height:64px;border-radius:16px;margin-bottom:10px;object-fit:cover" />
+        <img id="brandLogo" src="/static/brand/logo.png?v=20260722p" alt="Katire" style="width:64px;height:64px;border-radius:16px;margin-bottom:10px;object-fit:cover" />
         <div class="brand-mark"><span class="k">K</span>atire</div>
         <strong id="shopNameLabel" style="display:block;margin-top:4px;color:var(--foam);font-weight:800;letter-spacing:0.02em;font-size:0.95rem">Autorespuesto</strong>
         <small id="shopSlogan">De la llave al XML.</small>
@@ -537,7 +537,13 @@
               <label>SINPE teléfono<input name="sinpe_phone" placeholder="8870-8123" /></label>
               <label>SINPE a nombre de<input name="sinpe_name" placeholder="Autorespuesto" /></label>
               <label class="full">Dirección<input name="address" placeholder="Provincia, cantón, señas" /></label>
-              <div class="full"><button class="btn btn-primary" type="submit">Guardar identidad</button></div>
+              <label class="full">Logo del taller (solo este cliente)
+                <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp" />
+              </label>
+              <div class="full" style="display:flex;gap:10px;flex-wrap:wrap">
+                <button class="btn btn-primary" type="submit">Guardar identidad</button>
+                <button class="btn btn-ghost" type="button" id="logoUploadBtn">Subir logo</button>
+              </div>
             </form>
           </div>
           <div class="panel">
@@ -591,8 +597,8 @@
       }
     })();
   </script>
-  <script src="/static/js/app.js?v=20260722n"></script>
-  <script src="/static/js/ficha.js?v=20260722n"></script>
-  <script src="/static/js/taller-dvi.js?v=20260722n"></script>
+  <script src="/static/js/app.js?v=20260722p"></script>
+  <script src="/static/js/ficha.js?v=20260722p"></script>
+  <script src="/static/js/taller-dvi.js?v=20260722p"></script>
 </body>
 </html>

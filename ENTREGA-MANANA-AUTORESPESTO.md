@@ -33,7 +33,7 @@ Clave de lanzamiento Autorespuesto (activar si hace falta):
 KT1.eyJ2IjoxLCJzaG9wIjoiQXV0b3Jlc3B1ZXN0byIsImV4cCI6IjIwMjctMDctMjEiLCJzZWF0cyI6OCwibm90ZSI6IkNsaWVudGUxIiwiaXNzdWVkIjoiMjAyNi0wNy0yMSJ9.pGJfMMDuOpsn1as1uHE6Q93jOy9mOZTimgV4njKHG4M
 ```
 
-(En producción el servidor también puede auto-activar la licencia de este primer cliente al arrancar.)
+(En producción el taller activa la licencia al entrar: usuario/clave + pegar clave KT1… si el sistema la pide.)
 
 5. Capacitación: Patio, Ingreso, Diagnóstico/croqui, Estantería (pistola), Factura  
 

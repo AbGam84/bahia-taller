@@ -61,9 +61,14 @@ DEFAULT_SHOPS = [
 ]
 
 
-def ensure_default_shops(db: Session) -> None:
+def ensure_default_shops(db: Session, tenant_id: int | None = None) -> None:
+    from app.tenancy import ensure_default_tenant
+
+    tid = tenant_id or ensure_default_tenant(db).id
     for row in DEFAULT_SHOPS:
-        existing = db.query(Supplier).filter(Supplier.name == row["name"]).first()
+        existing = (
+            db.query(Supplier).filter(Supplier.name == row["name"], Supplier.tenant_id == tid).first()
+        )
         if existing:
             for key, value in row.items():
                 if key == "name":
@@ -72,8 +77,9 @@ def ensure_default_shops(db: Session) -> None:
                 if current in (None, "", "tienda") or (key != "kind" and not current):
                     setattr(existing, key, value)
             existing.active = True
+            existing.tenant_id = tid
         else:
-            db.add(Supplier(**row))
+            db.add(Supplier(tenant_id=tid, **row))
     db.commit()
 
 

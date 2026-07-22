@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Katire — acceso licenciado</title>
-  <link rel="stylesheet" href="/static/css/app.css?v=20260722n" />
+  <link rel="stylesheet" href="/static/css/app.css?v=20260722q" />
 </head>
 <body class="login-page">
   <section class="login-hero" aria-label="Katire">
     <div class="login-hero-top">Software licenciado · Costa Rica</div>
     <div class="login-hero-copy">
-      <img src="/static/brand/logo.png?v=20260722g" alt="Katire" style="width:min(120px,28vw);margin-bottom:18px;border-radius:22px;box-shadow:0 18px 50px rgba(0,0,0,0.45)" />
+      <img src="/static/brand/logo.png?v=20260722q" alt="Katire" style="width:min(120px,28vw);margin-bottom:18px;border-radius:22px;box-shadow:0 18px 50px rgba(0,0,0,0.45)" />
       <h1 class="wordmark"><span class="k">K</span><span class="rest">atire</span></h1>
       <p style="font-weight:800;letter-spacing:0.04em;margin:8px 0 0;color:var(--foam)">Para talleres</p>
       <p>De la llave al XML.</p>
@@ -24,20 +24,23 @@
     <div class="login-card">
       <p class="kicker">Katire OS</p>
       <h2>Entrar al taller</h2>
-      <p class="sub">Sistema operativo del patio — ingreso, diagnóstico, bodega y factura electrónica.</p>
+      <p class="sub">Usuario y clave. Para trabajar el sistema debe activar su licencia Katire.</p>
 
       <div id="licenseBox" class="license-box" hidden>
-        <h3 style="margin:0 0 8px;font-size:1rem">Activar licencia</h3>
-        <p class="muted" style="margin:0 0 10px;font-size:0.85rem">Este equipo aún no tiene licencia Katire. Pegue la clave que le entregó su proveedor.</p>
+        <h3 style="margin:0 0 8px;font-size:1rem">Licencia requerida</h3>
+        <p class="muted" style="margin:0 0 10px;font-size:0.85rem">
+          Pegue la clave que le entregó Katire. Sin licencia el patio no abre.
+        </p>
         <form id="licenseForm" class="stack">
           <label>Clave de licencia
-            <textarea name="key" required rows="3" placeholder="KT1...." style="resize:vertical"></textarea>
+            <textarea name="key" id="licKey" required rows="3" placeholder="KT1...." style="resize:vertical"></textarea>
           </label>
-          <button class="btn btn-primary" type="submit">Activar</button>
+          <button class="btn btn-primary" type="submit">Activar licencia</button>
         </form>
       </div>
 
       <form id="loginForm" class="stack">
+        <input type="hidden" name="tenant_code" id="tenantCode" value="autorespuesto" />
         <label>Usuario
           <input name="username" autocomplete="username" required placeholder="Usuario" />
         </label>
@@ -60,6 +63,10 @@
       setTimeout(() => el.classList.remove("show"), 3200);
     };
 
+    const showLicense = (show) => {
+      document.getElementById("licenseBox").hidden = !show;
+    };
+
     async function refreshProduct() {
       try {
         const res = await fetch("/api/product");
@@ -67,38 +74,17 @@
         if (p.copyright) document.getElementById("copyLine").textContent = p.copyright;
         if (p.support) document.getElementById("supportLine").textContent = "Soporte: " + p.support;
         const lic = p.license || {};
-        const box = document.getElementById("licenseBox");
-        if (!lic.ok) {
-          box.hidden = false;
-        } else {
-          box.hidden = true;
-        }
+        showLicense(!lic.ok);
         if (p.show_demo_hints) {
           const h = document.getElementById("demoHint");
           h.hidden = false;
-          h.innerHTML = "Demo interna: <strong>admin</strong> / dueño · <strong>cliente</strong> / recepción";
+          h.innerHTML = "Demo: <strong>admin</strong> / dueño · <strong>cliente</strong> / recepción";
         }
       } catch (_) {}
     }
 
-    document.getElementById("licenseForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const key = new FormData(e.target).get("key");
-      try {
-        const res = await fetch("/api/license/activate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "No se pudo activar");
-        toast("Licencia activa · " + (data.license?.shop || ""));
-        e.target.reset();
-        refreshProduct();
-      } catch (err) {
-        toast(err.message);
-      }
-    });
+    const savedCode = localStorage.getItem("tp_tenant_code");
+    if (savedCode) document.getElementById("tenantCode").value = savedCode;
 
     if (localStorage.getItem("tp_token")) location.href = "/";
     refreshProduct();
@@ -112,14 +98,36 @@
       return id;
     };
 
+    document.getElementById("licenseForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const key = new FormData(e.target).get("key");
+      try {
+        const res = await fetch("/api/license/activate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "No se pudo activar");
+        toast("Licencia activa · " + (data.license?.shop || data.parsed?.shop || ""));
+        e.target.reset();
+        showLicense(false);
+        refreshProduct();
+      } catch (err) {
+        toast(err.message);
+      }
+    });
+
     document.getElementById("loginForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
+      const tenant_code = (fd.get("tenant_code") || "autorespuesto").toString().trim().toLowerCase();
       try {
         const res = await fetch("/api/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            tenant_code,
             username: fd.get("username"),
             password: fd.get("password"),
             device_id: deviceId(),
@@ -128,12 +136,14 @@
         });
         const data = await res.json();
         if (res.status === 402) {
-          document.getElementById("licenseBox").hidden = false;
-          throw new Error(data.detail || "Active la licencia primero");
+          showLicense(true);
+          throw new Error(data.detail || "Active la licencia para trabajar");
         }
         if (!res.ok) throw new Error(data.detail || "No se pudo entrar");
         localStorage.setItem("tp_token", data.access_token);
         localStorage.setItem("tp_user", JSON.stringify(data.user));
+        if (data.tenant?.code) localStorage.setItem("tp_tenant_code", data.tenant.code);
+        if (data.tenant?.logo_url) localStorage.setItem("tp_logo", data.tenant.logo_url);
         location.href = "/";
       } catch (err) {
         toast(err.message);

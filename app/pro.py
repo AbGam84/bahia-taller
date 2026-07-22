@@ -273,15 +273,18 @@ def decline_estimate(db: Session, est: Estimate, message: str = "") -> Estimate:
     return est
 
 
-def owner_analytics(db: Session) -> dict:
+def owner_analytics(db: Session, tenant_id: int | None = None) -> dict:
     from app.services import dashboard_stats
 
-    base = dashboard_stats(db)
-    receptions = db.query(Reception).options(
+    base = dashboard_stats(db, tenant_id=tenant_id)
+    rq = db.query(Reception).options(
         joinedload(Reception.work_order).joinedload(WorkOrder.lines).joinedload(WorkOrderLine.part),
         joinedload(Reception.estimate),
         joinedload(Reception.vehicle),
-    ).all()
+    )
+    if tenant_id:
+        rq = rq.filter(Reception.tenant_id == tenant_id)
+    receptions = rq.all()
 
     closed = [r for r in receptions if r.work_order and r.status == "entregado"]
     revenue = sum((r.work_order.grand_total or 0) for r in closed)
@@ -318,13 +321,10 @@ def owner_analytics(db: Session) -> dict:
         if r.work_order.closed_at and r.work_order.closed_at >= week_ago
     )
 
-    appointments = (
-        db.query(Appointment)
-        .filter(Appointment.starts_at >= datetime.utcnow() - timedelta(hours=2))
-        .order_by(Appointment.starts_at)
-        .limit(12)
-        .all()
-    )
+    aq = db.query(Appointment).filter(Appointment.starts_at >= datetime.utcnow() - timedelta(hours=2))
+    if tenant_id:
+        aq = aq.filter(Appointment.tenant_id == tenant_id)
+    appointments = aq.order_by(Appointment.starts_at).limit(12).all()
 
     base.update(
         {

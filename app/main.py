@@ -120,7 +120,7 @@ async def license_and_docs_guard(request, call_next):
     if path in ("/docs", "/redoc", "/openapi.json") or path.startswith("/docs/") or path.startswith("/redoc/"):
         if IS_PRODUCTION:
             return Response(content="Not Found", status_code=404)
-    # Licencia: permitir health, login, activación, estáticos y portal público
+    # Rutas libres (sin sesión). Licencia se valida por taller al login / en JWT.
     free = (
         path.startswith("/static")
         or path.startswith("/uploads")
@@ -128,17 +128,16 @@ async def license_and_docs_guard(request, call_next):
         or path.startswith("/api/health")
         or path.startswith("/api/license")
         or path.startswith("/api/auth/login")
-        or path.startswith("/api/vendor")  # panel del dueño Katire
+        or path.startswith("/api/onboard")
+        or path.startswith("/api/branding")
+        or path.startswith("/api/vendor")
         or path.startswith("/api/public")
         or path.startswith("/api/product")
-        or path in ("/", "/login", "/admin", "/vendor", "/favicon.ico")
+        or path in ("/", "/login", "/admin", "/vendor", "/activar", "/favicon.ico")
     )
-    if not free and path.startswith("/api/"):
-        st = license_status()
-        if not st.get("ok"):
-            from fastapi.responses import JSONResponse
-
-            return JSONResponse({"detail": st.get("message") or "Licencia requerida"}, status_code=402)
+    # Ya no bloqueamos toda la API con una sola licencia de instancia:
+    # cada taller (tenant) tiene su propia licencia.
+    _ = free
     return await call_next(request)
 
 
@@ -155,22 +154,12 @@ def on_startup():
             save_license(LICENSE_KEY)
         except Exception:
             pass
-    # Primer cliente Autorespuesto: si producción aún sin licencia, emitir la de lanzamiento
-    if IS_PRODUCTION and not load_stored_key():
-        try:
-            from app.license import issue_license
-
-            key = issue_license(
-                "Autorespuesto",
-                "2027-07-21",
-                seats=2,
-                note="Cliente 1 — Katire / Autorespuesto · 2 dispositivos",
-            )
-            save_license(key)
-        except Exception:
-            pass
+    # No auto-emitir licencia: el taller debe activarla al entrar (usuario/clave + licencia).
     db = next(get_db())
     try:
+        from app.tenancy import ensure_default_tenant
+
+        ensure_default_tenant(db)
         seed_if_empty(db)
     finally:
         db.close()
@@ -179,11 +168,29 @@ def on_startup():
 # ---------- Auth ----------
 @app.post("/api/auth/login")
 def login(payload: LoginIn, db: Session = Depends(get_db)):
-    require_license_ok()
-    user = db.query(User).filter(User.username == payload.username, User.active.is_(True)).first()
+    from app.models import Tenant
+    from app.tenancy import tenant_dict, tenant_license_status
+
+    uname = (payload.username or "").strip().lower()
+    q = db.query(User).filter(User.username == uname, User.active.is_(True))
+    tenant = None
+    code = (payload.tenant_code or "").strip().lower()
+    if code:
+        tenant = db.query(Tenant).filter(Tenant.code == code, Tenant.active.is_(True)).first()
+        if not tenant:
+            raise HTTPException(status_code=401, detail="Código de taller incorrecto")
+        user = q.filter(User.tenant_id == tenant.id).first()
+    else:
+        user = q.first()
+        if user:
+            tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
-    # Límite de dispositivos por licencia (por defecto 2)
+    if not tenant:
+        raise HTTPException(status_code=403, detail="Usuario sin taller asignado")
+    st = tenant_license_status(tenant)
+    if not st.get("ok"):
+        raise HTTPException(status_code=402, detail=st.get("message") or "Licencia requerida")
     device_info = None
     if payload.device_id:
         try:
@@ -194,28 +201,53 @@ def login(payload: LoginIn, db: Session = Depends(get_db)):
                 payload.device_id,
                 device_name=payload.device_name or "Navegador",
                 username=user.username,
+                license_key=tenant.license_key or None,
+                seats=tenant.seats or 2,
             )
         except ValueError as exc:
             raise HTTPException(status_code=403, detail=str(exc)) from exc
-    token = create_access_token({"sub": user.username, "role": user.role})
+    token = create_access_token(
+        {
+            "sub": user.username,
+            "role": user.role,
+            "tenant_id": tenant.id,
+            "tenant_code": tenant.code,
+        }
+    )
     return {
         "access_token": token,
         "token_type": "bearer",
-        "user": {"id": user.id, "name": user.name, "username": user.username, "role": user.role},
-        "license": license_status(),
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "username": user.username,
+            "role": user.role,
+            "tenant_id": tenant.id,
+            "tenant_code": tenant.code,
+        },
+        "tenant": tenant_dict(tenant),
+        "license": st,
         "device": device_info,
         "copyright": COPYRIGHT,
     }
 
 
 @app.get("/api/auth/me")
-def me(user: Annotated[User, Depends(get_current_user)]):
+@app.get("/api/me")
+def me(user: Annotated[User, Depends(get_current_user)], db: Session = Depends(get_db)):
+    from app.models import Tenant
+    from app.tenancy import tenant_dict, tenant_license_status
+
+    tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
     return {
         "id": user.id,
         "name": user.name,
         "username": user.username,
         "role": user.role,
-        "license": license_status(),
+        "tenant_id": user.tenant_id,
+        "tenant_code": tenant.code if tenant else "",
+        "tenant": tenant_dict(tenant) if tenant else None,
+        "license": tenant_license_status(tenant),
         "copyright": COPYRIGHT,
         "admin_ui": user.role == "admin",
     }
@@ -227,16 +259,42 @@ def api_license_status():
 
 
 @app.post("/api/license/activate")
-def api_license_activate(payload: dict):
+def api_license_activate(payload: dict, db: Session = Depends(get_db)):
     """Activa la licencia del taller (clave emitida solo por Katire vendor)."""
+    from app.license import license_fingerprint, parse_license
+    from app.models import Tenant
+    from app.tenancy import ensure_default_tenant
+
     key = (payload.get("key") or payload.get("license_key") or "").strip()
     if not key:
         raise HTTPException(status_code=400, detail="Falta la clave de licencia")
     try:
         data = save_license(key)
+        parsed = parse_license(key)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return {"ok": True, "message": "Licencia activada", "license": license_status(), "parsed": data}
+    # Adjunta la licencia al taller (Autorespuesto / por nombre de la clave)
+    tenant = ensure_default_tenant(db)
+    shop = (parsed.get("shop") or "").strip()
+    if shop:
+        by_name = db.query(Tenant).filter(Tenant.name.ilike(shop)).first()
+        if by_name:
+            tenant = by_name
+    tenant.license_key = key
+    tenant.license_fp = license_fingerprint(key)
+    tenant.seats = int(parsed.get("seats") or tenant.seats or 2)
+    tenant.expires = str(parsed.get("exp") or tenant.expires or "")
+    if shop:
+        tenant.name = shop
+    tenant.active = True
+    db.commit()
+    return {
+        "ok": True,
+        "message": "Licencia activada. Ya puede entrar con usuario y clave.",
+        "license": license_status(),
+        "parsed": data if isinstance(data, dict) else parsed,
+        "tenant_code": tenant.code,
+    }
 
 
 @app.get("/api/product")
@@ -255,7 +313,13 @@ def api_product():
 # ---------- Settings / Dashboard ----------
 @app.get("/api/settings")
 def settings_get(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    s = get_settings(db)
+    from app.tenancy import tenant_id_of
+
+    s = get_settings(db, tenant_id_of(user))
+    from app.models import Tenant
+    from app.tenancy import tenant_dict
+
+    tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
     return {
         "shop_name": s.shop_name,
         "slogan": s.slogan,
@@ -266,12 +330,16 @@ def settings_get(db: Session = Depends(get_db), user: User = Depends(get_current
         "currency": s.currency,
         "sinpe_phone": getattr(s, "sinpe_phone", None) or s.whatsapp or s.phone or "",
         "sinpe_name": getattr(s, "sinpe_name", None) or s.shop_name or "",
+        "tenant": tenant_dict(tenant) if tenant else None,
+        "logo_url": (tenant_dict(tenant)["logo_url"] if tenant else "/static/brand/logo.png"),
     }
 
 
 @app.put("/api/settings")
 def settings_put(payload: SettingsIn, db: Session = Depends(get_db), user: User = Depends(require_admin)):
-    s = get_settings(db)
+    from app.tenancy import tenant_id_of
+
+    s = get_settings(db, tenant_id_of(user))
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(s, field, value)
     db.commit()
@@ -280,7 +348,9 @@ def settings_put(payload: SettingsIn, db: Session = Depends(get_db), user: User 
 
 @app.get("/api/dashboard")
 def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    return owner_analytics(db)
+    from app.tenancy import tenant_id_of
+
+    return owner_analytics(db, tenant_id=tenant_id_of(user))
 
 
 @app.post("/api/payments/sinpe-link")
@@ -341,7 +411,9 @@ def work_order_mark_paid(work_order_id: int, db: Session = Depends(get_db), user
 # ---------- Customers / Vehicles ----------
 @app.get("/api/customers")
 def customers_list(q: str = "", db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    query = db.query(Customer)
+    from app.tenancy import tenant_id_of
+
+    query = db.query(Customer).filter(Customer.tenant_id == tenant_id_of(user))
     if q:
         like = f"%{q}%"
         query = query.filter(
@@ -352,7 +424,9 @@ def customers_list(q: str = "", db: Session = Depends(get_db), user: User = Depe
 
 @app.post("/api/customers")
 def customers_create(payload: CustomerIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    c = Customer(**payload.model_dump())
+    from app.tenancy import tenant_id_of
+
+    c = Customer(tenant_id=tenant_id_of(user), **payload.model_dump())
     db.add(c)
     db.commit()
     db.refresh(c)
@@ -361,7 +435,14 @@ def customers_create(payload: CustomerIn, db: Session = Depends(get_db), user: U
 
 @app.get("/api/vehicles")
 def vehicles_list(q: str = "", db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    query = db.query(Vehicle).options(joinedload(Vehicle.customer))
+    from app.tenancy import tenant_id_of
+
+    query = (
+        db.query(Vehicle)
+        .options(joinedload(Vehicle.customer))
+        .join(Customer)
+        .filter(Customer.tenant_id == tenant_id_of(user))
+    )
     if q:
         like = f"%{q}%"
         query = query.filter(
@@ -372,7 +453,10 @@ def vehicles_list(q: str = "", db: Session = Depends(get_db), user: User = Depen
 
 @app.post("/api/vehicles")
 def vehicles_create(payload: VehicleIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    if not db.query(Customer).filter(Customer.id == payload.customer_id).first():
+    from app.tenancy import tenant_id_of
+
+    tid = tenant_id_of(user)
+    if not db.query(Customer).filter(Customer.id == payload.customer_id, Customer.tenant_id == tid).first():
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
     v = Vehicle(**payload.model_dump())
     db.add(v)
@@ -389,12 +473,18 @@ def receptions_list(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    query = db.query(Reception).options(
-        joinedload(Reception.vehicle).joinedload(Vehicle.customer),
-        joinedload(Reception.damages),
-        joinedload(Reception.photos),
-        joinedload(Reception.diagnosis),
-        joinedload(Reception.work_order).joinedload(WorkOrder.lines).joinedload(WorkOrderLine.part),
+    from app.tenancy import tenant_id_of
+
+    query = (
+        db.query(Reception)
+        .options(
+            joinedload(Reception.vehicle).joinedload(Vehicle.customer),
+            joinedload(Reception.damages),
+            joinedload(Reception.photos),
+            joinedload(Reception.diagnosis),
+            joinedload(Reception.work_order).joinedload(WorkOrder.lines).joinedload(WorkOrderLine.part),
+        )
+        .filter(Reception.tenant_id == tenant_id_of(user))
     )
     if status:
         query = query.filter(Reception.status == status)
@@ -402,8 +492,8 @@ def receptions_list(
     return [reception_dict(r) for r in rows]
 
 
-def _load_reception(db: Session, reception_id: int) -> Reception:
-    r = (
+def _load_reception(db: Session, reception_id: int, tenant_id: int | None = None) -> Reception:
+    q = (
         db.query(Reception)
         .options(
             joinedload(Reception.vehicle).joinedload(Vehicle.customer),
@@ -415,8 +505,10 @@ def _load_reception(db: Session, reception_id: int) -> Reception:
             joinedload(Reception.estimate).joinedload(Estimate.lines),
         )
         .filter(Reception.id == reception_id)
-        .first()
     )
+    if tenant_id:
+        q = q.filter(Reception.tenant_id == tenant_id)
+    r = q.first()
     if not r:
         raise HTTPException(status_code=404, detail="Recepción no encontrada")
     seed_inspection(db, r)
@@ -427,27 +519,35 @@ def _load_reception(db: Session, reception_id: int) -> Reception:
 
 @app.get("/api/receptions/{reception_id}")
 def reception_get(reception_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    r = _load_reception(db, reception_id)
-    # Completa piezas del croqui si el ingreso es anterior
+    from app.tenancy import tenant_id_of
+
+    tid = tenant_id_of(user)
+    r = _load_reception(db, reception_id, tid)
     seed_inspection(db, r)
     db.commit()
-    r = _load_reception(db, reception_id)
+    r = _load_reception(db, reception_id, tid)
     return enrich_reception(r)
 
 
 @app.post("/api/receptions")
 def reception_create(payload: ReceptionIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    from app.tenancy import tenant_id_of
+
+    tid = tenant_id_of(user)
     customer_id = payload.customer_id
     if payload.customer and not customer_id:
         cust = payload.customer.model_dump()
         if not str(cust.get("name") or "").strip():
             raise HTTPException(status_code=400, detail="Nombre de quien entrega es obligatorio")
-        c = Customer(**cust)
+        c = Customer(tenant_id=tid, **cust)
         db.add(c)
         db.flush()
         customer_id = c.id
     if not customer_id:
         raise HTTPException(status_code=400, detail="Debe indicar o crear un cliente")
+    cust_ok = db.query(Customer).filter(Customer.id == customer_id, Customer.tenant_id == tid).first()
+    if not cust_ok:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
 
     vehicle_id = payload.vehicle_id
     if not vehicle_id:
@@ -456,7 +556,12 @@ def reception_create(payload: ReceptionIn, db: Session = Depends(get_db), user: 
         model = payload.model or (payload.vehicle.model if payload.vehicle else "")
         if not plate or not brand or not model:
             raise HTTPException(status_code=400, detail="Placa, marca y modelo son obligatorios")
-        existing = db.query(Vehicle).filter(Vehicle.plate == plate).first()
+        existing = (
+            db.query(Vehicle)
+            .join(Customer)
+            .filter(Vehicle.plate == plate, Customer.tenant_id == tid)
+            .first()
+        )
         if existing:
             vehicle_id = existing.id
             existing.customer_id = customer_id
@@ -474,6 +579,7 @@ def reception_create(payload: ReceptionIn, db: Session = Depends(get_db), user: 
             vehicle_id = v.id
 
     reception = Reception(
+        tenant_id=tid,
         code=next_code(db, "REC", Reception),
         vehicle_id=vehicle_id,
         received_by=payload.received_by or user.name,
@@ -504,8 +610,9 @@ def reception_status(
     user: User = Depends(get_current_user),
 ):
     from app.services import STATUS_FLOW
+    from app.tenancy import tenant_id_of
 
-    r = db.query(Reception).filter(Reception.id == reception_id).first()
+    r = db.query(Reception).filter(Reception.id == reception_id, Reception.tenant_id == tenant_id_of(user)).first()
     if not r:
         raise HTTPException(status_code=404, detail="Recepción no encontrada")
     status = (payload.status or "").strip()
@@ -764,14 +871,17 @@ def work_order_request_part(
 
 
 # ---------- Inventory ----------
-def _find_part_by_code(db: Session, code: str) -> Part | None:
+def _find_part_by_code(db: Session, code: str, tenant_id: int | None = None) -> Part | None:
     code = (code or "").strip()
     if not code:
         return None
+    filters = [Part.active.is_(True)]
+    if tenant_id:
+        filters.append(Part.tenant_id == tenant_id)
     p = (
         db.query(Part)
         .options(joinedload(Part.preferred_supplier))
-        .filter(Part.active.is_(True), Part.barcode == code)
+        .filter(*filters, Part.barcode == code)
         .first()
     )
     if p:
@@ -779,7 +889,7 @@ def _find_part_by_code(db: Session, code: str) -> Part | None:
     return (
         db.query(Part)
         .options(joinedload(Part.preferred_supplier))
-        .filter(Part.active.is_(True), Part.sku == code)
+        .filter(*filters, Part.sku == code)
         .first()
     )
 
@@ -791,7 +901,13 @@ def parts_list(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    query = db.query(Part).options(joinedload(Part.preferred_supplier)).filter(Part.active.is_(True))
+    from app.tenancy import tenant_id_of
+
+    query = (
+        db.query(Part)
+        .options(joinedload(Part.preferred_supplier))
+        .filter(Part.active.is_(True), Part.tenant_id == tenant_id_of(user))
+    )
     if q:
         like = f"%{q}%"
         query = query.filter(
@@ -815,10 +931,12 @@ def parts_by_barcode(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    from app.tenancy import tenant_id_of
+
     code = (code or "").strip()
     if not code:
         raise HTTPException(status_code=400, detail="Código vacío")
-    p = _find_part_by_code(db, code)
+    p = _find_part_by_code(db, code, tenant_id_of(user))
     if not p:
         return {"found": False, "barcode": code, "part": None}
     return {"found": True, "barcode": code, "part": part_dict(p)}
@@ -832,7 +950,9 @@ def parts_scan(
 ):
     """Pistola de códigos: lookup, +stock o alta rápida si no existe."""
     from app.services import apply_stock_change
+    from app.tenancy import tenant_id_of
 
+    tid = tenant_id_of(user)
     code = (payload.barcode or "").strip()
     if not code:
         raise HTTPException(status_code=400, detail="Código vacío")
@@ -841,7 +961,7 @@ def parts_scan(
     if qty == 0:
         qty = 1
 
-    p = _find_part_by_code(db, code)
+    p = _find_part_by_code(db, code, tid)
     if action == "lookup":
         if not p:
             return {"found": False, "created": False, "barcode": code, "part": None, "message": "No está en bodega"}
@@ -896,10 +1016,11 @@ def parts_scan(
                 "message": f"Ya existía · +{abs(qty)}",
             }
         sku = code[:60]
-        if db.query(Part).filter(Part.sku == sku).first():
+        if db.query(Part).filter(Part.sku == sku, Part.tenant_id == tid).first():
             sku = f"BC-{code[:50]}"
         name = (payload.name or "").strip() or f"Pieza {code}"
         p = Part(
+            tenant_id=tid,
             sku=sku,
             barcode=code,
             name=name,
@@ -937,11 +1058,15 @@ def parts_scan(
 
 @app.post("/api/parts")
 def parts_create(payload: PartIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    if db.query(Part).filter(Part.sku == payload.sku).first():
+    from app.tenancy import tenant_id_of
+
+    tid = tenant_id_of(user)
+    if db.query(Part).filter(Part.sku == payload.sku, Part.tenant_id == tid).first():
         raise HTTPException(status_code=400, detail="SKU ya existe")
     data = payload.model_dump()
     data["barcode"] = (data.get("barcode") or "").strip() or data["sku"]
-    if data["barcode"] and db.query(Part).filter(Part.barcode == data["barcode"]).first():
+    data["tenant_id"] = tid
+    if data["barcode"] and db.query(Part).filter(Part.barcode == data["barcode"], Part.tenant_id == tid).first():
         raise HTTPException(status_code=400, detail="Código de barras ya existe")
     p = Part(**data)
     db.add(p)
@@ -953,7 +1078,9 @@ def parts_create(payload: PartIn, db: Session = Depends(get_db), user: User = De
 
 @app.put("/api/parts/{part_id}")
 def parts_update(part_id: int, payload: PartIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    p = db.query(Part).filter(Part.id == part_id).first()
+    from app.tenancy import tenant_id_of
+
+    p = db.query(Part).filter(Part.id == part_id, Part.tenant_id == tenant_id_of(user)).first()
     if not p:
         raise HTTPException(status_code=404, detail="Repuesto no encontrado")
     data = payload.model_dump()
@@ -1059,7 +1186,9 @@ def suppliers_list(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    query = db.query(Supplier).filter(Supplier.active.is_(True))
+    from app.tenancy import tenant_id_of
+
+    query = db.query(Supplier).filter(Supplier.active.is_(True), Supplier.tenant_id == tenant_id_of(user))
     if kind:
         query = query.filter(Supplier.kind == kind)
     rows = query.order_by(Supplier.kind, Supplier.name).all()
@@ -1068,7 +1197,11 @@ def suppliers_list(
 
 @app.post("/api/suppliers")
 def suppliers_create(payload: SupplierIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    s = Supplier(**payload.model_dump())
+    from app.tenancy import tenant_id_of
+
+    data = payload.model_dump()
+    data["tenant_id"] = tenant_id_of(user)
+    s = Supplier(**data)
     db.add(s)
     db.commit()
     db.refresh(s)
@@ -1083,9 +1216,11 @@ def parts_market_search(
     user: User = Depends(get_current_user),
 ):
     """Buscar/comprar en tiendas proveedoras (Gigante, Guacamaya, etc.)."""
+    from app.tenancy import tenant_id_of
+
     shops = (
         db.query(Supplier)
-        .filter(Supplier.active.is_(True), Supplier.kind == "tienda")
+        .filter(Supplier.active.is_(True), Supplier.kind == "tienda", Supplier.tenant_id == tenant_id_of(user))
         .order_by(Supplier.name)
         .all()
     )
@@ -1105,11 +1240,14 @@ def diagnosis_print(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    r = _load_reception(db, reception_id)
+    from app.tenancy import tenant_id_of
+
+    tid = tenant_id_of(user)
+    r = _load_reception(db, reception_id, tid)
     seed_inspection(db, r)
     db.commit()
-    r = _load_reception(db, reception_id)
-    settings = get_settings(db)
+    r = _load_reception(db, reception_id, tid)
+    settings = get_settings(db, tid)
     return HTMLResponse(diagnosis_print_html(r, shop_name=settings.shop_name or "Autorespuesto"))
 
 
@@ -1358,8 +1496,9 @@ def inspection_update(
 ):
     from app.models import InspectionCheck
     from app.pro import DVI_SYSTEMS
+    from app.tenancy import tenant_id_of
 
-    r = _load_reception(db, reception_id)
+    r = _load_reception(db, reception_id, tenant_id_of(user))
     seed_inspection(db, r)
     by_key = {c.system_key: c for c in r.inspection_checks}
     names = dict(DVI_SYSTEMS)
@@ -1393,14 +1532,17 @@ def estimate_create(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    r = _load_reception(db, reception_id)
+    from app.tenancy import tenant_id_of
+
+    tid = tenant_id_of(user)
+    r = _load_reception(db, reception_id, tid)
     est = build_estimate_from_reception(db, r)
     db.commit()
     return {
         "estimate": estimate_dict_safe(est),
         "public_url": f"/t/{r.public_token}",
         "message": "Cotización lista. Envíe el link al cliente por WhatsApp.",
-        "reception": enrich_reception(_load_reception(db, reception_id)),
+        "reception": enrich_reception(_load_reception(db, reception_id, tid)),
     }
 
 
@@ -1427,7 +1569,14 @@ class UserCreateIn(BaseModel):
 
 @app.get("/api/services")
 def services_list(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    rows = db.query(ServiceCatalog).filter(ServiceCatalog.active.is_(True)).order_by(ServiceCatalog.name).all()
+    from app.tenancy import tenant_id_of
+
+    rows = (
+        db.query(ServiceCatalog)
+        .filter(ServiceCatalog.active.is_(True), ServiceCatalog.tenant_id == tenant_id_of(user))
+        .order_by(ServiceCatalog.name)
+        .all()
+    )
     return [
         {
             "id": s.id,
@@ -1443,7 +1592,9 @@ def services_list(db: Session = Depends(get_db), user: User = Depends(get_curren
 
 @app.post("/api/services")
 def services_create(payload: ServiceIn, db: Session = Depends(get_db), user: User = Depends(require_admin)):
-    s = ServiceCatalog(**payload.model_dump())
+    from app.tenancy import tenant_id_of
+
+    s = ServiceCatalog(tenant_id=tenant_id_of(user), **payload.model_dump())
     db.add(s)
     db.commit()
     db.refresh(s)
@@ -1459,19 +1610,23 @@ def services_create(payload: ServiceIn, db: Session = Depends(get_db), user: Use
 
 @app.get("/api/users")
 def users_list(db: Session = Depends(get_db), user: User = Depends(require_admin)):
-    rows = db.query(User).order_by(User.name).all()
+    from app.tenancy import tenant_id_of
+
+    rows = db.query(User).filter(User.tenant_id == tenant_id_of(user)).order_by(User.name).all()
     return [{"id": u.id, "name": u.name, "username": u.username, "role": u.role, "active": u.active} for u in rows]
 
 
 @app.post("/api/users")
 def users_create(payload: UserCreateIn, db: Session = Depends(get_db), user: User = Depends(require_admin)):
     from app.auth import hash_password
+    from app.tenancy import tenant_id_of
 
     if payload.role not in ("admin", "recepcion", "mecanico"):
         raise HTTPException(status_code=400, detail="Rol inválido")
     if db.query(User).filter(User.username == payload.username).first():
         raise HTTPException(status_code=400, detail="Usuario ya existe")
     u = User(
+        tenant_id=tenant_id_of(user),
         name=payload.name,
         username=payload.username.strip().lower(),
         password_hash=hash_password(payload.password),
@@ -1512,7 +1667,15 @@ def vehicle_history_api(vehicle_id: int, db: Session = Depends(get_db), user: Us
 
 @app.get("/api/appointments")
 def appointments_list(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    rows = db.query(Appointment).order_by(Appointment.starts_at.desc()).limit(50).all()
+    from app.tenancy import tenant_id_of
+
+    rows = (
+        db.query(Appointment)
+        .filter(Appointment.tenant_id == tenant_id_of(user))
+        .order_by(Appointment.starts_at.desc())
+        .limit(50)
+        .all()
+    )
     return [
         {
             "id": a.id,
@@ -1540,6 +1703,7 @@ def appointments_create(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Fecha inválida") from exc
     a = Appointment(
+        tenant_id=user.tenant_id,
         customer_name=payload.customer_name,
         phone=payload.phone,
         plate=payload.plate.upper(),
@@ -1626,7 +1790,7 @@ def health():
         "db": db_ok,
         "license_ok": lic.get("ok"),
         "license_shop": lic.get("shop"),
-        "build": "20260722o",
+        "build": "20260722q",
         "copyright": COPYRIGHT,
     }
 
@@ -1895,9 +2059,68 @@ def login_page():
     return FileResponse(WEB_DIR / "login.html")
 
 
+@app.get("/activar")
+def activar_page():
+    return FileResponse(WEB_DIR / "activar.html")
+
+
 @app.get("/vendor")
 def vendor_page():
     return FileResponse(WEB_DIR / "vendor.html")
+
+
+@app.post("/api/onboard/activate")
+def onboard_activate(payload: dict, db: Session = Depends(get_db)):
+    """Link de instalación: licencia + admin → taller independiente."""
+    from app.tenancy import activate_tenant
+
+    try:
+        return activate_tenant(
+            db,
+            license_key=(payload.get("license_key") or payload.get("key") or "").strip(),
+            admin_name=(payload.get("admin_name") or "Administrador").strip(),
+            admin_username=(payload.get("admin_username") or payload.get("username") or "").strip(),
+            admin_password=(payload.get("admin_password") or payload.get("password") or ""),
+            shop_name=(payload.get("shop_name") or "").strip(),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/branding/{code}/logo")
+def branding_logo(code: str, db: Session = Depends(get_db)):
+    from app.models import Tenant
+    from app.tenancy import tenant_logo_path
+
+    tenant = db.query(Tenant).filter(Tenant.code == (code or "").strip().lower()).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Taller no encontrado")
+    path = tenant_logo_path(tenant)
+    if not path:
+        fallback = WEB_DIR / "static" / "brand" / "logo.png"
+        if fallback.exists():
+            return FileResponse(fallback)
+        raise HTTPException(status_code=404, detail="Sin logo")
+    return FileResponse(path)
+
+
+@app.post("/api/branding/logo")
+async def branding_upload_logo(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin),
+):
+    from app.models import Tenant
+    from app.tenancy import save_tenant_logo, tenant_dict
+
+    tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Taller no encontrado")
+    try:
+        tenant = save_tenant_logo(db, tenant, file)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "tenant": tenant_dict(tenant)}
 
 
 @app.get("/t/{token}")

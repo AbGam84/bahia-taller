@@ -8,6 +8,7 @@ class LoginIn(BaseModel):
     password: str
     device_id: str = ""
     device_name: str = ""
+    tenant_code: str = ""  # código del taller (ej. autorespuesto)
 
 
 class TokenOut(BaseModel):

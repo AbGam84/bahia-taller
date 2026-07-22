@@ -18,10 +18,28 @@ def utcnow() -> datetime:
     return datetime.utcnow()
 
 
+class Tenant(Base):
+    """Un taller cliente independiente (datos, logo, inventario aislados)."""
+
+    __tablename__ = "tenants"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String(40), unique=True, index=True)  # ej. autorespuesto
+    name: Mapped[str] = mapped_column(String(160))
+    license_key: Mapped[str] = mapped_column(String(500), default="")
+    license_fp: Mapped[str] = mapped_column(String(64), default="", index=True)
+    seats: Mapped[int] = mapped_column(Integer, default=2)
+    expires: Mapped[str] = mapped_column(String(20), default="")
+    logo_filename: Mapped[str] = mapped_column(String(255), default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), default=1, index=True)
     name: Mapped[str] = mapped_column(String(120))
     username: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
@@ -34,6 +52,7 @@ class Customer(Base):
     __tablename__ = "customers"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), default=1, index=True)
     name: Mapped[str] = mapped_column(String(160))
     phone: Mapped[str] = mapped_column(String(40), default="")
     email: Mapped[str] = mapped_column(String(160), default="")
@@ -66,7 +85,8 @@ class Reception(Base):
     __tablename__ = "receptions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    code: Mapped[str] = mapped_column(String(30), unique=True, index=True)
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), default=1, index=True)
+    code: Mapped[str] = mapped_column(String(30), index=True)
     vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id"))
     received_by: Mapped[str] = mapped_column(String(120), default="")
     odometer_km: Mapped[int] = mapped_column(Integer, default=0)
@@ -183,6 +203,7 @@ class Supplier(Base):
     __tablename__ = "suppliers"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), default=1, index=True)
     name: Mapped[str] = mapped_column(String(160))
     phone: Mapped[str] = mapped_column(String(40), default="")
     email: Mapped[str] = mapped_column(String(160), default="")
@@ -252,7 +273,8 @@ class Part(Base):
     __tablename__ = "parts"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    sku: Mapped[str] = mapped_column(String(60), unique=True, index=True)
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), default=1, index=True)
+    sku: Mapped[str] = mapped_column(String(60), index=True)
     barcode: Mapped[str] = mapped_column(String(80), default="", index=True)  # pistola / EAN
     name: Mapped[str] = mapped_column(String(200))
     brand: Mapped[str] = mapped_column(String(80), default="")
@@ -355,6 +377,7 @@ class ShopSettings(Base):
     __tablename__ = "shop_settings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), default=1, index=True)
     shop_name: Mapped[str] = mapped_column(String(160), default="Katire")
     slogan: Mapped[str] = mapped_column(String(200), default="De la llave al XML.")
     phone: Mapped[str] = mapped_column(String(40), default="")
@@ -426,6 +449,7 @@ class ServiceCatalog(Base):
     __tablename__ = "service_catalog"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), default=1, index=True)
     name: Mapped[str] = mapped_column(String(160))
     category: Mapped[str] = mapped_column(String(80), default="General")
     hours: Mapped[float] = mapped_column(Float, default=1)
@@ -438,6 +462,7 @@ class Appointment(Base):
     __tablename__ = "appointments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), default=1, index=True)
     customer_name: Mapped[str] = mapped_column(String(160))
     phone: Mapped[str] = mapped_column(String(40), default="")
     plate: Mapped[str] = mapped_column(String(20), default="")
@@ -456,6 +481,7 @@ class IssuerProfile(Base):
     __tablename__ = "issuer_profiles"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tenant_id: Mapped[int] = mapped_column(Integer, ForeignKey("tenants.id"), default=1, index=True)
     nombre: Mapped[str] = mapped_column(String(200), default="")
     nombre_comercial: Mapped[str] = mapped_column(String(200), default="")
     tipo_id: Mapped[str] = mapped_column(String(2), default="02")

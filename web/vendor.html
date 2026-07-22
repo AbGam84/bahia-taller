@@ -84,8 +84,19 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Taller</th><th>Disp.</th><th>Vence</th><th>Contacto</th><th>Clave</th></tr></thead>
+          <thead><tr><th>Taller</th><th>Disp.</th><th>Vence</th><th>Contacto</th><th>Clave / link</th></tr></thead>
           <tbody id="licBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <h2>Talleres instalados (aislados)</h2>
+      <p class="muted">Cada uno con inventario, OT y logo propios.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nombre / código</th><th>Disp.</th><th>Vence</th><th>Estado</th></tr></thead>
+          <tbody id="tenantBody"></tbody>
         </table>
       </div>
     </div>
@@ -144,18 +155,30 @@
         `Instancia: ${lic.shop || "—"} · licencia ${lic.ok ? "OK" : "NO"} · asientos ${d.seats}`;
       document.getElementById("vStats").innerHTML = `
         <div class="stat"><div class="label">Licencias emitidas</div><div class="value">${d.licenses_issued}</div></div>
+        <div class="stat"><div class="label">Talleres activos</div><div class="value">${d.tenants_count || (d.tenants || []).length}</div></div>
         <div class="stat"><div class="label">Usuarios taller</div><div class="value">${d.shop_users}</div></div>
-        <div class="stat"><div class="label">Dispositivos activos</div><div class="value">${d.devices_active} / ${d.seats}</div></div>
-        <div class="stat"><div class="label">Plan</div><div class="value">2 disp.</div></div>`;
+        <div class="stat"><div class="label">Dispositivos activos</div><div class="value">${d.devices_active}</div></div>`;
       document.getElementById("licBody").innerHTML = (d.licenses || []).map((x) => `
         <tr>
           <td><strong>${x.shop_name}</strong><br><span class="muted">${x.note || ""}</span></td>
           <td>${x.seats}</td>
           <td>${x.expires}</td>
           <td>${x.contact_name || "—"}<br><span class="muted">${x.contact_phone || ""}</span></td>
-          <td><div class="key-box">${x.license_key || x.key_preview}</div></td>
+          <td>
+            <div class="key-box">${x.license_key || x.key_preview}</div>
+            ${x.activation_url ? `<a href="${x.activation_url}" target="_blank">Link activación</a>` : ""}
+          </td>
         </tr>`).join("") || `<tr><td colspan="5">Sin licencias aún</td></tr>`;
-      document.getElementById("userBody").innerHTML = (d.users || []).map((u) => `
+      const tenantBox = document.getElementById("tenantBody");
+      if (tenantBox) {
+        tenantBox.innerHTML = (d.tenants || []).map((t) => `
+          <tr>
+            <td><strong>${t.name}</strong><br><code>${t.code}</code></td>
+            <td>${t.seats}</td>
+            <td>${t.expires || "—"}</td>
+            <td>${t.active ? "Activo" : "Off"}</td>
+          </tr>`).join("") || `<tr><td colspan="4">Sin talleres</td></tr>`;
+      }      document.getElementById("userBody").innerHTML = (d.users || []).map((u) => `
         <tr>
           <td>${u.name}</td><td>${u.username}</td><td>${u.role}</td>
           <td><button class="btn btn-ghost" data-pw="${u.id}" type="button">Reset clave</button></td>
@@ -219,7 +242,9 @@
         box.hidden = false;
         box.innerHTML = `<p><strong>Licencia lista para ${res.shop_name}</strong> · ${res.seats} dispositivos</p>
           <div class="key-box">${res.license_key}</div>
-          <p class="muted">Cópiela y entréguela al taller. ${res.activated_here ? "Ya quedó activa en esta instancia." : ""}</p>`;
+          <p><strong>Link de instalación:</strong><br>
+          <a href="${location.origin}${res.activation_url}" target="_blank">${location.origin}${res.activation_url}</a></p>
+          <p class="muted">El taller abre el link, crea usuario/clave y queda aislado de los demás clientes.</p>`;
         toast("Licencia emitida");
         e.target.reset();
         e.target.seats.value = 2;
