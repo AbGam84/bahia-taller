@@ -944,7 +944,7 @@ tr:hover td { background: rgba(30, 201, 167, 0.04); }
 }
 .taller-dvi-layout {
   display: grid;
-  grid-template-columns: minmax(220px, 280px) 1fr;
+  grid-template-columns: minmax(260px, 320px) 1fr;
   gap: 18px;
   align-items: start;
   margin-bottom: 18px;
@@ -953,27 +953,77 @@ tr:hover td { background: rgba(30, 201, 167, 0.04); }
   border: 1px solid var(--line);
   background: rgba(0,0,0,0.16);
 }
-.taller-dvi-list { max-height: 420px; }
-.taller-car-svg { max-width: 260px; }
+.taller-dvi-list { max-height: 520px; }
+.croqui-wrap { max-width: 320px; }
+.taller-car-svg, .croqui-svg {
+  width: 100%;
+  max-width: 300px;
+  display: block;
+}
 .car-svg {
   width: 100%;
-  max-width: 220px;
-  background: rgba(0,0,0,0.25);
+  max-width: 300px;
+  background: linear-gradient(180deg, rgba(20, 28, 36, 0.9), rgba(8, 12, 18, 0.95));
   border-radius: 16px;
   border: 1px solid var(--line);
-  padding: 12px;
+  padding: 8px;
+}
+.car-svg .car-body {
+  fill: rgba(40, 52, 64, 0.85);
+  stroke: rgba(238, 247, 244, 0.35);
+  stroke-width: 2;
+}
+.car-svg .car-glass {
+  fill: rgba(90, 160, 200, 0.18);
+  stroke: rgba(180, 220, 240, 0.25);
+  stroke-width: 1;
+}
+.car-svg .car-wheel {
+  fill: rgba(10, 12, 16, 0.85);
+  stroke: rgba(238, 247, 244, 0.2);
 }
 .car-svg .zone {
   cursor: pointer;
   transition: 0.15s ease;
-  stroke: rgba(238,247,244,0.35);
-  stroke-width: 1.5;
+  stroke: rgba(238,247,244,0.45);
+  stroke-width: 1.4;
 }
-.car-svg .zone:hover { filter: brightness(1.15); }
-.car-svg .zone.ok { fill: rgba(61, 214, 140, 0.55); }
-.car-svg .zone.watch { fill: rgba(240, 195, 90, 0.55); }
-.car-svg .zone.fail { fill: rgba(255, 107, 122, 0.6); }
-.car-svg .zone.na { fill: rgba(155, 176, 184, 0.22); }
+.car-svg .zone:hover { filter: brightness(1.2); stroke: #fff; }
+.car-svg .zone.ok { fill: rgba(61, 214, 140, 0.62); }
+.car-svg .zone.watch { fill: rgba(240, 195, 90, 0.62); }
+.car-svg .zone.fail { fill: rgba(255, 107, 122, 0.72); }
+.car-svg .zone.na { fill: rgba(155, 176, 184, 0.18); }
+.car-svg .zone-label {
+  fill: #eef7f4;
+  font-size: 7.5px;
+  font-family: var(--body);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.car-svg .croqui-title {
+  fill: var(--mist);
+  font-size: 9px;
+  font-family: var(--body);
+}
+.croqui-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 0.78rem;
+  color: var(--foam);
+}
+.croqui-legend .dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 4px;
+}
+.croqui-legend .dot.ok { background: #3dd68c; }
+.croqui-legend .dot.watch { background: #f0c35a; }
+.croqui-legend .dot.fail { background: #ff6b7a; }
+.croqui-legend .dot.na { background: #9bb0b8; }
 
 .dvi-items { display: grid; gap: 8px; max-height: 360px; overflow: auto; }
 .dvi-item {

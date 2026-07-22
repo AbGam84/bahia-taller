@@ -306,6 +306,10 @@ def _load_reception(db: Session, reception_id: int) -> Reception:
 @app.get("/api/receptions/{reception_id}")
 def reception_get(reception_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     r = _load_reception(db, reception_id)
+    # Completa piezas del croqui si el ingreso es anterior
+    seed_inspection(db, r)
+    db.commit()
+    r = _load_reception(db, reception_id)
     return enrich_reception(r)
 
 
@@ -980,6 +984,9 @@ def diagnosis_print(
     user: User = Depends(get_current_user),
 ):
     r = _load_reception(db, reception_id)
+    seed_inspection(db, r)
+    db.commit()
+    r = _load_reception(db, reception_id)
     settings = get_settings(db)
     return HTMLResponse(diagnosis_print_html(r, shop_name=settings.shop_name or "Autorespuesto"))
 
@@ -1227,11 +1234,28 @@ def inspection_update(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    from app.models import InspectionCheck
+    from app.pro import DVI_SYSTEMS
+
     r = _load_reception(db, reception_id)
+    seed_inspection(db, r)
     by_key = {c.system_key: c for c in r.inspection_checks}
+    names = dict(DVI_SYSTEMS)
     for item in payload.items:
         key = item.get("system_key")
+        if not key:
+            continue
         if key not in by_key:
+            row = InspectionCheck(
+                reception_id=reception_id,
+                system_key=key,
+                system_name=names.get(key, key),
+                status=item.get("status") or "na",
+                notes=item.get("notes") or "",
+                sort_order=len(by_key),
+            )
+            db.add(row)
+            by_key[key] = row
             continue
         by_key[key].status = item.get("status", by_key[key].status)
         by_key[key].notes = item.get("notes", by_key[key].notes)
@@ -1474,7 +1498,7 @@ def health():
         "production": IS_PRODUCTION,
         "fe": "hacienda-cr-v4.4",
         "db": db_ok,
-        "build": "20260722k",
+        "build": "20260722m",
     }
 
 

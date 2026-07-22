@@ -28,19 +28,28 @@ from app.services import (
 )
 
 DVI_SYSTEMS = [
-    ("frenos", "Frenos"),
-    ("motor", "Motor"),
-    ("suspension", "Suspensión"),
-    ("electrico", "Eléctrico"),
-    ("llantas", "Llantas / neumáticos"),
-    ("fluidos", "Fluidos"),
-    ("direccion", "Dirección"),
-    ("transmision", "Transmisión"),
+    ("frente", "Frente / parachoques"),
     ("luces", "Luces"),
+    ("capot", "Capó"),
+    ("motor", "Motor"),
+    ("fluidos", "Fluidos"),
+    ("parabrisas", "Parabrisas"),
+    ("techo", "Techo"),
     ("aire", "Aire acondicionado"),
+    ("interior", "Interior / cabina"),
+    ("direccion", "Dirección"),
+    ("electrico", "Eléctrico"),
+    ("transmision", "Transmisión"),
+    ("suspension", "Suspensión"),
+    ("frenos", "Frenos"),
+    ("llantas", "Llantas / neumáticos"),
+    ("lateral_izq", "Lateral izquierdo"),
+    ("lateral_der", "Lateral derecho"),
     ("escape", "Escape"),
-    ("carroceria", "Carrocería"),
+    ("trasera", "Trasera / maletero"),
+    ("carroceria", "Carrocería general"),
 ]
+
 
 def ensure_public_token(reception: Reception) -> str:
     if not reception.public_token:
@@ -49,10 +58,14 @@ def ensure_public_token(reception: Reception) -> str:
 
 
 def seed_inspection(db: Session, reception: Reception) -> list[InspectionCheck]:
-    if reception.inspection_checks:
-        return list(reception.inspection_checks)
-    rows = []
+    """Crea o completa el checklist del croqui (todas las piezas)."""
+    existing = {c.system_key: c for c in (reception.inspection_checks or [])}
+    rows = list(existing.values())
     for i, (key, name) in enumerate(DVI_SYSTEMS):
+        if key in existing:
+            existing[key].system_name = name
+            existing[key].sort_order = i
+            continue
         row = InspectionCheck(
             reception_id=reception.id,
             system_key=key,
@@ -63,7 +76,7 @@ def seed_inspection(db: Session, reception: Reception) -> list[InspectionCheck]:
         db.add(row)
         rows.append(row)
     db.flush()
-    return rows
+    return sorted(rows, key=lambda x: x.sort_order or 0)
 
 
 def seed_services(db: Session) -> None:
