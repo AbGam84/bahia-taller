@@ -150,7 +150,11 @@ function showSection(name) {
     }
   };
   if (name === "tablero") run(loadDashboard);
-  if (name === "recepcion") run(loadReceptions);
+  if (name === "recepcion") {
+    run(loadReceptions);
+    // Firma: redimensionar cuando la sección ya es visible (si no, el canvas queda a 0px)
+    requestAnimationFrame(() => resizeSignaturePad(true));
+  }
   if (name === "taller") run(loadTaller);
   if (name === "bodega") run(loadParts);
   if (name === "proveedores") run(loadSuppliers);
@@ -186,9 +190,14 @@ async function loadFeReadiness() {
 }
 
 async function loadFacturacion() {
-  const issuer = await api("/api/fe/issuer");
+  let issuer = {};
+  try {
+    issuer = await api("/api/fe/issuer");
+  } catch (err) {
+    toast(err.message || "No se pudo cargar emisor FE");
+  }
   const form = document.getElementById("issuerForm");
-  if (form) {
+  if (form && issuer) {
     Object.keys(issuer).forEach((k) => {
       if (
         form[k] !== undefined &&
@@ -202,10 +211,16 @@ async function loadFacturacion() {
   if (certStatus) {
     certStatus.textContent = issuer.has_cert
       ? `Certificado cargado: ${issuer.cert_filename || "sí"} · PIN ${issuer.has_pin ? "guardado" : "pendiente"}`
-      : "Sin certificado cargado";
+      : "Sin certificado cargado — complete ATV y .p12 para transmitir";
   }
   await loadFeReadiness();
-  const rows = await api("/api/fe/invoices");
+  let rows = [];
+  try {
+    rows = await api("/api/fe/invoices");
+  } catch (err) {
+    setHtml("feBody", `<tr><td colspan="5" class="muted">${esc(err.message || "Sin acceso a comprobantes")}</td></tr>`);
+    return;
+  }
   setHtml(
     "feBody",
     rows
@@ -379,16 +394,27 @@ function renderPhotoPreviews() {
   });
 }
 
+function isLikelyImageFile(file) {
+  if (!file) return false;
+  if (file.type && file.type.startsWith("image/")) return true;
+  const name = String(file.name || "").toLowerCase();
+  return /\.(jpe?g|png|webp|heic|heif)$/i.test(name);
+}
+
 function initArrivalPhotos() {
   const input = document.getElementById("arrivalPhotos");
   const clearBtn = document.getElementById("clearPhotosBtn");
-  if (!input) return;
+  if (!input || input.dataset.bound === "1") return;
+  input.dataset.bound = "1";
   input.addEventListener("change", () => {
+    let skipped = 0;
     [...(input.files || [])].forEach((f) => {
-      if (f.type.startsWith("image/")) arrivalPhotoFiles.push(f);
+      if (isLikelyImageFile(f)) arrivalPhotoFiles.push(f);
+      else skipped += 1;
     });
     input.value = "";
     renderPhotoPreviews();
+    if (skipped) toast(`${skipped} archivo(s) no eran imagen y se omitieron`);
   });
   clearBtn?.addEventListener("click", () => {
     arrivalPhotoFiles.length = 0;
@@ -397,15 +423,18 @@ function initArrivalPhotos() {
   renderPhotoPreviews();
 }
 
-function initSignaturePad() {
+function resizeSignaturePad(keepDrawing = false) {
   const canvas = document.getElementById("signaturePad");
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
+  if (!canvas || !signaturePad?.ctx) return;
+  const prev = keepDrawing && signaturePad.isDirty() ? canvas.toDataURL("image/png") : null;
+  const ctx = signaturePad.ctx;
   const ratio = Math.max(window.devicePixelRatio || 1, 1);
-  const cssW = canvas.clientWidth || 640;
+  const rect = canvas.getBoundingClientRect();
+  const cssW = Math.max(Math.floor(rect.width || canvas.clientWidth || 0), 280);
   const cssH = 180;
   canvas.width = Math.floor(cssW * ratio);
   canvas.height = Math.floor(cssH * ratio);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.scale(ratio, ratio);
   ctx.fillStyle = "#f7f1ea";
   ctx.fillRect(0, 0, cssW, cssH);
@@ -413,13 +442,61 @@ function initSignaturePad() {
   ctx.lineWidth = 2.2;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
+  signaturePad.cssW = cssW;
+  signaturePad.cssH = cssH;
+  if (prev) {
+    const img = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, cssW, cssH);
+      signaturePad._dirty = true;
+    };
+    img.src = prev;
+  } else {
+    signaturePad._dirty = false;
+  }
+}
 
+function initSignaturePad() {
+  const canvas = document.getElementById("signaturePad");
+  if (!canvas || canvas.dataset.bound === "1") return;
+  canvas.dataset.bound = "1";
+  const ctx = canvas.getContext("2d");
   let drawing = false;
   let dirty = false;
+
+  signaturePad = {
+    ctx,
+    cssW: 640,
+    cssH: 180,
+    get _dirty() {
+      return dirty;
+    },
+    set _dirty(v) {
+      dirty = !!v;
+    },
+    isDirty: () => dirty,
+    toBlob: () =>
+      new Promise((resolve) => {
+        canvas.toBlob((blob) => resolve(blob), "image/png");
+      }),
+    clear: () => {
+      const w = signaturePad.cssW || 640;
+      const h = signaturePad.cssH || 180;
+      ctx.fillStyle = "#f7f1ea";
+      ctx.fillRect(0, 0, w, h);
+      dirty = false;
+    },
+  };
+
   const pos = (e) => {
     const rect = canvas.getBoundingClientRect();
     const src = e.touches ? e.touches[0] : e;
-    return { x: src.clientX - rect.left, y: src.clientY - rect.top };
+    const scaleX = (signaturePad.cssW || rect.width) / (rect.width || 1);
+    const scaleY = (signaturePad.cssH || rect.height) / (rect.height || 1);
+    return {
+      x: (src.clientX - rect.left) * scaleX,
+      y: (src.clientY - rect.top) * scaleY,
+    };
   };
   const start = (e) => {
     e.preventDefault();
@@ -445,45 +522,43 @@ function initSignaturePad() {
   canvas.addEventListener("touchstart", start, { passive: false });
   canvas.addEventListener("touchmove", move, { passive: false });
   canvas.addEventListener("touchend", end);
-
-  document.getElementById("clearSigBtn")?.addEventListener("click", () => {
-    ctx.fillStyle = "#f7f1ea";
-    ctx.fillRect(0, 0, cssW, cssH);
-    dirty = false;
+  document.getElementById("clearSigBtn")?.addEventListener("click", () => signaturePad.clear());
+  window.addEventListener("resize", () => {
+    if (document.getElementById("sec-recepcion")?.classList.contains("active")) {
+      resizeSignaturePad(true);
+    }
   });
-
-  signaturePad = {
-    isDirty: () => dirty,
-    toBlob: () =>
-      new Promise((resolve) => {
-        canvas.toBlob((blob) => resolve(blob), "image/png");
-      }),
-    clear: () => {
-      ctx.fillStyle = "#f7f1ea";
-      ctx.fillRect(0, 0, cssW, cssH);
-      dirty = false;
-    },
-  };
+  resizeSignaturePad(false);
 }
 
 async function uploadArrivalMedia(receptionId) {
+  const errors = [];
   for (const file of arrivalPhotoFiles) {
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("zone", "Ingreso");
-    fd.append("caption", "Foto al llegar");
-    await api(`/api/receptions/${receptionId}/photos`, { method: "POST", body: fd, headers: {} });
-  }
-  if (signaturePad?.isDirty()) {
-    const blob = await signaturePad.toBlob();
-    if (blob) {
+    try {
       const fd = new FormData();
-      fd.append("file", blob, "firma.png");
-      fd.append("zone", "Firma");
-      fd.append("caption", "Firma de quien entrega");
+      fd.append("file", file, file.name || "foto.jpg");
+      fd.append("zone", "Ingreso");
+      fd.append("caption", "Foto al llegar");
       await api(`/api/receptions/${receptionId}/photos`, { method: "POST", body: fd, headers: {} });
+    } catch (err) {
+      errors.push(err.message || "foto");
     }
   }
+  if (signaturePad?.isDirty()) {
+    try {
+      const blob = await signaturePad.toBlob();
+      if (blob) {
+        const fd = new FormData();
+        fd.append("file", blob, "firma.png");
+        fd.append("zone", "Firma");
+        fd.append("caption", "Firma de quien entrega");
+        await api(`/api/receptions/${receptionId}/photos`, { method: "POST", body: fd, headers: {} });
+      }
+    } catch (err) {
+      errors.push(err.message || "firma");
+    }
+  }
+  return errors;
 }
 
 async function loadSettings() {
@@ -1516,17 +1591,28 @@ function bindUI() {
         btn.textContent = "Guardando ingreso…";
       }
       const created = await api("/api/receptions", { method: "POST", body: JSON.stringify(body) });
-      await uploadArrivalMedia(created.id);
-      toast(`Ingreso ${created.code} listo — fotos y firma guardadas`);
+      const mediaErrors = await uploadArrivalMedia(created.id);
+      if (mediaErrors.length) {
+        toast(`Ingreso ${created.code} listo · fotos/firma parcial: ${mediaErrors[0]}`);
+      } else {
+        toast(`Ingreso ${created.code} listo — en el patio`);
+      }
       e.target.reset();
       arrivalPhotoFiles.length = 0;
       renderPhotoPreviews();
       signaturePad?.clear();
       document.querySelectorAll("#zoneGrid .zone-chip.active").forEach((el) => el.classList.remove("active"));
-      document.getElementById("receivedBy").value = user().name;
+      const rb = document.getElementById("receivedBy");
+      if (rb) rb.value = user()?.name || "";
       loadReceptions();
       loadDashboard();
-      openReception(created.id);
+      if (typeof loadTaller === "function") loadTaller();
+      try {
+        await openReception(created.id);
+      } catch (openErr) {
+        console.warn(openErr);
+        toast(`Ingreso ${created.code} guardado. Ábralo desde la lista.`);
+      }
     } catch (err) {
       toast(err.message || "No se pudo cerrar el ingreso");
     } finally {
@@ -1798,8 +1884,9 @@ function bindUI() {
   initZones();
   initArrivalPhotos();
   initSignaturePad();
-  loadSettings();
+  loadSettings().catch((err) => toast(err.message || "No se pudo cargar identidad"));
   showSection("recepcion");
+  setTimeout(() => resizeSignaturePad(false), 80);
 }
 
 try {

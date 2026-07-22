@@ -37,6 +37,12 @@ def migrate_schema() -> None:
             cols = {c["name"] for c in insp.get_columns("receptions")}
             if "public_token" not in cols:
                 conn.execute(text("ALTER TABLE receptions ADD COLUMN public_token VARCHAR(64) DEFAULT ''"))
+            if "customer_accepted" not in cols:
+                conn.execute(text("ALTER TABLE receptions ADD COLUMN customer_accepted BOOLEAN DEFAULT 0"))
+            if "customer_signature_name" not in cols:
+                conn.execute(
+                    text("ALTER TABLE receptions ADD COLUMN customer_signature_name VARCHAR(160) DEFAULT ''")
+                )
         if "work_orders" in tables:
             wcols = {c["name"] for c in insp.get_columns("work_orders")}
             if "payment_status" not in wcols:

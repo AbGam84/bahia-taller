@@ -59,6 +59,7 @@ async function openReception(id) {
         </p>
       </div>
       <div class="row-actions">
+        <button class="btn btn-primary" id="goTallerFromFicha">Abrir Lectura / OT</button>
         <button class="btn btn-ghost" id="copyLink">Link cliente</button>
         <button class="btn btn-ghost" id="closeModalBtn">Cerrar</button>
       </div>
@@ -194,10 +195,19 @@ async function openReception(id) {
   const state = Object.fromEntries(inspection.map((i) => [i.system_key, { ...i }]));
 
   document.getElementById("closeModalBtn").onclick = closeModal;
+  document.getElementById("goTallerFromFicha")?.addEventListener("click", () => {
+    closeModal();
+    showSection("taller");
+    openTallerJob(id);
+  });
   document.getElementById("openTrack").onclick = () => window.open(publicUrl, "_blank");
   document.getElementById("copyLink").onclick = async () => {
-    await navigator.clipboard.writeText(publicUrl);
-    toast("Link del cliente copiado — péguelo en WhatsApp");
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      toast("Link del cliente copiado — péguelo en WhatsApp");
+    } catch (_) {
+      toast("Copie el link manualmente del portal");
+    }
   };
 
   const paint = () => {

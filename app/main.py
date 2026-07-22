@@ -153,8 +153,8 @@ def settings_get(db: Session = Depends(get_db), user: User = Depends(get_current
 
 @app.put("/api/settings")
 def settings_put(payload: SettingsIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    if user.role != "admin":
-        raise HTTPException(status_code=403, detail="Solo el administrador puede editar la configuración")
+    if user.role not in ("admin", "recepcion", "mecanico"):
+        raise HTTPException(status_code=403, detail="Sin permiso para editar la configuración")
     s = get_settings(db)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(s, field, value)
@@ -319,7 +319,10 @@ def reception_get(reception_id: int, db: Session = Depends(get_db), user: User =
 def reception_create(payload: ReceptionIn, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     customer_id = payload.customer_id
     if payload.customer and not customer_id:
-        c = Customer(**payload.customer.model_dump())
+        cust = payload.customer.model_dump()
+        if not str(cust.get("name") or "").strip():
+            raise HTTPException(status_code=400, detail="Nombre de quien entrega es obligatorio")
+        c = Customer(**cust)
         db.add(c)
         db.flush()
         customer_id = c.id
@@ -436,9 +439,25 @@ async def reception_photo(
     r = db.query(Reception).filter(Reception.id == reception_id).first()
     if not r:
         raise HTTPException(status_code=404, detail="Recepción no encontrada")
-    ext = Path(file.filename or "foto.jpg").suffix.lower() or ".jpg"
-    if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
-        raise HTTPException(status_code=400, detail="Formato de imagen no permitido")
+    raw_name = file.filename or "foto.jpg"
+    ext = Path(raw_name).suffix.lower()
+    if not ext and (file.content_type or "").startswith("image/"):
+        mime = (file.content_type or "").split(";")[0].strip().lower()
+        ext = {
+            "image/jpeg": ".jpg",
+            "image/jpg": ".jpg",
+            "image/png": ".png",
+            "image/webp": ".webp",
+            "image/heic": ".heic",
+            "image/heif": ".heif",
+        }.get(mime, ".jpg")
+    if not ext:
+        ext = ".jpg"
+    if ext not in {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Formato de imagen no permitido (use JPG, PNG, WEBP o HEIC)",
+        )
     filename = f"rec{reception_id}_{uuid.uuid4().hex[:10]}{ext}"
     dest = UPLOADS_DIR / filename
     async with aiofiles.open(dest, "wb") as out:
@@ -1305,7 +1324,7 @@ def health():
         "production": IS_PRODUCTION,
         "fe": "hacienda-cr-v4.4",
         "db": db_ok,
-        "build": "20260721b",
+        "build": "20260722a",
     }
 
 
