@@ -163,14 +163,14 @@ def main() -> int:
             "/api/settings",
             headers=demo_h,
             json={
-                "shop_name": "Aitorepuestos",
+                "shop_name": "Autorespuesto",
                 "slogan": "De la llave al XML.",
                 "phone": "+506 8870-8123",
                 "whatsapp": "+506 8870-8123",
                 "address": "Costa Rica",
                 "labor_rate": 15000,
                 "sinpe_phone": "88708123",
-                "sinpe_name": "Aitorepuestos",
+                "sinpe_name": "Autorespuesto",
             },
         )
         expect(put_set, 200, "settings PUT recepcion")
@@ -378,10 +378,10 @@ def main() -> int:
             fail(f"missing {rel}")
 
     idx = (ROOT / "web/index.html").read_text(encoding="utf-8")
-    if "taller-dvi.js?v=20260722d" in idx:
-        ok("index.html taller-dvi.js?v=20260722d")
+    if "taller-dvi.js?v=" in idx and "app.js?v=" in idx:
+        ok("index.html carga app.js + taller-dvi.js")
     else:
-        fail("index.html falta taller-dvi.js?v=20260722d")
+        fail("index.html falta app.js / taller-dvi.js")
     app_pos = idx.find("app.js")
     dvi_pos = idx.find("taller-dvi.js")
     if app_pos >= 0 and dvi_pos > app_pos:

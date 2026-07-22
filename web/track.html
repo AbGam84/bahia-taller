@@ -100,9 +100,9 @@
       const canDecide = est && est.status === "enviada";
       document.getElementById("app").innerHTML = `
         <div class="track-hero">
-          <div class="mark" style="font-family:Syne,sans-serif;font-weight:800;letter-spacing:-0.04em">${(d.shop && d.shop.name) || "Aitorepuestos"}</div>
+          <div class="mark" style="font-family:Syne,sans-serif;font-weight:800;letter-spacing:-0.06em">Ka<span style="background:linear-gradient(120deg,#ff4d2e,#ffb347,#1ec9a7);-webkit-background-clip:text;color:transparent">tire</span></div>
           <p style="font-family:Syne,sans-serif;font-size:1.1rem;letter-spacing:-0.03em;margin:10px 0 0">${d.shop.slogan || "De la llave al XML."}</p>
-          <p class="muted" style="margin:8px 0 0">El patio repara. Hacienda acepta.</p>
+          <p class="muted" style="margin:8px 0 0">${(d.shop && d.shop.name) || "Autorespuesto"} · El patio repara. Hacienda acepta.</p>
           <h1 style="font-family:var(--display);font-size:1.6rem;margin:18px 0 6px;letter-spacing:-0.03em">${d.plate} · ${d.vehicle}</h1>
           <p class="muted">${d.code} · ${d.customer_name || "Cliente"} · estado: <strong style="color:var(--foam)">${(d.status||"").replaceAll("_"," ")}</strong></p>
           <p style="margin:14px 0 0">${d.complaint || ""}</p>

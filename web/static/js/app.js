@@ -70,7 +70,7 @@ function avanceControlsHtml(currentStatus) {
     </div>`;
 }
 
-const BRAND = "Aitorepuestos";
+const BRAND = "Katire";
 const arrivalPhotoFiles = [];
 let signaturePad = null;
 let tallerActiveId = null;
@@ -624,14 +624,14 @@ async function uploadArrivalMedia(receptionId) {
 async function loadSettings() {
   const s = await api("/api/settings");
   setText("shopSlogan", s.slogan || "De la llave al XML.");
-  // Marca del negocio: Aitorepuestos (nunca “Autorespuesto”)
-  let shopName = String(s.shop_name || "Aitorepuestos");
-  shopName = shopName.replace(/autorespuestos?/gi, "Aitorepuestos");
-  if (!/aitorepuestos/i.test(shopName)) shopName = "Aitorepuestos";
+  // Negocio: Autorespuesto (no Aitorepuestos)
+  let shopName = String(s.shop_name || "Autorespuesto");
+  shopName = shopName.replace(/aitorepuestos?/gi, "Autorespuesto");
+  if (!/autorespuesto/i.test(shopName)) shopName = "Autorespuesto";
   setText("shopNameLabel", shopName);
   const form = document.getElementById("settingsForm");
   if (!form) return;
-  if (form.shop_name) form.shop_name.value = s.shop_name || "Aitorepuestos";
+  if (form.shop_name) form.shop_name.value = s.shop_name || "Autorespuesto";
   if (form.slogan) form.slogan.value = s.slogan || "De la llave al XML.";
   if (form.phone) form.phone.value = s.phone || "+506 8870-8123";
   if (form.whatsapp) form.whatsapp.value = s.whatsapp || "+506 8870-8123";
@@ -1825,7 +1825,7 @@ function bindUI() {
     }
     openModal(`
       <h2>Emitir y enviar a Hacienda</h2>
-      <p class="muted">Aitorepuestos firma con su .p12, transmite a ATV y consulta aceptación.</p>
+      <p class="muted">Autorespuesto · Katire firma con su .p12, transmite a ATV y consulta aceptación.</p>
       <form id="feIssueForm" class="form-grid">
         <label class="full">Orden de trabajo
           <select name="work_order_id" required>
@@ -2004,7 +2004,7 @@ try {
   console.error(err);
   const el = document.getElementById("toast");
   if (el) {
-    el.textContent = "Error al iniciar. Recargue la página (Ctrl+F5).";
+    el.textContent = "Error al iniciar Katire. Recargue la página (Ctrl+F5).";
     el.classList.add("show");
   }
 }

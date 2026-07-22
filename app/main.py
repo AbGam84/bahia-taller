@@ -824,7 +824,7 @@ def diagnosis_print(
 ):
     r = _load_reception(db, reception_id)
     settings = get_settings(db)
-    return HTMLResponse(diagnosis_print_html(r, shop_name=settings.shop_name or "Aitorepuestos"))
+    return HTMLResponse(diagnosis_print_html(r, shop_name=settings.shop_name or "Autorespuesto"))
 
 
 @app.get("/api/ally-jobs")
@@ -1317,7 +1317,7 @@ def health():
         "production": IS_PRODUCTION,
         "fe": "hacienda-cr-v4.4",
         "db": db_ok,
-        "build": "20260722f",
+        "build": "20260722g",
     }
 
 

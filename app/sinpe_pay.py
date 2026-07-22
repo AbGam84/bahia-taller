@@ -22,7 +22,7 @@ def cr_digits(phone: str) -> str:
 def sinpe_target(settings: ShopSettings) -> tuple[str, str]:
     """Teléfono SINPE y nombre a mostrar."""
     phone = (getattr(settings, "sinpe_phone", None) or "").strip() or (settings.whatsapp or settings.phone or "")
-    name = (getattr(settings, "sinpe_name", None) or "").strip() or (settings.shop_name or "Aitorepuestos")
+    name = (getattr(settings, "sinpe_name", None) or "").strip() or (settings.shop_name or "Autorespuesto")
     return phone, name
 
 

@@ -25,9 +25,9 @@ from app.models import (
 from app.pro import ensure_public_token, seed_inspection
 from app.services import next_code
 
-# Identidad del negocio (Aitorepuestos) + producto (Katire)
+# Identidad del negocio (Autorespuesto) + producto (Katire)
 SHOP = {
-    "shop_name": "Aitorepuestos",
+    "shop_name": "Autorespuesto",
     "slogan": "De la llave al XML.",
     "phone": "+506 8870-8123",
     "whatsapp": "+506 8870-8123",
@@ -35,12 +35,12 @@ SHOP = {
     "labor_rate": 15000,  # tarifa hora sugerida; ajustable en Casa
     "currency": "CRC",
     "sinpe_phone": "88708123",
-    "sinpe_name": "Aitorepuestos",
+    "sinpe_name": "Autorespuesto",
 }
 
 ISSUER = {
-    "nombre": "Aitorepuestos",
-    "nombre_comercial": "Aitorepuestos · Katire",
+    "nombre": "Autorespuesto",
+    "nombre_comercial": "Autorespuesto · Katire",
     "tipo_id": "01",  # Cédula Física
     "numero_id": "801390994",
     "codigo_actividad": "453001",  # Venta de partes/accesorios (confirmar en ATV si difiere)
@@ -100,7 +100,7 @@ def ensure_demo_client(db: Session) -> None:
 
 
 def ensure_settings(db: Session) -> None:
-    """Aplica identidad Aitorepuestos (datos del dueño)."""
+    """Aplica identidad Autorespuesto (datos del dueño)."""
     settings = db.query(ShopSettings).first()
     if not settings:
         settings = ShopSettings(**SHOP)
@@ -113,15 +113,13 @@ def ensure_settings(db: Session) -> None:
         settings.address = SHOP["address"]
         if not settings.labor_rate:
             settings.labor_rate = SHOP["labor_rate"]
-        if not getattr(settings, "sinpe_phone", None):
-            settings.sinpe_phone = SHOP.get("sinpe_phone") or settings.whatsapp or settings.phone
-        if not getattr(settings, "sinpe_name", None):
-            settings.sinpe_name = SHOP.get("sinpe_name") or settings.shop_name
+        settings.sinpe_phone = SHOP.get("sinpe_phone") or settings.whatsapp or settings.phone or settings.sinpe_phone
+        settings.sinpe_name = SHOP.get("sinpe_name") or settings.shop_name
     db.commit()
 
 
 def ensure_issuer(db: Session) -> None:
-    """Emisor Hacienda: cédula y actividad de Aitorepuestos."""
+    """Emisor Hacienda: cédula y actividad de Autorespuesto."""
     issuer = db.query(IssuerProfile).first()
     if not issuer:
         issuer = IssuerProfile(**ISSUER)

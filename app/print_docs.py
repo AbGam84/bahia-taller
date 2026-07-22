@@ -57,7 +57,7 @@ def _car_map_svg(checks: list) -> str:
     )
 
 
-def diagnosis_print_html(r: Reception, shop_name: str = "Aitorepuestos") -> str:
+def diagnosis_print_html(r: Reception, shop_name: str = "Autorespuesto") -> str:
     v = r.vehicle
     c = v.customer if v else None
     d = r.diagnosis
@@ -131,7 +131,7 @@ def diagnosis_print_html(r: Reception, shop_name: str = "Aitorepuestos") -> str:
     return f"""<!doctype html>
 <html lang="es"><head>
 <meta charset="utf-8"/>
-<title>Diagnóstico {escape(r.code)} · Aitorepuestos</title>
+<title>Diagnóstico {escape(r.code)} · Autorespuesto</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@700&family=Manrope:wght@400;600;700&display=swap');
   body{{font-family:Manrope,sans-serif;color:#0e1620;margin:0;padding:28px;background:#f7f1ea}}
@@ -155,7 +155,7 @@ def diagnosis_print_html(r: Reception, shop_name: str = "Aitorepuestos") -> str:
     <button onclick="window.print()" style="padding:10px 14px;border-radius:10px;border:0;background:#ff4d2e;color:#fff;font-weight:700;cursor:pointer">Imprimir / PDF</button>
     <span style="align-self:center;color:#5a6a74;font-size:13px">Entregue al cliente, pida firma y luego asigne el carro al taller en Katire.</span>
   </div>
-  <h1>Aitorepuestos · Diagnóstico digital</h1>
+  <h1>Katire · Diagnóstico digital</h1>
   <p class="tag">Katire · {escape(r.code)} · {escape(r.status)} · {escape((r.created_at.isoformat() if r.created_at else '')[:16])}</p>
   <div class="box">
     <p><strong>Vehículo:</strong> {plate} · {brand} {model} {year}<br/>
@@ -209,5 +209,5 @@ def diagnosis_print_html(r: Reception, shop_name: str = "Aitorepuestos") -> str:
       <div><div class="line">Fecha / cédula<br/>&nbsp;</div></div>
     </div>
   </div>
-  <p class="tag" style="margin-top:28px">De la llave al XML. · Katire · Aitorepuestos</p>
+  <p class="tag" style="margin-top:28px">De la llave al XML. · Katire · Autorespuesto</p>
 </body></html>"""

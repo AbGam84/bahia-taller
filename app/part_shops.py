@@ -110,7 +110,7 @@ def build_whatsapp_order(shop: Supplier, query: str, vehicle: str = "") -> str:
         digits = "506" + digits
     if not digits:
         return ""
-    msg = f"Hola {shop.name}, soy de Aitorepuestos. Necesito cotizar: {query}"
+    msg = f"Hola {shop.name}, soy de Autorespuesto. Necesito cotizar: {query}"
     if vehicle:
         msg += f" para {vehicle}"
     msg += ". ¿Tienen disponibilidad y precio?"
