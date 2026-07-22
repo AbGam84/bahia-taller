@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field
 class LoginIn(BaseModel):
     username: str
     password: str
+    device_id: str = ""
+    device_name: str = ""
 
 
 class TokenOut(BaseModel):

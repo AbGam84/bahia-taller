@@ -2,7 +2,25 @@
 
 Documento interno del **vendor**. No entregar la parte de secretos al personal operativo del taller.
 
-## Qué recibe el taller (cliente)
+## Panel VENDOR (usted — dueño del software)
+
+URL: https://katire.onrender.com/vendor  
+
+- Usuario: `katire`  
+- Clave: `KatireVendor2026` *(cámbiela en Render: `KATIRE_VENDOR_USER` / `KATIRE_VENDOR_PASSWORD`)*
+
+Desde ahí usted:
+1. Emite licencias para otros talleres (**2 dispositivos** por defecto)
+2. Crea usuarios y contraseñas del taller
+3. Ve y libera dispositivos si el cliente cambió de PC
+4. Copia la clave `KT1....` para entregarla al nuevo taller
+
+El **admin del taller** (`admin`) no es usted: es el dueño de Autorespuesto. Usted es **Vendor**.
+
+## Dispositivos
+
+Cada licencia permite **2 dispositivos** (PC + tablet, o 2 PCs).  
+Al tercer equipo el login se bloquea hasta que usted libere uno en el panel Vendor.
 
 1. URL: https://katire.onrender.com  
 2. Usuario dueño del taller: `admin` / `DuenoKatire2026` (cámbiela el día 1)  

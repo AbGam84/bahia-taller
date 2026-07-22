@@ -103,6 +103,15 @@
     if (localStorage.getItem("tp_token")) location.href = "/";
     refreshProduct();
 
+    const deviceId = () => {
+      let id = localStorage.getItem("tp_device_id");
+      if (!id) {
+        id = "dev-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        localStorage.setItem("tp_device_id", id);
+      }
+      return id;
+    };
+
     document.getElementById("loginForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
@@ -113,6 +122,8 @@
           body: JSON.stringify({
             username: fd.get("username"),
             password: fd.get("password"),
+            device_id: deviceId(),
+            device_name: navigator.userAgent.slice(0, 80),
           }),
         });
         const data = await res.json();

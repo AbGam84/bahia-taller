@@ -63,3 +63,9 @@ COPYRIGHT = "© Katire Software. Uso exclusivo bajo licencia. Prohibida la reven
 PRODUCT_NAME = "Katire"
 VENDOR_CONTACT = _env("KATIRE_VENDOR_CONTACT", "WhatsApp +506 8870-8123")
 VENDOR_SUPPORT = _env("KATIRE_VENDOR_SUPPORT", VENDOR_CONTACT)
+
+# Panel del dueño del software (NO es el admin del taller)
+VENDOR_USERNAME = _env("KATIRE_VENDOR_USER", "katire")
+VENDOR_PASSWORD = _env("KATIRE_VENDOR_PASSWORD", "KatireVendor2026")
+VENDOR_NAME = _env("KATIRE_VENDOR_NAME", "Katire Vendor")
+DEFAULT_LICENSE_SEATS = int(_env("KATIRE_DEFAULT_SEATS", "2"))  # 2 dispositivos por cliente

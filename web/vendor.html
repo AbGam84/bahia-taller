@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Katire Vendor — administración del software</title>
+  <link rel="stylesheet" href="/static/css/app.css?v=20260722o" />
+  <style>
+    .vendor-shell { max-width: 1100px; margin: 0 auto; padding: 24px 18px 60px; }
+    .vendor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 900px) { .vendor-grid { grid-template-columns: 1fr; } }
+    .key-box { word-break: break-all; font-size: 0.78rem; background: rgba(0,0,0,.35); padding: 10px; border-radius: 10px; }
+    .vendor-login { max-width: 420px; margin: 10vh auto; }
+  </style>
+</head>
+<body>
+  <div id="loginView" class="vendor-login panel">
+    <h1 style="font-family:var(--display);margin:0 0 8px">Katire Vendor</h1>
+    <p class="muted">Panel del dueño del software — no es el admin del taller.</p>
+    <form id="vLogin" class="form-grid">
+      <label class="full">Usuario vendor<input name="username" required autocomplete="username" /></label>
+      <label class="full">Clave<input name="password" type="password" required autocomplete="current-password" /></label>
+      <div class="full"><button class="btn btn-primary" type="submit">Entrar al panel</button></div>
+    </form>
+    <p class="muted" style="font-size:0.75rem;margin-top:14px">© Katire Software · Solo ustedes venden y emiten licencias</p>
+  </div>
+
+  <div id="appView" class="vendor-shell" hidden>
+    <div class="topbar">
+      <div>
+        <h1 style="margin:0;font-family:var(--display)">Panel Vendor Katire</h1>
+        <p class="muted" id="vHello" style="margin:6px 0 0">—</p>
+      </div>
+      <div class="row-actions">
+        <a class="btn btn-ghost" href="/login" target="_blank">Abrir login taller</a>
+        <button class="btn btn-ghost" id="vLogout" type="button">Salir</button>
+      </div>
+    </div>
+
+    <div class="stats" id="vStats"></div>
+
+    <div class="vendor-grid" style="margin-top:16px">
+      <div class="panel">
+        <h2>Nueva licencia (taller cliente)</h2>
+        <p class="muted">Por defecto <strong>2 dispositivos</strong> por cliente.</p>
+        <form id="licForm" class="form-grid">
+          <label class="full">Nombre del taller<input name="shop_name" required placeholder="Ej. Autorespuesto" /></label>
+          <label>Vence (YYYY-MM-DD)<input name="expires" required placeholder="2027-07-21" /></label>
+          <label>Dispositivos<input name="seats" type="number" min="1" max="50" value="2" /></label>
+          <label>Contacto<input name="contact_name" /></label>
+          <label>WhatsApp<input name="contact_phone" placeholder="+506..." /></label>
+          <label class="full">Nota<textarea name="note" rows="2" placeholder="Plan mensual, etc."></textarea></label>
+          <label class="full" style="flex-direction:row;align-items:center;gap:8px">
+            <input type="checkbox" name="activate_here" style="width:auto" /> Activar en ESTA instancia ahora
+          </label>
+          <div class="full"><button class="btn btn-primary" type="submit">Emitir licencia</button></div>
+        </form>
+        <div id="licResult" hidden style="margin-top:12px"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Usuario del taller (esta instancia)</h2>
+        <p class="muted">Cree clave para recepción o admin del cliente.</p>
+        <form id="userForm" class="form-grid">
+          <label>Nombre<input name="name" required /></label>
+          <label>Usuario<input name="username" required /></label>
+          <label>Clave<input name="password" type="password" required minlength="6" /></label>
+          <label>Rol
+            <select name="role">
+              <option value="recepcion">Recepción</option>
+              <option value="mecanico">Mecánico</option>
+              <option value="admin">Admin taller</option>
+            </select>
+          </label>
+          <div class="full"><button class="btn btn-ok" type="submit">Crear usuario</button></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <div class="panel-head">
+        <h2>Licencias emitidas</h2>
+        <button class="btn btn-ghost" type="button" id="refreshBtn">Actualizar</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Taller</th><th>Disp.</th><th>Vence</th><th>Contacto</th><th>Clave</th></tr></thead>
+          <tbody id="licBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="vendor-grid" style="margin-top:16px">
+      <div class="panel">
+        <h2>Usuarios (instancia actual)</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th></th></tr></thead>
+            <tbody id="userBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Dispositivos (máx. 2 por defecto)</h2>
+        <p class="muted">Libere un equipo si el taller cambió de PC/celular.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Nombre</th><th>Usuario</th><th>Estado</th><th></th></tr></thead>
+            <tbody id="devBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script>
+    const toast = (m) => {
+      const el = document.getElementById("toast");
+      el.textContent = m;
+      el.classList.add("show");
+      setTimeout(() => el.classList.remove("show"), 3200);
+    };
+    const tok = () => localStorage.getItem("kv_token");
+    const api = async (path, opts = {}) => {
+      const headers = Object.assign({}, opts.headers || {});
+      if (!(opts.body instanceof FormData)) headers["Content-Type"] = "application/json";
+      if (tok()) headers.Authorization = "Bearer " + tok();
+      const res = await fetch(path, Object.assign({}, opts, { headers }));
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || "Error");
+      return data;
+    };
+
+    function showApp(on) {
+      document.getElementById("loginView").hidden = on;
+      document.getElementById("appView").hidden = !on;
+    }
+
+    async function loadOverview() {
+      const d = await api("/api/vendor/overview");
+      const lic = d.instance_license || {};
+      document.getElementById("vHello").textContent =
+        `Instancia: ${lic.shop || "—"} · licencia ${lic.ok ? "OK" : "NO"} · asientos ${d.seats}`;
+      document.getElementById("vStats").innerHTML = `
+        <div class="stat"><div class="label">Licencias emitidas</div><div class="value">${d.licenses_issued}</div></div>
+        <div class="stat"><div class="label">Usuarios taller</div><div class="value">${d.shop_users}</div></div>
+        <div class="stat"><div class="label">Dispositivos activos</div><div class="value">${d.devices_active} / ${d.seats}</div></div>
+        <div class="stat"><div class="label">Plan</div><div class="value">2 disp.</div></div>`;
+      document.getElementById("licBody").innerHTML = (d.licenses || []).map((x) => `
+        <tr>
+          <td><strong>${x.shop_name}</strong><br><span class="muted">${x.note || ""}</span></td>
+          <td>${x.seats}</td>
+          <td>${x.expires}</td>
+          <td>${x.contact_name || "—"}<br><span class="muted">${x.contact_phone || ""}</span></td>
+          <td><div class="key-box">${x.license_key || x.key_preview}</div></td>
+        </tr>`).join("") || `<tr><td colspan="5">Sin licencias aún</td></tr>`;
+      document.getElementById("userBody").innerHTML = (d.users || []).map((u) => `
+        <tr>
+          <td>${u.name}</td><td>${u.username}</td><td>${u.role}</td>
+          <td><button class="btn btn-ghost" data-pw="${u.id}" type="button">Reset clave</button></td>
+        </tr>`).join("") || `<tr><td colspan="4">Sin usuarios</td></tr>`;
+      document.getElementById("devBody").innerHTML = (d.devices || []).map((dev) => `
+        <tr>
+          <td>${dev.device_name || dev.device_id}</td>
+          <td>${dev.last_user || "—"}</td>
+          <td>${dev.active ? "Activo" : "Liberado"}</td>
+          <td>${dev.active ? `<button class="btn btn-warn" data-rev="${dev.id}" type="button">Liberar</button>` : "—"}</td>
+        </tr>`).join("") || `<tr><td colspan="4">Ningún dispositivo registrado</td></tr>`;
+
+      document.querySelectorAll("[data-pw]").forEach((btn) => {
+        btn.onclick = async () => {
+          const password = prompt("Nueva clave (mín. 6):");
+          if (!password) return;
+          try {
+            await api(`/api/vendor/users/${btn.dataset.pw}/password`, { method: "POST", body: JSON.stringify({ password }) });
+            toast("Clave actualizada");
+          } catch (e) { toast(e.message); }
+        };
+      });
+      document.querySelectorAll("[data-rev]").forEach((btn) => {
+        btn.onclick = async () => {
+          try {
+            await api(`/api/vendor/devices/${btn.dataset.rev}/revoke`, { method: "POST", body: "{}" });
+            toast("Dispositivo liberado");
+            loadOverview();
+          } catch (e) { toast(e.message); }
+        };
+      });
+    }
+
+    document.getElementById("vLogin").onsubmit = async (e) => {
+      e.preventDefault();
+      const body = Object.fromEntries(new FormData(e.target).entries());
+      try {
+        const data = await api("/api/vendor/login", { method: "POST", body: JSON.stringify(body) });
+        localStorage.setItem("kv_token", data.access_token);
+        showApp(true);
+        await loadOverview();
+      } catch (err) { toast(err.message); }
+    };
+
+    document.getElementById("vLogout").onclick = () => {
+      localStorage.removeItem("kv_token");
+      showApp(false);
+    };
+
+    document.getElementById("refreshBtn").onclick = () => loadOverview().catch((e) => toast(e.message));
+
+    document.getElementById("licForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = Object.fromEntries(fd.entries());
+      body.seats = Number(body.seats || 2);
+      body.activate_here = fd.get("activate_here") === "on";
+      try {
+        const res = await api("/api/vendor/licenses", { method: "POST", body: JSON.stringify(body) });
+        const box = document.getElementById("licResult");
+        box.hidden = false;
+        box.innerHTML = `<p><strong>Licencia lista para ${res.shop_name}</strong> · ${res.seats} dispositivos</p>
+          <div class="key-box">${res.license_key}</div>
+          <p class="muted">Cópiela y entréguela al taller. ${res.activated_here ? "Ya quedó activa en esta instancia." : ""}</p>`;
+        toast("Licencia emitida");
+        e.target.reset();
+        e.target.seats.value = 2;
+        loadOverview();
+      } catch (err) { toast(err.message); }
+    };
+
+    document.getElementById("userForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const body = Object.fromEntries(new FormData(e.target).entries());
+      try {
+        await api("/api/vendor/users", { method: "POST", body: JSON.stringify(body) });
+        toast("Usuario creado: " + body.username);
+        e.target.reset();
+        loadOverview();
+      } catch (err) { toast(err.message); }
+    };
+
+    if (tok()) {
+      showApp(true);
+      loadOverview().catch(() => {
+        localStorage.removeItem("kv_token");
+        showApp(false);
+      });
+    }
+  </script>
+</body>
+</html>

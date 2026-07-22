@@ -31,7 +31,7 @@ def _sign(payload_b64: str, secret: str) -> str:
 def issue_license(
     shop_name: str,
     expires: str,
-    seats: int = 5,
+    seats: int = 2,
     note: str = "",
     secret: str | None = None,
 ) -> str:
@@ -133,6 +133,67 @@ def license_status() -> dict:
             "expires": None,
             "seats": 0,
         }
+
+
+def license_fingerprint(key: str) -> str:
+    return hashlib.sha256((key or "").encode("utf-8")).hexdigest()[:40]
+
+
+def current_seats() -> int:
+    st = license_status()
+    if not st.get("ok"):
+        return 0
+    try:
+        return int(st.get("seats") or 2)
+    except Exception:
+        return 2
+
+
+def register_device(db, device_id: str, device_name: str = "", username: str = "") -> dict:
+    """Registra o actualiza un dispositivo. Máximo `seats` activos por licencia."""
+    from app.models import LicenseDevice
+
+    device_id = (device_id or "").strip()
+    if not device_id:
+        raise ValueError("Falta identificador de dispositivo")
+    key = load_stored_key()
+    if not key:
+        # desarrollo sin licencia: no limitar
+        if not IS_PRODUCTION:
+            return {"ok": True, "mode": "development", "seats": 99, "used": 0}
+        raise ValueError("Sin licencia activa")
+    fp = license_fingerprint(key)
+    seats = current_seats() or 2
+    existing = (
+        db.query(LicenseDevice)
+        .filter(LicenseDevice.license_fp == fp, LicenseDevice.device_id == device_id)
+        .first()
+    )
+    if existing:
+        existing.active = True
+        existing.last_seen = datetime.utcnow()
+        existing.last_user = username or existing.last_user
+        if device_name:
+            existing.device_name = device_name
+        db.commit()
+        used = db.query(LicenseDevice).filter(LicenseDevice.license_fp == fp, LicenseDevice.active.is_(True)).count()
+        return {"ok": True, "seats": seats, "used": used, "device_id": device_id}
+
+    used = db.query(LicenseDevice).filter(LicenseDevice.license_fp == fp, LicenseDevice.active.is_(True)).count()
+    if used >= seats:
+        raise ValueError(
+            f"Límite de {seats} dispositivos alcanzado. Pida al proveedor Katire liberar un equipo o ampliar la licencia."
+        )
+    row = LicenseDevice(
+        license_fp=fp,
+        device_id=device_id,
+        device_name=device_name or "Dispositivo",
+        last_user=username or "",
+        active=True,
+    )
+    db.add(row)
+    db.commit()
+    return {"ok": True, "seats": seats, "used": used + 1, "device_id": device_id}
 
 
 def require_license_ok() -> None:

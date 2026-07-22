@@ -40,6 +40,8 @@ from app.models import (
     DamageItem,
     Diagnosis,
     Estimate,
+    IssuedLicense,
+    LicenseDevice,
     Part,
     PurchaseOrder,
     PurchaseOrderLine,
@@ -126,8 +128,10 @@ async def license_and_docs_guard(request, call_next):
         or path.startswith("/api/health")
         or path.startswith("/api/license")
         or path.startswith("/api/auth/login")
+        or path.startswith("/api/vendor")  # panel del dueño Katire
         or path.startswith("/api/public")
-        or path in ("/", "/login", "/admin", "/favicon.ico")
+        or path.startswith("/api/product")
+        or path in ("/", "/login", "/admin", "/vendor", "/favicon.ico")
     )
     if not free and path.startswith("/api/"):
         st = license_status()
@@ -159,8 +163,8 @@ def on_startup():
             key = issue_license(
                 "Autorespuesto",
                 "2027-07-21",
-                seats=8,
-                note="Cliente 1 — Katire / Autorespuesto",
+                seats=2,
+                note="Cliente 1 — Katire / Autorespuesto · 2 dispositivos",
             )
             save_license(key)
         except Exception:
@@ -179,12 +183,27 @@ def login(payload: LoginIn, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == payload.username, User.active.is_(True)).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
+    # Límite de dispositivos por licencia (por defecto 2)
+    device_info = None
+    if payload.device_id:
+        try:
+            from app.license import register_device
+
+            device_info = register_device(
+                db,
+                payload.device_id,
+                device_name=payload.device_name or "Navegador",
+                username=user.username,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
     token = create_access_token({"sub": user.username, "role": user.role})
     return {
         "access_token": token,
         "token_type": "bearer",
         "user": {"id": user.id, "name": user.name, "username": user.username, "role": user.role},
         "license": license_status(),
+        "device": device_info,
         "copyright": COPYRIGHT,
     }
 
@@ -1607,7 +1626,7 @@ def health():
         "db": db_ok,
         "license_ok": lic.get("ok"),
         "license_shop": lic.get("shop"),
-        "build": "20260722n",
+        "build": "20260722o",
         "copyright": COPYRIGHT,
     }
 
@@ -1876,6 +1895,17 @@ def login_page():
     return FileResponse(WEB_DIR / "login.html")
 
 
+@app.get("/vendor")
+def vendor_page():
+    return FileResponse(WEB_DIR / "vendor.html")
+
+
 @app.get("/t/{token}")
 def track_page(token: str):
     return FileResponse(WEB_DIR / "track.html")
+
+
+# Panel vendor (dueño del software)
+from app.vendor_api import router as vendor_router  # noqa: E402
+
+app.include_router(vendor_router)

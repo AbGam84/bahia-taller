@@ -272,6 +272,38 @@ class Part(Base):
     movements: Mapped[list["StockMovement"]] = relationship(back_populates="part")
 
 
+class IssuedLicense(Base):
+    """Registro de licencias emitidas por el vendor Katire (panel /vendor)."""
+
+    __tablename__ = "issued_licenses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    shop_name: Mapped[str] = mapped_column(String(160), index=True)
+    license_key: Mapped[str] = mapped_column(String(500), unique=True)
+    seats: Mapped[int] = mapped_column(Integer, default=2)  # dispositivos
+    expires: Mapped[str] = mapped_column(String(20), default="")  # YYYY-MM-DD
+    note: Mapped[str] = mapped_column(Text, default="")
+    contact_phone: Mapped[str] = mapped_column(String(40), default="")
+    contact_name: Mapped[str] = mapped_column(String(120), default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class LicenseDevice(Base):
+    """Dispositivos registrados contra la licencia activa (máx. seats)."""
+
+    __tablename__ = "license_devices"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    license_fp: Mapped[str] = mapped_column(String(64), index=True)  # hash de la clave
+    device_id: Mapped[str] = mapped_column(String(80), index=True)
+    device_name: Mapped[str] = mapped_column(String(160), default="")
+    last_user: Mapped[str] = mapped_column(String(80), default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    last_seen: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class StockMovement(Base):
     __tablename__ = "stock_movements"
 
