@@ -497,12 +497,17 @@ function renderPlatePartsReference(data) {
   const plate = data?.plate || "";
   const hist = data?.history_parts || [];
   const sugg = data?.suggested_parts || [];
-  if (!plate || (!hist.length && !sugg.length && !data?.found_vehicle)) {
+  if (!plate) {
     box.hidden = true;
     body.innerHTML = "";
     return;
   }
   box.hidden = false;
+  if (!hist.length && !sugg.length && !data?.found_vehicle) {
+    meta.textContent = "Placa nueva en este taller — complete marca/modelo o vaya a Consulta de repuesto (menú ★)";
+    body.innerHTML = `<p class="muted" style="margin:0;font-size:0.85rem">No hay historial aún. Use el menú <strong>Consulta de repuesto</strong> para códigos OEM y repuesteras.</p>`;
+    return;
+  }
   const v = data.vehicle;
   if (data.found_vehicle && v) {
     meta.textContent = `${v.brand} ${v.model}${v.year ? ` · ${v.year}` : ""} · ${data.visits_count || 0} visita(s) en este taller`;
@@ -1580,11 +1585,42 @@ async function applyConsultaFromPlate() {
   }
 }
 
+function renderConsultaShopCards(dossier) {
+  const box = document.getElementById("consultaShops");
+  if (!box) return;
+  const shops = dossier?.shops || [];
+  if (!shops.length) {
+    box.innerHTML = `<div class="empty-state"><strong>Sin repuesteras cargadas</strong>Recargue la página (Ctrl+F5)</div>`;
+    return;
+  }
+  box.innerHTML = shops
+    .map((s) => {
+      const webBtn = s.search_link
+        ? `<a class="btn btn-primary" href="${hrefAttr(s.search_link)}" target="_blank" rel="noopener noreferrer">Buscar aquí</a>`
+        : "";
+      return `<div class="shop-card">
+        <h3>${esc(s.name)}</h3>
+        <div class="spec">${esc(s.specialty || "")}</div>
+        <div class="row-actions">${webBtn}
+          ${s.whatsapp_link ? `<a class="btn btn-ok" href="${hrefAttr(s.whatsapp_link)}" target="_blank" rel="noopener noreferrer">WhatsApp</a>` : ""}
+        </div></div>`;
+    })
+    .join("");
+}
+
 function renderFichaOem(dossier) {
   const panel = document.getElementById("consultaFichaPanel");
   if (!panel) return;
-  if (!dossier || dossier.error) {
+  if (!dossier) {
     panel.hidden = true;
+    return;
+  }
+  if (dossier.error) {
+    panel.hidden = false;
+    setHtml(
+      "consultaSpecsGrid",
+      `<div class="empty-state" style="grid-column:1/-1"><strong>${esc(dossier.error)}</strong></div>`
+    );
     return;
   }
   panel.hidden = false;
@@ -1654,28 +1690,31 @@ function renderFichaOem(dossier) {
   }
   const wrap = document.getElementById("consultaOemTableWrap");
   if (!wrap) return;
+  const totalParts = (dossier.oem_parts || []).length;
   if (!parts.length) {
-    wrap.innerHTML = `<div class="empty-state"><strong>Sin piezas en esta búsqueda</strong>Pruebe otra palabra o cargue solo la placa</div>`;
-    return;
-  }
-  wrap.innerHTML = `<table><thead><tr><th>Sistema</th><th>Pieza</th><th>Código OEM</th><th>Origen</th><th>Red</th></tr></thead><tbody>${parts
-    .map((p) => {
-      const links = (p.network_links || [])
-        .slice(0, 3)
-        .map(
-          (l) =>
-            `<a class="btn btn-ghost" style="padding:4px 8px;font-size:0.72rem;margin:2px" href="${hrefAttr(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`
-        )
-        .join("");
-      return `<tr>
+    wrap.innerHTML = `<div class="empty-state"><strong>${totalParts ? `Ninguna pieza coincide con el filtro (${totalParts} en catálogo)` : "Sin catálogo OEM para esta placa aún"}</strong>
+      <p class="muted" style="margin:8px 0 0">${esc(dossier.message || "Complete marca, modelo y año y vuelva a consultar, o use las repuesteras abajo.")}</p></div>`;
+  } else {
+    wrap.innerHTML = `<table><thead><tr><th>Sistema</th><th>Pieza</th><th>Código OEM</th><th>Origen</th><th>Red</th></tr></thead><tbody>${parts
+      .map((p) => {
+        const oemRaw = String(p.oem_code || "");
+        const links = (p.network_links || [])
+          .slice(0, 3)
+          .map(
+            (l) =>
+              `<a class="btn btn-ghost" style="padding:4px 8px;font-size:0.72rem;margin:2px" href="${hrefAttr(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`
+          )
+          .join("");
+        return `<tr>
         <td>${esc(p.category)}</td>
         <td><strong>${esc(p.name)}</strong>${p.times_used ? `<br><span class="muted">Usado ${p.times_used}× en taller</span>` : ""}</td>
-        <td><code>${esc(p.oem_code)}</code> <button type="button" class="btn btn-ghost" style="padding:2px 6px;font-size:0.7rem" data-copy-oem="${esc(p.oem_code)}">Copiar</button></td>
+        <td><code>${esc(oemRaw)}</code> <button type="button" class="btn btn-ghost" style="padding:2px 6px;font-size:0.7rem" data-copy-oem="${hrefAttr(oemRaw)}">Copiar</button></td>
         <td><span class="muted">${p.source === "historial_ot" ? "Su taller" : p.source === "tecdoc" ? "TecDoc" : "Catálogo CR"}</span></td>
         <td class="row-actions">${links || "—"}</td>
       </tr>`;
-    })
-    .join("")}</tbody></table>`;
+      })
+      .join("")}</tbody></table>`;
+  }
   wrap.querySelectorAll("[data-copy-oem]").forEach((btn) => {
     btn.onclick = async () => {
       try {
@@ -1713,16 +1752,37 @@ async function loadFichaByPlate() {
     }
     const dossier = await api(`/api/plates/${encodeURIComponent(plate)}/ficha-oem?${params.toString()}`);
     renderFichaOem(dossier);
+    renderConsultaShopCards(dossier);
+    const histWrap = document.getElementById("consultaHistoryWrap");
+    const hist = dossier.history_parts || [];
+    if (histWrap) {
+      histWrap.innerHTML = hist.length
+        ? `<div class="table-wrap"><table><thead><tr><th>Repuesto</th><th>Veces</th><th>Última OT</th></tr></thead><tbody>${hist
+            .map(
+              (h) =>
+                `<tr><td><strong>${esc(h.name)}</strong></td><td>${h.times_used || 1}×</td><td class="muted">${esc(h.last_reception_code || "")}</td></tr>`
+            )
+            .join("")}</tbody></table></div>`
+        : `<div class="empty-state"><strong>Sin historial de repuestos</strong>Para esta placa aún no hay OT con piezas en su taller</div>`;
+    }
     const meta = document.getElementById("consultaVehicleMeta");
-    if (meta && dossier.specifications) {
-      const s = dossier.specifications;
-      meta.textContent = `${s.marca || ""} ${s.modelo || ""}${s.año ? ` · ${s.año}` : ""} · ${dossier.visits_count || 0} visita(s) en su taller`;
+    if (meta) {
+      const s = dossier.specifications || {};
+      meta.textContent =
+        dossier.message ||
+        `${s.marca || "Placa"} ${s.modelo || plate}${s.año ? ` · ${s.año}` : ""} · ${dossier.visits_count || 0} visita(s)`;
     }
-    if (!dossier.catalog_match && meta) {
-      meta.textContent += " · Sin catálogo OEM para esta marca/modelo — use enlaces de red";
-    }
+    toast(dossier.message || `Ficha ${plate} cargada`);
   } catch (err) {
     toast(err.message || "No se pudo cargar la ficha");
+    const panel = document.getElementById("consultaFichaPanel");
+    if (panel) {
+      panel.hidden = false;
+      setHtml(
+        "consultaOemTableWrap",
+        `<div class="empty-state"><strong>Error al consultar</strong>${esc(err.message || "Revise sesión o conexión")}</div>`
+      );
+    }
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -1732,8 +1792,11 @@ async function loadFichaByPlate() {
 }
 
 function renderConsultaResults(data) {
-  if (data.ficha_oem) renderFichaOem(data.ficha_oem);
   const meta = document.getElementById("consultaVehicleMeta");
+  if (data.ficha_oem) {
+    renderFichaOem(data.ficha_oem);
+    if (meta && data.ficha_oem.message) meta.textContent = data.ficha_oem.message;
+  }
   if (meta && data.vehicle_label && !meta.textContent) {
     meta.textContent = data.found_vehicle
       ? `Vehículo en sistema · ${data.vehicle_label} · ${data.visits_count || 0} visita(s)`

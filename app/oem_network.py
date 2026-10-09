@@ -239,19 +239,26 @@ def vehicle_technical_dossier(
             }
         )
 
+    search_text = (part_hint or "").strip() or f"{brand} {model}".strip() or f"repuestos vehículo {plate_norm}"
     intro: list[dict] = []
     guaca = next((s for s in shops if "guaca" in (s.name or "").lower()), None)
     if guaca:
-        url = build_search_link(guaca, f"{brand} {model} repuestos", plate_norm)
+        url = build_search_link(guaca, search_text, plate_norm)
         if url:
             intro.append({"label": "La Guaca en línea", "url": url})
-    if brand or model:
-        intro.append(
-            {
-                "label": "Repuestos Gigante (web)",
-                "url": f"https://www.google.com/search?q={quote_plus(f'site:repuestosgigante.com {brand} {model} repuesto')}",
-            }
-        )
+    gigante_q = f"site:repuestosgigante.com {brand} {model} repuesto".strip() or f"site:repuestosgigante.com {plate_norm}"
+    intro.append(
+        {
+            "label": "Repuestos Gigante (web)",
+            "url": f"https://www.google.com/search?q={quote_plus(gigante_q)}",
+        }
+    )
+    intro.append(
+        {
+            "label": "Google código / pieza",
+            "url": f"https://www.google.com/search?q={quote_plus(f'{search_text} {plate_norm} Costa Rica OEM')}",
+        }
+    )
 
     result = dict(empty)
     result["found_vehicle"] = bool(ref.get("found_vehicle"))
@@ -271,19 +278,50 @@ def vehicle_technical_dossier(
     from app.tecdoc_client import enrich_parts, tecdoc_configured
 
     tecdoc_meta: dict = {}
-    if tecdoc_configured() or (vehicle and (vehicle.get("vin") or "").strip()):
-        tec_parts, tecdoc_meta = enrich_parts(
-            brand=brand,
-            model=model,
-            year=year,
-            vin=(vehicle.get("vin") if vehicle else "") or "",
-            part_hint=(part_hint or "").strip(),
+    try:
+        if tecdoc_configured() or (vehicle and (vehicle.get("vin") or "").strip()):
+            tec_parts, tecdoc_meta = enrich_parts(
+                brand=brand,
+                model=model,
+                year=year,
+                vin=(vehicle.get("vin") if vehicle else "") or "",
+                part_hint=(part_hint or "").strip(),
+            )
+            for row in tec_parts:
+                code = row.get("oem_code") or ""
+                name = row.get("name") or ""
+                row["network_links"] = network_links_for_part(code, name, brand, model, year_str, shops)
+                oem_parts.append(row)
+    except Exception:
+        tecdoc_meta = {"tecdoc": {"configured": False, "connected": False}}
+
+    from app.part_shops import build_whatsapp_order
+    from app.services import get_settings
+
+    settings = get_settings(db, tenant_id)
+    shop_label = settings.shop_name or "el taller"
+    veh_whatsapp = f"{plate_norm} {brand} {model}".strip()
+    shop_cards = []
+    for s in shops:
+        item = shop_dict(s)
+        item["search_link"] = build_search_link(s, search_text, plate_norm)
+        item["whatsapp_link"] = build_whatsapp_order(s, search_text, veh_whatsapp, from_shop=shop_label)
+        shop_cards.append(item)
+
+    if not ref.get("found_vehicle") and not profile:
+        result_message = (
+            "Placa no registrada en su taller. Elija marca, modelo y año arriba y pulse otra vez "
+            "Consultar — o registre el vehículo en Ingreso."
         )
-        for row in tec_parts:
-            code = row.get("oem_code") or ""
-            name = row.get("name") or ""
-            row["network_links"] = network_links_for_part(code, name, brand, model, year_str, shops)
-            oem_parts.append(row)
+    elif not profile:
+        result_message = (
+            f"Vehículo encontrado ({brand} {model}). Sin catálogo OEM para esa combinación — "
+            "use los enlaces de repuesteras abajo."
+        )
+    elif not oem_parts:
+        result_message = "Catálogo listo pero sin filas — limpie el filtro «Repuesto» si escribió algo."
+    else:
+        result_message = f"{len(oem_parts)} referencia(s) de pieza / OEM."
 
     if tecdoc_meta.get("tecdoc", {}).get("configured"):
         result["disclaimer"] = (
@@ -297,8 +335,10 @@ def vehicle_technical_dossier(
         )
 
     result["oem_parts"] = oem_parts
+    result["history_parts"] = ref.get("history_parts") or []
     result["network_intro"] = intro
-    result["shops"] = [shop_dict(s) for s in shops]
+    result["shops"] = shop_cards
+    result["message"] = result_message
     result["tecdoc"] = tecdoc_meta.get("tecdoc") or {"configured": False}
     result["tecdoc_vehicle"] = tecdoc_meta.get("tecdoc_vehicle")
     return result
