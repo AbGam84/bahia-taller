@@ -16,6 +16,7 @@ from app.models import (
     Part,
     Reception,
     ServiceCatalog,
+    Supplier,
     Vehicle,
     WorkOrder,
     WorkOrderLine,
@@ -503,6 +504,123 @@ def parts_reference_by_plate(
     result["history_parts"] = history_parts
     result["suggested_parts"] = suggested
     return result
+
+
+def _score_warehouse_part(p: Part, q: str, brand: str, model: str) -> int:
+    blob = f"{p.name} {p.sku} {p.brand} {p.compatible_with} {p.category}".lower()
+    score = _score_part_match(p, brand, model, "")
+    for term in [t for t in [q, brand, model] if t and t.strip()]:
+        if term.lower() in blob:
+            score += 2
+    if q and q.lower() in blob:
+        score += 1
+    return score
+
+
+def parts_consulta(
+    db: Session,
+    tenant_id: int,
+    q: str,
+    plate: str = "",
+    brand: str = "",
+    model: str = "",
+    year: str = "",
+) -> dict:
+    """Unifica bodega, historial del vehículo y repuesteras externas."""
+    from app.part_shops import (
+        build_search_link,
+        build_whatsapp_order,
+        ensure_default_shops,
+        shop_dict,
+    )
+
+    ensure_default_shops(db, tenant_id)
+    settings = get_settings(db, tenant_id)
+    shop_label = settings.shop_name or "el taller"
+
+    search_q = (q or "").strip()
+    plate_norm = (plate or "").upper().strip()
+    brand = (brand or "").strip()
+    model = (model or "").strip()
+
+    plate_ref = None
+    if plate_norm or brand or model:
+        plate_ref = parts_reference_by_plate(db, tenant_id, plate_norm, brand, model)
+
+    vehicle = plate_ref.get("vehicle") if plate_ref else None
+    if vehicle:
+        brand = brand or (vehicle.get("brand") or "")
+        model = model or (vehicle.get("model") or "")
+
+    veh_label_parts = [p for p in [plate_norm, brand, model, (year or "").strip()] if p]
+    vehicle_label = " ".join(veh_label_parts)
+
+    warehouse: list[dict] = []
+    parts = (
+        db.query(Part)
+        .options(joinedload(Part.preferred_supplier))
+        .filter(Part.active.is_(True), Part.tenant_id == tenant_id)
+        .order_by(Part.name)
+        .limit(500)
+        .all()
+    )
+    sq_lower = search_q.lower()
+    for p in parts:
+        score = _score_warehouse_part(p, search_q, brand, model)
+        blob = f"{p.name} {p.sku} {p.compatible_with}".lower()
+        if sq_lower and sq_lower not in blob and score <= 0:
+            continue
+        if not sq_lower and (brand or model) and score <= 0:
+            continue
+        item = part_dict(p)
+        item["match_score"] = score
+        warehouse.append(item)
+    warehouse.sort(key=lambda x: (-x["match_score"], x["name"]))
+    warehouse = warehouse[:35]
+
+    history_parts = (plate_ref or {}).get("history_parts") or []
+    if search_q and history_parts:
+        sq = search_q.lower()
+        history_parts = [h for h in history_parts if sq in (h.get("name") or "").lower()] or history_parts[:8]
+
+    shops_rows = (
+        db.query(Supplier)
+        .filter(Supplier.active.is_(True), Supplier.kind == "tienda", Supplier.tenant_id == tenant_id)
+        .order_by(Supplier.name)
+        .all()
+    )
+    shops = []
+    for s in shops_rows:
+        item = shop_dict(s)
+        item["search_link"] = build_search_link(s, search_q, vehicle_label)
+        item["whatsapp_link"] = build_whatsapp_order(
+            s, search_q or "repuesto", vehicle_label, from_shop=shop_label
+        )
+        shops.append(item)
+
+    dossier = None
+    if plate_norm:
+        from app.oem_network import vehicle_technical_dossier
+
+        dossier = vehicle_technical_dossier(
+            db, tenant_id, plate_norm, brand, model, (year or "").strip()
+        )
+
+    return {
+        "query": search_q,
+        "plate": plate_norm,
+        "brand": brand,
+        "model": model,
+        "year": (year or "").strip(),
+        "vehicle_label": vehicle_label,
+        "found_vehicle": bool(plate_ref and plate_ref.get("found_vehicle")),
+        "vehicle": vehicle,
+        "visits_count": (plate_ref or {}).get("visits_count") or 0,
+        "history_parts": history_parts[:25],
+        "warehouse": warehouse,
+        "shops": shops,
+        "ficha_oem": dossier,
+    }
 
 
 def vehicle_history(db: Session, vehicle_id: int) -> list[dict]:

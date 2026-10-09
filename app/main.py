@@ -31,6 +31,7 @@ from app.pro import (
     owner_analytics,
     public_payload,
     seed_inspection,
+    parts_consulta,
     parts_reference_by_plate,
     vehicle_history,
 )
@@ -1699,6 +1700,40 @@ def add_service_to_wo(
 @app.get("/api/vehicles/{vehicle_id}/history")
 def vehicle_history_api(vehicle_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     return vehicle_history(db, vehicle_id)
+
+
+@app.get("/api/parts/consulta")
+def parts_consulta_api(
+    q: str = "",
+    plate: str = "",
+    brand: str = "",
+    model: str = "",
+    year: str = "",
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Consulta unificada: bodega + historial del carro + repuesteras."""
+    from app.tenancy import tenant_id_of
+
+    if not (q or "").strip() and not (plate or "").strip():
+        raise HTTPException(status_code=400, detail="Escriba la placa o qué repuesto busca")
+    return parts_consulta(db, tenant_id_of(user), q or "", plate, brand, model, year)
+
+
+@app.get("/api/plates/{plate}/ficha-oem")
+def plate_ficha_oem(
+    plate: str,
+    brand: str = "",
+    model: str = "",
+    year: str = "",
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Especificaciones del vehículo + piezas OEM referencia + enlaces red."""
+    from app.oem_network import vehicle_technical_dossier
+    from app.tenancy import tenant_id_of
+
+    return vehicle_technical_dossier(db, tenant_id_of(user), plate, brand, model, year)
 
 
 @app.get("/api/plates/{plate}/parts-reference")

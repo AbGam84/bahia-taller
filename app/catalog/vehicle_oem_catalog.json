@@ -1,0 +1,180 @@
+{
+  "version": 1,
+  "note": "Referencia OEM de mantenimiento frecuente (confirmar con VIN/motor en taller). Catálogo completo de fábrica requiere integración TecDoc u OEM.",
+  "profiles": [
+    {
+      "brand": "Toyota",
+      "models": ["Corolla"],
+      "year_min": 2014,
+      "year_max": 2022,
+      "specs": {
+        "segmento": "Sedán compacto",
+        "motor_referencia": "1.8L 2ZR-FE / 2.0L (varía por mercado)",
+        "traccion": "Delantera",
+        "combustible": "Gasolina"
+      },
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "04152-YZZA6"},
+        {"category": "Motor", "name": "Filtro de aire", "oem_code": "17801-0Y040"},
+        {"category": "Motor", "name": "Bujía (set referencia)", "oem_code": "90919-01253"},
+        {"category": "Frenos", "name": "Pastillas freno delanteras", "oem_code": "04465-02220"},
+        {"category": "Frenos", "name": "Discos freno delanteros (par ref.)", "oem_code": "43512-02280"},
+        {"category": "Suspensión", "name": "Amortiguador delantero (ref.)", "oem_code": "48520-02290"},
+        {"category": "Transmisión", "name": "Filtro caja automática (ref.)", "oem_code": "35330-02030"}
+      ]
+    },
+    {
+      "brand": "Toyota",
+      "models": ["Yaris"],
+      "year_min": 2012,
+      "year_max": 2020,
+      "specs": {
+        "segmento": "Subcompacto",
+        "motor_referencia": "1.5L 1NZ-FE",
+        "traccion": "Delantera",
+        "combustible": "Gasolina"
+      },
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "04152-YZZA1"},
+        {"category": "Motor", "name": "Filtro de aire", "oem_code": "17801-21050"},
+        {"category": "Frenos", "name": "Pastillas freno delanteras", "oem_code": "04465-52010"}
+      ]
+    },
+    {
+      "brand": "Toyota",
+      "models": ["Hilux"],
+      "year_min": 2016,
+      "year_max": 2024,
+      "specs": {
+        "segmento": "Pick-up",
+        "motor_referencia": "2.7L / 2.8L diesel (varía)",
+        "traccion": "4x2 / 4x4",
+        "combustible": "Gasolina / Diésel"
+      },
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "04152-YZZA4"},
+        {"category": "Motor", "name": "Filtro de aire", "oem_code": "17801-0L040"},
+        {"category": "Frenos", "name": "Pastillas freno delanteras", "oem_code": "04465-0K478"}
+      ]
+    },
+    {
+      "brand": "Nissan",
+      "models": ["Versa", "Sentra"],
+      "year_min": 2012,
+      "year_max": 2022,
+      "specs": {
+        "segmento": "Sedán",
+        "motor_referencia": "1.6L / 1.8L HR16DE / MRA8DE",
+        "traccion": "Delantera",
+        "combustible": "Gasolina"
+      },
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "15208-65F0E"},
+        {"category": "Motor", "name": "Filtro de aire", "oem_code": "16546-1HK0A"},
+        {"category": "Frenos", "name": "Pastillas freno delanteras", "oem_code": "D1060-1HA0A"}
+      ]
+    },
+    {
+      "brand": "Hyundai",
+      "models": ["Accent", "Elantra"],
+      "year_min": 2012,
+      "year_max": 2022,
+      "specs": {
+        "segmento": "Sedán compacto",
+        "motor_referencia": "1.6L Gamma G4FG",
+        "traccion": "Delantera",
+        "combustible": "Gasolina"
+      },
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "26300-35504"},
+        {"category": "Motor", "name": "Filtro de aire", "oem_code": "28113-1R100"},
+        {"category": "Frenos", "name": "Pastillas freno delanteras", "oem_code": "58101-1R000"}
+      ]
+    },
+    {
+      "brand": "Kia",
+      "models": ["Rio", "Sportage"],
+      "year_min": 2012,
+      "year_max": 2022,
+      "specs": {
+        "segmento": "Compacto / SUV",
+        "motor_referencia": "1.6L / 2.0L (varía)",
+        "traccion": "Delantera",
+        "combustible": "Gasolina"
+      },
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "26300-35504"},
+        {"category": "Motor", "name": "Filtro de aire", "oem_code": "28113-1G000"},
+        {"category": "Frenos", "name": "Pastillas freno delanteras", "oem_code": "58101-1RA00"}
+      ]
+    },
+    {
+      "brand": "Suzuki",
+      "models": ["Swift", "Vitara"],
+      "year_min": 2012,
+      "year_max": 2022,
+      "specs": {
+        "segmento": "Compacto / SUV",
+        "motor_referencia": "1.4L / 1.6L",
+        "traccion": "Delantera / AWD",
+        "combustible": "Gasolina"
+      },
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "16510-85E00"},
+        {"category": "Motor", "name": "Filtro de aire", "oem_code": "13780-61M00"},
+        {"category": "Frenos", "name": "Pastillas freno delanteras", "oem_code": "55810-61M00"}
+      ]
+    },
+    {
+      "brand": "Honda",
+      "models": ["Civic", "CR-V", "Fit"],
+      "year_min": 2012,
+      "year_max": 2022,
+      "specs": {
+        "segmento": "Varios",
+        "motor_referencia": "1.5L / 1.8L / 2.4L (varía)",
+        "traccion": "Delantera",
+        "combustible": "Gasolina"
+      },
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "15400-RTA-003"},
+        {"category": "Motor", "name": "Filtro de aire", "oem_code": "17220-5AA-A00"},
+        {"category": "Frenos", "name": "Pastillas freno delanteras", "oem_code": "45022-TBA-A01"}
+      ]
+    },
+    {
+      "brand": "Chevrolet",
+      "models": ["Spark", "Aveo", "Sail"],
+      "year_min": 2010,
+      "year_max": 2020,
+      "specs": {
+        "segmento": "Subcompacto / sedán",
+        "motor_referencia": "1.2L / 1.4L / 1.5L",
+        "traccion": "Delantera",
+        "combustible": "Gasolina"
+      },
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "25171847"},
+        {"category": "Motor", "name": "Filtro de aire", "oem_code": "96353302"},
+        {"category": "Frenos", "name": "Pastillas freno delanteras", "oem_code": "19244627"}
+      ]
+    },
+    {
+      "brand": "Ford",
+      "models": ["Ranger", "Escape", "Fiesta"],
+      "year_min": 2012,
+      "year_max": 2022,
+      "specs": {
+        "segmento": "Pick-up / SUV / compacto",
+        "motor_referencia": "2.5L / 3.2L / EcoBoost (varía)",
+        "traccion": "4x2 / 4x4",
+        "combustible": "Gasolina / Diésel"
+      },
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "BE8Z-6731-A"},
+        {"category": "Motor", "name": "Filtro de aire", "oem_code": "FA-1927"},
+        {"category": "Frenos", "name": "Pastillas freno delanteras", "oem_code": "BR3Z-2001-A"}
+      ]
+    }
+  ]
+}

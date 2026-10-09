@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Katire — taller + factura electrónica CR</title>
-  <link rel="stylesheet" href="/static/css/app.css?v=20260722q" />
+  <link rel="stylesheet" href="/static/css/app.css?v=20260722s" />
 </head>
 <body>
   <div class="app-shell">
@@ -32,16 +32,20 @@
           <span class="n">04</span>
           <span class="t">Estantería viva</span>
         </button>
-        <button data-section="proveedores">
+        <button data-section="consulta-repuesto">
           <span class="n">05</span>
+          <span class="t">Consultas repuesto</span>
+        </button>
+        <button data-section="proveedores">
+          <span class="n">06</span>
           <span class="t">Repuestos & tiendas</span>
         </button>
         <button data-section="aliados">
-          <span class="n">06</span>
+          <span class="n">07</span>
           <span class="t">Aliados</span>
         </button>
         <button data-section="facturacion">
-          <span class="n">07</span>
+          <span class="n">08</span>
           <span class="t">Facturación CR</span>
         </button>
         <button data-section="config" data-admin-only="1">
@@ -87,6 +91,7 @@
           <button type="button" class="quick-action" data-go="recepcion"><b>Ingreso</b><span>Meter carro</span></button>
           <button type="button" class="quick-action" data-go="taller"><b>Diagnóstico</b><span>Mapa y OT</span></button>
           <button type="button" class="quick-action" data-go="bodega"><b>Estantería</b><span>Pistola / stock</span></button>
+          <button type="button" class="quick-action" data-go="consulta-repuesto"><b>Consulta</b><span>Bodega + repuesteras</span></button>
           <button type="button" class="quick-action" data-go="facturacion"><b>Factura</b><span>Hacienda CR</span></button>
         </div>
         <div class="panel">
@@ -367,22 +372,104 @@
         </div>
       </section>
 
+      <section id="sec-consulta-repuesto" class="section">
+        <div class="topbar">
+          <div>
+            <h1>Consultas de repuesto</h1>
+            <p>Con la placa: ficha del carro, piezas de referencia y código OEM de fábrica, más enlaces a Gigante, Guacamaya y su bodega.</p>
+          </div>
+        </div>
+        <div class="panel" style="margin-bottom:16px">
+          <h2>Vehículo y repuesto</h2>
+          <form id="consultaRepuestoForm" class="form-grid">
+            <label>Placa <span class="muted">(empiece aquí)</span>
+              <input id="consultaPlate" name="plate" placeholder="GAA-123" style="text-transform:uppercase" autocomplete="off" />
+            </label>
+            <label class="full" style="align-self:end">
+              <button class="btn btn-primary" type="button" id="consultaPlateOnlyBtn" style="width:100%">Cargar ficha por placa</button>
+            </label>
+            <label class="full">Repuesto <span class="muted">(opcional — filtra la lista)</span>
+              <input id="consultaQuery" name="q" placeholder="Ej. pastillas, filtro aceite, amortiguador..." autocomplete="off" />
+            </label>
+            <label>Marca
+              <select id="consultaBrand" name="brand">
+                <option value="">Cualquiera / escriba abajo</option>
+                <option>Toyota</option>
+                <option>Nissan</option>
+                <option>Hyundai</option>
+                <option>Kia</option>
+                <option>Suzuki</option>
+                <option>Honda</option>
+                <option>Mazda</option>
+                <option>Mitsubishi</option>
+                <option>Chevrolet</option>
+                <option>Ford</option>
+                <option>Volkswagen</option>
+                <option>Isuzu</option>
+                <option>Great Wall</option>
+                <option>BYD</option>
+                <option>Otra</option>
+              </select>
+            </label>
+            <label>Modelo
+              <select id="consultaModel" name="model">
+                <option value="">—</option>
+              </select>
+              <input id="consultaModelOther" name="model_other" placeholder="Modelo" style="display:none;margin-top:8px" />
+            </label>
+            <label>Año
+              <select id="consultaYear" name="year">
+                <option value="">—</option>
+              </select>
+            </label>
+            <div class="full row-actions" style="margin-top:4px">
+              <button class="btn btn-primary" type="submit" id="consultaSearchBtn">Consultar repuesto</button>
+            </div>
+          </form>
+          <p id="consultaVehicleMeta" class="muted" style="margin:12px 0 0;font-size:0.85rem"></p>
+        </div>
+        <div class="panel" style="margin-bottom:16px" id="consultaFichaPanel" hidden>
+          <h2>Ficha técnica del vehículo</h2>
+          <div id="consultaSpecsGrid" class="stats" style="margin-bottom:12px"></div>
+          <p id="consultaOemDisclaimer" class="muted" style="font-size:0.82rem;margin:0 0 10px"></p>
+          <div id="consultaNetworkIntro" class="row-actions" style="margin-bottom:12px;flex-wrap:wrap"></div>
+          <h3 style="margin:0 0 8px;font-size:0.95rem">Piezas y código OEM de referencia</h3>
+          <div class="table-wrap" id="consultaOemTableWrap">
+            <div class="empty-state"><strong>Sin catálogo para esta combinación</strong>Indique marca/modelo/año o registre el VIN en Ingreso</div>
+          </div>
+        </div>
+        <div class="grid-2" style="align-items:start">
+          <div class="panel">
+            <h2>Su bodega</h2>
+            <div class="table-wrap" id="consultaWarehouseWrap">
+              <div class="empty-state"><strong>Lista para consultar</strong>Escriba el repuesto y pulse Consultar</div>
+            </div>
+          </div>
+          <div class="panel">
+            <h2>Ya usó en este vehículo</h2>
+            <div id="consultaHistoryWrap">
+              <div class="empty-state"><strong>Sin placa aún</strong>Si el carro ya estuvo en el taller, aquí verá el historial</div>
+            </div>
+          </div>
+        </div>
+        <div class="panel" style="margin-top:16px">
+          <h2>Repuesteras — buscar y pedir</h2>
+          <p class="muted" style="margin-top:0">Abre la tienda en línea o WhatsApp con el repuesto y el vehículo ya armados.</p>
+          <div id="consultaShops" class="shop-cards">
+            <div class="empty-state"><strong>Consulte arriba</strong>Se listan Gigante, Guacamaya y sus proveedores tipo tienda</div>
+          </div>
+        </div>
+      </section>
+
       <section id="sec-proveedores" class="section">
         <div class="topbar">
           <div>
             <h1>Repuestos & tiendas</h1>
-            <p>Busque y pida en Gigante, Guacamaya y su cadena. Pedidos en ruta a la vista.</p>
+            <p>Pedidos en ruta y catálogo de proveedores. Para buscar piezas use <strong>Consultas repuesto</strong> en el menú.</p>
           </div>
         </div>
         <div class="panel" style="margin-bottom:16px">
-          <h2>Buscar / comprar en tiendas</h2>
-          <p class="muted" style="margin-top:0">Escriba el repuesto (ej. pastillas Corolla 2018) y abra la tienda o WhatsApp.</p>
-          <div class="row-actions" style="margin-bottom:12px">
-            <input id="marketQuery" placeholder="Nombre del repuesto, marca, modelo..." style="flex:1;min-width:220px" />
-            <input id="marketVehicle" placeholder="Vehículo (placa / modelo)" style="max-width:220px" />
-            <button class="btn btn-primary" id="marketSearchBtn">Buscar en tiendas</button>
-          </div>
-          <div id="marketShops" class="shop-cards"></div>
+          <p class="muted" style="margin:0">La búsqueda unificada está en el menú <button type="button" class="btn btn-primary" data-go="consulta-repuesto" style="margin-left:6px">Consultas repuesto</button></p>
         </div>
         <div class="grid-2">
           <div class="panel">
@@ -604,7 +691,7 @@
       }
     })();
   </script>
-  <script src="/static/js/app.js?v=20260722r"></script>
+  <script src="/static/js/app.js?v=20260722t"></script>
   <script src="/static/js/ficha.js?v=20260722p"></script>
   <script src="/static/js/taller-dvi.js?v=20260722p"></script>
 </body>
