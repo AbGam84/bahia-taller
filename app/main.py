@@ -1720,12 +1720,20 @@ def parts_consulta_api(
     return parts_consulta(db, tenant_id_of(user), q or "", plate, brand, model, year)
 
 
+@app.get("/api/tecdoc/status")
+def tecdoc_status_api(user: User = Depends(get_current_user)):
+    from app.tecdoc_client import tecdoc_status
+
+    return tecdoc_status()
+
+
 @app.get("/api/plates/{plate}/ficha-oem")
 def plate_ficha_oem(
     plate: str,
     brand: str = "",
     model: str = "",
     year: str = "",
+    q: str = "",
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -1733,7 +1741,7 @@ def plate_ficha_oem(
     from app.oem_network import vehicle_technical_dossier
     from app.tenancy import tenant_id_of
 
-    return vehicle_technical_dossier(db, tenant_id_of(user), plate, brand, model, year)
+    return vehicle_technical_dossier(db, tenant_id_of(user), plate, brand, model, year, q)
 
 
 @app.get("/api/plates/{plate}/parts-reference")

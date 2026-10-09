@@ -1623,7 +1623,16 @@ function renderFichaOem(dossier) {
       )
       .join("");
   }
-  setText("consultaOemDisclaimer", dossier.disclaimer || "");
+  const disc = document.getElementById("consultaOemDisclaimer");
+  if (disc) {
+    const td = dossier.tecdoc || {};
+    const pill = td.connected
+      ? `<span class="tecdoc-pill on">TecDoc ON</span>`
+      : td.configured
+        ? `<span class="tecdoc-pill off">TecDoc — revise clave</span>`
+        : `<span class="tecdoc-pill off">TecDoc — licencia pendiente</span>`;
+    disc.innerHTML = `${esc(dossier.disclaimer || "")} ${pill}`;
+  }
   const intro = document.getElementById("consultaNetworkIntro");
   if (intro) {
     intro.innerHTML = (dossier.network_intro || [])
@@ -1662,7 +1671,7 @@ function renderFichaOem(dossier) {
         <td>${esc(p.category)}</td>
         <td><strong>${esc(p.name)}</strong>${p.times_used ? `<br><span class="muted">Usado ${p.times_used}× en taller</span>` : ""}</td>
         <td><code>${esc(p.oem_code)}</code> <button type="button" class="btn btn-ghost" style="padding:2px 6px;font-size:0.7rem" data-copy-oem="${esc(p.oem_code)}">Copiar</button></td>
-        <td><span class="muted">${p.source === "historial_ot" ? "Su taller" : "Catálogo ref."}</span></td>
+        <td><span class="muted">${p.source === "historial_ot" ? "Su taller" : p.source === "tecdoc" ? "TecDoc" : "Catálogo CR"}</span></td>
         <td class="row-actions">${links || "—"}</td>
       </tr>`;
     })

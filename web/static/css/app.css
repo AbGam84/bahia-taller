@@ -416,6 +416,64 @@ input:focus, select:focus, textarea:focus {
 
 .nav button.active .t { color: #fff; }
 
+.nav button.nav-destaque {
+  margin: 6px 0 8px;
+  padding: 12px 12px;
+  background: linear-gradient(135deg, rgba(255, 77, 46, 0.22), rgba(255, 179, 71, 0.12));
+  border: 1px solid rgba(255, 179, 71, 0.45);
+  box-shadow: 0 8px 28px rgba(255, 77, 46, 0.15);
+}
+
+.nav button.nav-destaque .n {
+  color: var(--ember);
+  font-size: 0.85rem;
+}
+
+.nav button.nav-destaque .t {
+  font-size: 1.02rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: var(--katire);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.nav button.nav-destaque.active,
+.nav button.nav-destaque:hover {
+  border-color: rgba(255, 179, 71, 0.65);
+  background: linear-gradient(135deg, rgba(255, 77, 46, 0.32), rgba(30, 201, 167, 0.12));
+}
+
+.titulo-consulta-repuesto {
+  background: var(--katire);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.tecdoc-pill {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.tecdoc-pill.on {
+  background: rgba(61, 214, 140, 0.18);
+  border: 1px solid rgba(61, 214, 140, 0.45);
+  color: var(--ok);
+}
+
+.tecdoc-pill.off {
+  background: rgba(255, 179, 71, 0.12);
+  border: 1px solid rgba(255, 179, 71, 0.35);
+  color: var(--ember);
+}
+
 .user-box {
   flex-shrink: 0;
   padding: 12px;

@@ -117,6 +117,7 @@ def vehicle_technical_dossier(
     brand_hint: str = "",
     model_hint: str = "",
     year_hint: str = "",
+    part_hint: str = "",
 ) -> dict:
     from app.pro import parts_reference_by_plate
     from app.part_shops import shop_dict
@@ -267,7 +268,37 @@ def vehicle_technical_dossier(
         if profile
         else None
     )
+    from app.tecdoc_client import enrich_parts, tecdoc_configured
+
+    tecdoc_meta: dict = {}
+    if tecdoc_configured() or (vehicle and (vehicle.get("vin") or "").strip()):
+        tec_parts, tecdoc_meta = enrich_parts(
+            brand=brand,
+            model=model,
+            year=year,
+            vin=(vehicle.get("vin") if vehicle else "") or "",
+            part_hint=(part_hint or "").strip(),
+        )
+        for row in tec_parts:
+            code = row.get("oem_code") or ""
+            name = row.get("name") or ""
+            row["network_links"] = network_links_for_part(code, name, brand, model, year_str, shops)
+            oem_parts.append(row)
+
+    if tecdoc_meta.get("tecdoc", {}).get("configured"):
+        result["disclaimer"] = (
+            "Catálogo local (GAM San José / Alajuela) + TecDoc cuando hay licencia activa. "
+            "Confirme códigos OEM con VIN/motor antes de comprar."
+        )
+    else:
+        result["disclaimer"] = (
+            "Catálogo de referencia Costa Rica (San José, Alajuela y nacional). "
+            "Para catálogo OEM completo active TecDoc (TECDOC_API_KEY en servidor)."
+        )
+
     result["oem_parts"] = oem_parts
     result["network_intro"] = intro
     result["shops"] = [shop_dict(s) for s in shops]
+    result["tecdoc"] = tecdoc_meta.get("tecdoc") or {"configured": False}
+    result["tecdoc_vehicle"] = tecdoc_meta.get("tecdoc_vehicle")
     return result

@@ -603,7 +603,7 @@ def parts_consulta(
         from app.oem_network import vehicle_technical_dossier
 
         dossier = vehicle_technical_dossier(
-            db, tenant_id, plate_norm, brand, model, (year or "").strip()
+            db, tenant_id, plate_norm, brand, model, (year or "").strip(), search_q
         )
 
     return {

@@ -1,10 +1,16 @@
 {
   "version": 1,
-  "note": "Referencia OEM de mantenimiento frecuente (confirmar con VIN/motor en taller). Catálogo completo de fábrica requiere integración TecDoc u OEM.",
+  "note": "Referencia OEM Costa Rica — énfasis GAM (San José, Alajuela). Confirmar con VIN/motor. Catálogo completo vía TecDoc en servidor.",
+  "regions": {
+    "san_jose": "Gran Área Metropolitana — San José",
+    "alajuela": "GAM — Alajuela, Heredia, Cartago corredor",
+    "nacional": "Resto del país"
+  },
   "profiles": [
     {
       "brand": "Toyota",
       "models": ["Corolla"],
+      "regions": ["san_jose", "alajuela", "nacional"],
       "year_min": 2014,
       "year_max": 2022,
       "specs": {
@@ -174,6 +180,181 @@
         {"category": "Motor", "name": "Filtro de aceite", "oem_code": "BE8Z-6731-A"},
         {"category": "Motor", "name": "Filtro de aire", "oem_code": "FA-1927"},
         {"category": "Frenos", "name": "Pastillas freno delanteras", "oem_code": "BR3Z-2001-A"}
+      ]
+    },
+    {
+      "brand": "Toyota",
+      "models": ["RAV4"],
+      "regions": ["san_jose", "alajuela"],
+      "year_min": 2013,
+      "year_max": 2024,
+      "specs": {
+        "segmento": "SUV",
+        "motor_referencia": "2.0L / 2.5L",
+        "traccion": "AWD / 4x2",
+        "zona_cr": "Muy frecuente GAM San José y Alajuela"
+      },
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "04152-YZZA6"},
+        {"category": "Motor", "name": "Filtro de aire", "oem_code": "17801-0Y040"},
+        {"category": "Frenos", "name": "Pastillas freno delanteras", "oem_code": "04465-42070"}
+      ]
+    },
+    {
+      "brand": "Toyota",
+      "models": ["Fortuner"],
+      "regions": ["san_jose", "alajuela"],
+      "year_min": 2016,
+      "year_max": 2024,
+      "specs": {
+        "segmento": "SUV grande",
+        "motor_referencia": "2.7L / 2.8L diesel",
+        "zona_cr": "Flota familiar GAM"
+      },
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "04152-YZZA4"},
+        {"category": "Frenos", "name": "Pastillas delanteras", "oem_code": "04465-0K010"}
+      ]
+    },
+    {
+      "brand": "Mazda",
+      "models": ["Mazda3", "Mazda 3"],
+      "regions": ["san_jose", "alajuela"],
+      "year_min": 2014,
+      "year_max": 2023,
+      "specs": {
+        "segmento": "Sedán / hatch GAM",
+        "motor_referencia": "2.0L / 2.5L Skyactiv"
+      },
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "PE01-14-302A"},
+        {"category": "Motor", "name": "Filtro de aire", "oem_code": "B6Y1-13-Z40"},
+        {"category": "Frenos", "name": "Pastillas delanteras", "oem_code": "B5Y0-33-28Z"}
+      ]
+    },
+    {
+      "brand": "Mazda",
+      "models": ["CX-5", "CX5"],
+      "regions": ["san_jose", "alajuela"],
+      "year_min": 2013,
+      "year_max": 2024,
+      "specs": {"segmento": "SUV", "motor_referencia": "2.0L / 2.5L"},
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "PE01-14-302A"},
+        {"category": "Frenos", "name": "Pastillas delanteras", "oem_code": "KAY0-33-28Z"}
+      ]
+    },
+    {
+      "brand": "Mitsubishi",
+      "models": ["L200", "Montero Sport", "ASX"],
+      "regions": ["san_jose", "alajuela", "nacional"],
+      "year_min": 2012,
+      "year_max": 2024,
+      "specs": {"segmento": "Pick-up / SUV", "motor_referencia": "2.4L / 2.5L"},
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "1230A040"},
+        {"category": "Motor", "name": "Filtro de aire", "oem_code": "1500A608"},
+        {"category": "Frenos", "name": "Pastillas delanteras", "oem_code": "4605B978"}
+      ]
+    },
+    {
+      "brand": "Volkswagen",
+      "models": ["Jetta", "Polo", "Tiguan"],
+      "regions": ["san_jose", "alajuela"],
+      "year_min": 2012,
+      "year_max": 2022,
+      "specs": {"segmento": "Europeos GAM", "motor_referencia": "1.4T / 2.0L"},
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "03H115561"},
+        {"category": "Motor", "name": "Filtro de aire", "oem_code": "1K0129620"},
+        {"category": "Frenos", "name": "Pastillas delanteras", "oem_code": "1K0698151"}
+      ]
+    },
+    {
+      "brand": "Isuzu",
+      "models": ["D-Max", "Dmax"],
+      "regions": ["san_jose", "alajuela", "nacional"],
+      "year_min": 2013,
+      "year_max": 2024,
+      "specs": {"segmento": "Pick-up trabajo", "motor_referencia": "2.5L / 3.0L diesel"},
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "8-97046719-0"},
+        {"category": "Motor", "name": "Filtro de aire", "oem_code": "8-97044217-0"},
+        {"category": "Frenos", "name": "Pastillas delanteras", "oem_code": "8-97055820-0"}
+      ]
+    },
+    {
+      "brand": "BYD",
+      "models": ["Yuan", "Song", "Dolphin"],
+      "regions": ["san_jose", "alajuela"],
+      "year_min": 2022,
+      "year_max": 2026,
+      "specs": {"segmento": "Eléctrico / híbrido GAM", "combustible": "EV / PHEV"},
+      "parts": [
+        {"category": "Frenos", "name": "Pastillas freno (ref. servicio)", "oem_code": "Consultar VIN BYD"},
+        {"category": "Climatización", "name": "Filtro cabina", "oem_code": "Consultar VIN BYD"}
+      ]
+    },
+    {
+      "brand": "Nissan",
+      "models": ["March", "X-Trail", "Navara", "Frontier"],
+      "regions": ["san_jose", "alajuela", "nacional"],
+      "year_min": 2012,
+      "year_max": 2024,
+      "specs": {"segmento": "Urbano / SUV / pick-up", "zona_cr": "March muy común San José"},
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "15208-65F0E"},
+        {"category": "Motor", "name": "Filtro de aire", "oem_code": "16546-1HK0A"},
+        {"category": "Frenos", "name": "Pastillas delanteras", "oem_code": "D1060-1HA0A"}
+      ]
+    },
+    {
+      "brand": "Hyundai",
+      "models": ["Tucson", "Creta", "Santa Fe", "Grand i10"],
+      "regions": ["san_jose", "alajuela"],
+      "year_min": 2015,
+      "year_max": 2024,
+      "specs": {"segmento": "SUV / city GAM", "motor_referencia": "2.0L / 1.6T"},
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "26300-35504"},
+        {"category": "Motor", "name": "Filtro de aire", "oem_code": "28113-2E000"},
+        {"category": "Frenos", "name": "Pastillas delanteras", "oem_code": "58101-D3A00"}
+      ]
+    },
+    {
+      "brand": "Kia",
+      "models": ["Seltos", "Sorento", "Picanto", "Cerato"],
+      "regions": ["san_jose", "alajuela"],
+      "year_min": 2015,
+      "year_max": 2024,
+      "specs": {"segmento": "SUV / compacto GAM"},
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "26300-35504"},
+        {"category": "Frenos", "name": "Pastillas delanteras", "oem_code": "58101-D4A00"}
+      ]
+    },
+    {
+      "brand": "Honda",
+      "models": ["HR-V", "CR-V", "City"],
+      "regions": ["san_jose", "alajuela"],
+      "year_min": 2015,
+      "year_max": 2024,
+      "specs": {"segmento": "SUV / sedán GAM"},
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite", "oem_code": "15400-RTA-003"},
+        {"category": "Frenos", "name": "Pastillas delanteras", "oem_code": "45022-TBA-A01"}
+      ]
+    },
+    {
+      "brand": "Great Wall",
+      "models": ["Wingle", "Poer", "Haval"],
+      "regions": ["alajuela", "nacional"],
+      "year_min": 2018,
+      "year_max": 2024,
+      "specs": {"segmento": "Pick-up / SUV", "zona_cr": "Creciente Alajuela y rutas norte"},
+      "parts": [
+        {"category": "Motor", "name": "Filtro de aceite (ref.)", "oem_code": "Consultar VIN Great Wall"},
+        {"category": "Frenos", "name": "Pastillas delanteras (ref.)", "oem_code": "Consultar VIN Great Wall"}
       ]
     }
   ]
