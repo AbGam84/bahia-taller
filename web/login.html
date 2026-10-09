@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Katire — acceso licenciado</title>
-  <link rel="stylesheet" href="/static/css/app.css?v=20260722q" />
+  <link rel="stylesheet" href="/static/css/app.css?v=20260722r" />
 </head>
 <body class="login-page">
   <section class="login-hero" aria-label="Katire">
@@ -74,9 +74,12 @@
         const p = await res.json();
         if (p.copyright) document.getElementById("copyLine").textContent = p.copyright;
         if (p.support) document.getElementById("supportLine").textContent = "Soporte: " + p.support;
-        const lic = p.license || {};
-        showLicense(!lic.ok);
-        if (p.show_demo_hints) {
+        // En /acceso/{taller} la licencia es del tenant, no del servidor (KT1 global).
+        if (!tenantCodeFromPath()) {
+          const lic = p.license || {};
+          showLicense(!lic.ok);
+        }
+        if (p.show_demo_hints && !tenantCodeFromPath()) {
           const h = document.getElementById("demoHint");
           h.hidden = false;
           h.innerHTML = "Demo: <strong>admin</strong> / dueño · <strong>cliente</strong> / recepción";
@@ -112,21 +115,32 @@
             if (img) img.src = p.logo_url + "?t=" + Date.now();
           }
         }
-        if (p.pending_activation && p.activar_url) {
+        showLicense(false);
+        if (p.activated && !p.pending_activation) {
+          document.getElementById("activarHint").hidden = true;
+          document.getElementById("loginSub").textContent =
+            "Usuario y clave de su taller. Si olvidó la clave, contacte a Katire.";
+        } else if (p.pending_activation && p.activar_url) {
           const hint = document.getElementById("activarHint");
           const link = document.getElementById("activarLink");
           hint.hidden = false;
           link.href = p.activar_url;
           document.getElementById("loginSub").textContent =
-            "Si es la primera vez, active el taller con la clave KT1. Luego entre con usuario y clave.";
+            "Primera vez: active el taller con la clave KT1. Luego entre con usuario y clave.";
         }
       } catch (_) {}
     }
 
-    const pathCode = tenantCodeFromPath();
-    applyBranding(pathCode);
-    if (localStorage.getItem("tp_token")) location.href = "/";
-    refreshProduct();
+    (async function bootLogin() {
+      const pathCode = tenantCodeFromPath();
+      if (localStorage.getItem("tp_token")) {
+        location.href = "/";
+        return;
+      }
+      if (pathCode) showLicense(false);
+      await applyBranding(pathCode);
+      await refreshProduct();
+    })();
 
     const deviceId = () => {
       let id = localStorage.getItem("tp_device_id");
@@ -175,7 +189,13 @@
         });
         const data = await res.json();
         if (res.status === 402) {
-          showLicense(true);
+          const code = tenantCodeFromPath() || tenant_code;
+          if (code) {
+            document.getElementById("activarHint").hidden = false;
+            document.getElementById("activarLink").href = `/acceso/${code}/activar`;
+          } else {
+            showLicense(true);
+          }
           throw new Error(data.detail || "Active la licencia para trabajar");
         }
         if (!res.ok) throw new Error(data.detail || "No se pudo entrar");
