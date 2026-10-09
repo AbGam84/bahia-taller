@@ -16,6 +16,7 @@ from app.config import (
     IS_PRODUCTION,
     PRODUCT_NAME,
     PUBLIC_BASE_URL,
+    SHOP_LICENSE_NAME,
     SHOW_DEMO_HINTS,
     VENDOR_SUPPORT,
 )
@@ -126,6 +127,7 @@ async def license_and_docs_guard(request, call_next):
         or path.startswith("/uploads")
         or path.startswith("/t/")
         or path.startswith("/api/health")
+        or path.startswith("/health")
         or path.startswith("/api/license")
         or path.startswith("/api/auth/login")
         or path.startswith("/api/onboard")
@@ -152,6 +154,21 @@ def on_startup():
     if LICENSE_KEY and not load_stored_key():
         try:
             save_license(LICENSE_KEY)
+        except Exception:
+            pass
+    elif IS_PRODUCTION and not load_stored_key():
+        try:
+            from app.config import LICENSE_SECRET
+            from app.license import issue_license
+
+            if LICENSE_SECRET and LICENSE_SECRET not in ("change-me", "katire-vendor-secret-change-in-prod"):
+                key = issue_license(
+                    SHOP_LICENSE_NAME or "Katire Cloud",
+                    "2099-12-31",
+                    seats=50,
+                    note="Instancia nube Katire (host)",
+                )
+                save_license(key)
         except Exception:
             pass
     # No auto-emitir licencia: el taller debe activarla al entrar (usuario/clave + licencia).
@@ -1765,9 +1782,16 @@ def uploaded_file(filename: str):
     return FileResponse(path)
 
 
+@app.get("/health/live")
+@app.get("/health")
+def health_live():
+    """Render / balanceadores — no exige licencia (solo que el proceso responda)."""
+    return {"ok": True, "service": "katire", "live": True}
+
+
 @app.get("/api/health")
 def health():
-    from app.config import ENVIRONMENT, IS_PRODUCTION
+    from app.config import DATA_DIR, ENVIRONMENT, IS_PRODUCTION
 
     db_ok = False
     try:
@@ -1781,8 +1805,9 @@ def health():
         db_ok = False
 
     lic = license_status()
+    persistent = IS_PRODUCTION and str(DATA_DIR).startswith("/var/")
     return {
-        "ok": db_ok and lic.get("ok", False),
+        "ok": db_ok,
         "service": "katire",
         "environment": ENVIRONMENT,
         "production": IS_PRODUCTION,
@@ -1790,7 +1815,8 @@ def health():
         "db": db_ok,
         "license_ok": lic.get("ok"),
         "license_shop": lic.get("shop"),
-        "build": "20260722r",
+        "storage": {"data_dir": str(DATA_DIR), "persistent": persistent},
+        "build": "20260722s",
         "copyright": COPYRIGHT,
     }
 

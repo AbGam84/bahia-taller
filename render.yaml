@@ -1,24 +1,42 @@
-# Katire — nube 24/7 (no depende de su PC)
-# https://dashboard.render.com/blueprints/new?repo=https://github.com/AbGam84/bahia-taller
+# Katire — nube 24/7 (clientes no dependen de su PC)
+# Blueprint: https://dashboard.render.com/blueprints/new?repo=https://github.com/AbGam84/bahia-taller
 services:
   - type: web
     name: katire
     runtime: python
-    plan: free
+    plan: starter
     region: oregon
-    buildCommand: pip install -r requirements.txt
+    branch: main
+    runtimeVersion: "3.12.8"
+    buildCommand: pip install -r requirements.txt && python -c "from app.main import app"
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /api/health
+    healthCheckPath: /health/live
+    disk:
+      name: katire-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
+      - key: PYTHONPATH
+        value: .
       - key: ENVIRONMENT
         value: production
       - key: BAHIA_DATA_DIR
-        value: /tmp/katire-data
+        value: /var/data
       - key: BAHIA_SECRET_KEY
+        generateValue: true
+      - key: KATIRE_LICENSE_SECRET
         generateValue: true
       - key: BAHIA_ADMIN_USER
         value: admin
       - key: BAHIA_ADMIN_PASSWORD
-        value: "DuenoKatire2026"
-      - key: PYTHON_VERSION
-        value: "3.12.8"
+        value: DuenoKatire2026
+      - key: KATIRE_VENDOR_USER
+        value: katire
+      - key: KATIRE_VENDOR_PASSWORD
+        value: KatireVendor2026
+      - key: KATIRE_DEMO_USER
+        value: cliente
+      - key: KATIRE_DEMO_PASSWORD
+        value: VerKatire2026
+      - key: PUBLIC_BASE_URL
+        value: https://katire.onrender.com

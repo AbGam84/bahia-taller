@@ -1,0 +1,24 @@
+KATIRE — ACCESO NUBE (24/7 · HTTPS · datos en disco Render)
+
+Taller (cliente final):
+  https://katire.onrender.com/login
+  Demo: cliente / VerKatire2026
+  Admin taller: admin / DuenoKatire2026
+
+Panel VENDOR (crear licencia / cliente nuevo):
+  https://katire.onrender.com/vendor
+  Usuario: katire
+  Clave:   KatireVendor2026
+
+Activación con clave emitida:
+  https://katire.onrender.com/activar
+
+Salud (monitoreo):
+  https://katire.onrender.com/health/live
+  https://katire.onrender.com/api/health
+
+IMPORTANTE:
+• Plan Render con disco /var/data — inventario, OT y licencias sobreviven reinicios.
+• Primera carga tras inactividad: 40–90 s (plan Render); espere y F5.
+• Cambie claves vendor/admin en Render → Environment antes de producción real.
+• Publique código: Publicar-En-La-Nube.bat o git push origin main
