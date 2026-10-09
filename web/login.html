@@ -4,14 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Katire — acceso licenciado</title>
-  <link rel="stylesheet" href="/static/css/app.css?v=20260722r" />
+  <link rel="stylesheet" href="/static/css/app.css?v=20260722s" />
 </head>
 <body class="login-page">
   <section class="login-hero" aria-label="Katire">
     <div class="login-hero-top">Software licenciado · Costa Rica</div>
     <div class="login-hero-copy">
-      <img src="/static/brand/logo.png?v=20260722q" alt="Katire" style="width:min(120px,28vw);margin-bottom:18px;border-radius:22px;box-shadow:0 18px 50px rgba(0,0,0,0.45)" />
-      <h1 class="wordmark" id="heroTitle"><span class="k">K</span><span class="rest">atire</span></h1>
+      <img id="heroClientLogo" class="login-client-logo login-client-logo--hero" src="/static/brand/logo.png?v=20260722q" alt="Katire" />
+      <h1 class="wordmark" id="heroKatireWordmark"><span class="k">K</span><span class="rest">atire</span></h1>
       <p style="font-weight:800;letter-spacing:0.04em;margin:8px 0 0;color:var(--foam)" id="heroShop">Para talleres</p>
       <p id="heroTag">De la llave al XML.</p>
       <p style="margin-top:16px;font-size:0.78rem;color:rgba(247,241,234,0.55);max-width:32ch;line-height:1.45" id="copyLine">
@@ -22,7 +22,10 @@
 
   <section class="login-panel">
     <div class="login-card">
-      <p class="kicker">Katire OS</p>
+      <div class="login-card-brand" id="panelBrand" hidden>
+        <img id="panelClientLogo" class="login-client-logo login-client-logo--panel" src="" alt="" />
+      </div>
+      <p class="kicker" id="loginKicker">Katire OS</p>
       <h2 id="loginTitle">Entrar al taller</h2>
       <p class="sub" id="loginSub">Usuario y clave. Para trabajar el sistema debe activar su licencia Katire.</p>
       <p class="hint" id="activarHint" hidden style="margin-bottom:12px"><a id="activarLink" href="/activar">Primera vez — activar taller con la clave KT1</a></p>
@@ -111,8 +114,22 @@
           document.getElementById("heroShop").textContent = p.shop_name || p.name;
           document.getElementById("loginTitle").textContent = `Entrar · ${p.shop_name || p.name}`;
           if (p.logo_url) {
-            const img = document.querySelector(".login-hero-copy img");
-            if (img) img.src = p.logo_url + "?t=" + Date.now();
+            const bust = "?t=" + Date.now();
+            const hero = document.getElementById("heroClientLogo");
+            const panel = document.getElementById("panelClientLogo");
+            const name = p.shop_name || p.name || "";
+            if (hero) {
+              hero.src = p.logo_url + bust;
+              hero.alt = name;
+            }
+            if (panel) {
+              panel.src = p.logo_url + bust;
+              panel.alt = name;
+            }
+            document.getElementById("panelBrand").hidden = false;
+            document.body.classList.add("login-branded");
+            const kick = document.getElementById("loginKicker");
+            if (kick) kick.textContent = name || "Su taller";
           }
         }
         showLicense(false);

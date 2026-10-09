@@ -116,6 +116,70 @@ img { max-width: 100%; display: block; }
   animation: riseIn 0.7s ease both;
 }
 
+.login-client-logo--hero {
+  width: min(120px, 28vw);
+  max-height: 120px;
+  object-fit: contain;
+  margin-bottom: 18px;
+  border-radius: 18px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px;
+}
+
+.login-branded .login-client-logo--hero {
+  width: min(320px, 52vw);
+  max-height: 200px;
+  margin-bottom: 22px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.55);
+}
+
+.login-branded .login-hero-copy {
+  max-width: min(420px, 92vw);
+}
+
+.login-branded .login-hero-copy .wordmark {
+  display: none;
+}
+
+.login-branded #heroShop {
+  font-family: var(--display);
+  font-size: clamp(1.65rem, 3.5vw, 2.15rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  max-width: 18ch;
+  line-height: 1.15;
+}
+
+.login-card-brand {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.login-client-logo--panel {
+  width: min(240px, 78vw);
+  max-height: 110px;
+  object-fit: contain;
+  margin: 0 auto;
+  display: block;
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.login-branded .login-card .kicker {
+  text-align: center;
+  color: var(--ember);
+}
+
+.login-branded .login-card h2 {
+  text-align: center;
+}
+
 .login-hero-copy .wordmark {
   margin: 0;
   font-family: var(--display);
