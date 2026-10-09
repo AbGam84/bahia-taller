@@ -18,7 +18,7 @@ DEFAULT_SHOPS = [
         "email": "mercadeo@repuestosgigante.com",
         "city": "Costa Rica",
         "website": "https://repuestosgigante.com/",
-        "search_url": "https://repuestosgigante.com/?s={q}",
+        "search_url": "https://www.google.com/search?q=site:repuestosgigante.com+{q}",
         "specialty": "Repuestos Toyota, Nissan, Hyundai, Suzuki, Kia",
         "notes": "Sucursales en todo el país · Liberia/Nicoya disponibles",
     },
@@ -30,7 +30,7 @@ DEFAULT_SHOPS = [
         "email": "info@laguaca.cr",
         "city": "Costa Rica",
         "website": "https://laguacaenlinea.cr/",
-        "search_url": "https://laguacaenlinea.cr/?s={q}",
+        "search_url": "https://laguacaenlinea.cr/index.php?route=product/search&search={q}",
         "specialty": "Repuestos nuevos y usados · 17 sucursales",
         "notes": "Incluye Liberia y Santa Cruz",
     },
@@ -65,6 +65,7 @@ def ensure_default_shops(db: Session, tenant_id: int | None = None) -> None:
     from app.tenancy import ensure_default_tenant
 
     tid = tenant_id or ensure_default_tenant(db).id
+    sync_keys = ("search_url", "website", "whatsapp", "phone", "email", "specialty", "notes", "city")
     for row in DEFAULT_SHOPS:
         existing = (
             db.query(Supplier).filter(Supplier.name == row["name"], Supplier.tenant_id == tid).first()
@@ -72,6 +73,9 @@ def ensure_default_shops(db: Session, tenant_id: int | None = None) -> None:
         if existing:
             for key, value in row.items():
                 if key == "name":
+                    continue
+                if key in sync_keys:
+                    setattr(existing, key, value)
                     continue
                 current = getattr(existing, key, None)
                 if current in (None, "", "tienda") or (key != "kind" and not current):
@@ -81,6 +85,14 @@ def ensure_default_shops(db: Session, tenant_id: int | None = None) -> None:
         else:
             db.add(Supplier(tenant_id=tid, **row))
     db.commit()
+
+
+def ensure_shops_for_all_tenants(db: Session) -> None:
+    """Gigante / Guacamaya en cada taller activo (FyJ, Autorespuesto, etc.)."""
+    from app.models import Tenant
+
+    for tenant in db.query(Tenant).filter(Tenant.active.is_(True)).all():
+        ensure_default_shops(db, tenant.id)
 
 
 def shop_dict(s: Supplier) -> dict:
@@ -99,9 +111,12 @@ def shop_dict(s: Supplier) -> dict:
     }
 
 
-def build_search_link(shop: Supplier, query: str) -> str:
-    q = (query or "").strip()
-    if shop.search_url and "{q}" in shop.search_url and q:
+def build_search_link(shop: Supplier, query: str, vehicle: str = "") -> str:
+    parts = [p for p in [(query or "").strip(), (vehicle or "").strip()] if p]
+    q = " ".join(parts)
+    if shop.search_url and "{q}" in shop.search_url:
+        if not q:
+            return shop.website or ""
         return shop.search_url.replace("{q}", quote_plus(q))
     if shop.website:
         return shop.website
@@ -110,14 +125,16 @@ def build_search_link(shop: Supplier, query: str) -> str:
     return ""
 
 
-def build_whatsapp_order(shop: Supplier, query: str, vehicle: str = "") -> str:
+def build_whatsapp_order(shop: Supplier, query: str, vehicle: str = "", from_shop: str = "") -> str:
     digits = "".join(ch for ch in (shop.whatsapp or shop.phone or "") if ch.isdigit())
     if digits and not digits.startswith("506") and len(digits) == 8:
         digits = "506" + digits
     if not digits:
         return ""
-    msg = f"Hola {shop.name}, soy de Autorespuesto. Necesito cotizar: {query}"
-    if vehicle:
-        msg += f" para {vehicle}"
+    who = (from_shop or "el taller").strip()
+    qtext = (query or "repuesto").strip()
+    if vehicle and vehicle.strip() and vehicle.strip().lower() not in qtext.lower():
+        qtext = f"{qtext} ({vehicle.strip()})"
+    msg = f"Hola {shop.name}, soy de {who}. Necesito cotizar: {qtext}"
     msg += ". ¿Tienen disponibilidad y precio?"
     return f"https://wa.me/{digits}?text={quote_plus(msg)}"

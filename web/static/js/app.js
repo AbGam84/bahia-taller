@@ -1485,25 +1485,47 @@ function bindBarcodeScanner() {
   document.getElementById("scanGoBtn")?.addEventListener("click", () => runBarcodeScan());
 }
 
+function hrefAttr(url) {
+  return String(url ?? "").replace(/"/g, "%22");
+}
+
 async function runMarketSearch() {
   const q = document.getElementById("marketQuery")?.value?.trim() || "";
   const vehicle = document.getElementById("marketVehicle")?.value?.trim() || "";
   const box = document.getElementById("marketShops");
   if (!box) return;
+  if (!q) {
+    toast("Escriba el repuesto (ej. pastillas Corolla 2018) y pulse Buscar");
+    box.innerHTML = `<div class="empty-state"><strong>Escriba qué busca</strong>Ej. filtro aceite, amortiguador Hilux, pastillas Yaris</div>`;
+    return;
+  }
+  box.innerHTML = `<div class="empty-state"><strong>Buscando…</strong>Gigante, Guacamaya y sus tiendas</div>`;
   try {
     const data = await api(`/api/parts/market-search?q=${encodeURIComponent(q)}&vehicle=${encodeURIComponent(vehicle)}`);
-    box.innerHTML = (data.shops || [])
-      .map((s) => `<div class="shop-card">
+    const shops = data.shops || [];
+    if (!shops.length) {
+      box.innerHTML = `<div class="empty-state"><strong>Sin tiendas en su taller</strong>Recargue la página o pulse Sumar proveedor</div>`;
+      return;
+    }
+    box.innerHTML = shops
+      .map((s) => {
+        const webBtn = s.search_link
+          ? `<a class="btn btn-primary" href="${hrefAttr(s.search_link)}" target="_blank" rel="noopener noreferrer">Buscar en web</a>`
+          : s.website
+            ? `<a class="btn btn-primary" href="${hrefAttr(s.website)}" target="_blank" rel="noopener noreferrer">Abrir tienda</a>`
+            : "";
+        return `<div class="shop-card">
         <h3>${esc(s.name)}</h3>
         <div class="spec">${esc(s.specialty || s.notes || s.city || "")}</div>
         <div class="muted" style="font-size:0.8rem;margin-bottom:8px">${esc(s.phone || "")} ${s.whatsapp ? "· WA " + esc(s.whatsapp) : ""}</div>
         <div class="row-actions">
-          ${s.search_link ? `<a class="btn btn-primary" href="${esc(s.search_link)}" target="_blank" rel="noopener">Buscar en web</a>` : ""}
-          ${s.whatsapp_link ? `<a class="btn btn-ok" href="${esc(s.whatsapp_link)}" target="_blank" rel="noopener">Pedir por WA</a>` : ""}
-          ${s.website ? `<a class="btn btn-ghost" href="${esc(s.website)}" target="_blank" rel="noopener">Sitio</a>` : ""}
+          ${webBtn}
+          ${s.whatsapp_link ? `<a class="btn btn-ok" href="${hrefAttr(s.whatsapp_link)}" target="_blank" rel="noopener noreferrer">Pedir por WA</a>` : ""}
+          ${s.website ? `<a class="btn btn-ghost" href="${hrefAttr(s.website)}" target="_blank" rel="noopener noreferrer">Sitio</a>` : ""}
         </div>
-      </div>`)
-      .join("") || `<div class="empty-state"><strong>Sin tiendas</strong>Agregue proveedores tipo tienda</div>`;
+      </div>`;
+      })
+      .join("");
   } catch (err) {
     toast(err.message || "No se pudo buscar en tiendas");
   }
@@ -1532,7 +1554,14 @@ async function loadSuppliers() {
       .join("") ||
       `<tr><td colspan="5"><div class="empty-state"><strong>Sin proveedores</strong>Agregue Gigante, Guacamaya u otros</div></td></tr>`
   );
-  runMarketSearch();
+  const mq = document.getElementById("marketQuery");
+  if (mq?.value?.trim()) runMarketSearch();
+  else {
+    const box = document.getElementById("marketShops");
+    if (box) {
+      box.innerHTML = `<div class="empty-state"><strong>Listo para buscar</strong>Escriba el repuesto arriba — abrirá La Guaca en línea y Gigante (catálogo web)</div>`;
+    }
+  }
   setHtml(
     "poBody",
     orders

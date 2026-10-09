@@ -184,6 +184,9 @@ def on_startup():
             from app.bootstrap_clients import ensure_fyj_automotriz_ready
 
             ensure_fyj_automotriz_ready(db)
+            from app.part_shops import ensure_shops_for_all_tenants
+
+            ensure_shops_for_all_tenants(db)
         except Exception:
             pass
     finally:
@@ -1241,22 +1244,30 @@ def parts_market_search(
     user: User = Depends(get_current_user),
 ):
     """Buscar/comprar en tiendas proveedoras (Gigante, Guacamaya, etc.)."""
+    from app.part_shops import ensure_default_shops
     from app.tenancy import tenant_id_of
 
+    tid = tenant_id_of(user)
+    ensure_default_shops(db, tid)
     shops = (
         db.query(Supplier)
-        .filter(Supplier.active.is_(True), Supplier.kind == "tienda", Supplier.tenant_id == tenant_id_of(user))
+        .filter(Supplier.active.is_(True), Supplier.kind == "tienda", Supplier.tenant_id == tid)
         .order_by(Supplier.name)
         .all()
     )
     query = (q or "").strip()
+    veh = (vehicle or "").strip()
+    settings = get_settings(db, tid)
+    shop_label = settings.shop_name or "el taller"
     results = []
     for s in shops:
         item = shop_dict(s)
-        item["search_link"] = build_search_link(s, query)
-        item["whatsapp_link"] = build_whatsapp_order(s, query or "repuesto", vehicle)
+        item["search_link"] = build_search_link(s, query, veh)
+        item["whatsapp_link"] = build_whatsapp_order(
+            s, query or "repuesto", veh, from_shop=shop_label
+        )
         results.append(item)
-    return {"query": query, "vehicle": vehicle, "shops": results}
+    return {"query": query, "vehicle": veh, "shops": results}
 
 
 @app.get("/api/receptions/{reception_id}/diagnosis/print", response_class=HTMLResponse)
@@ -1848,8 +1859,9 @@ def bootstrap_workspace(db: Session = Depends(get_db), user: User = Depends(get_
     """Rellena patio/bodega si está vacío (operación del taller)."""
     from app.seed import ensure_demo_catalog, ensure_demo_workspace
     from app.part_shops import ensure_default_shops
+    from app.tenancy import tenant_id_of
 
-    ensure_default_shops(db)
+    ensure_default_shops(db, tenant_id_of(user))
     ensure_demo_catalog(db)
     ensure_demo_workspace(db)
     return {"ok": True, "message": "Patio, bodega, tiendas y citas listos"}

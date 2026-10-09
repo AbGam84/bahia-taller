@@ -190,6 +190,10 @@ def ensure_fyj_automotriz_ready(db: Session) -> dict:
     if logo_src:
         install_tenant_logo_file(db, tenant, logo_src)
 
+    from app.part_shops import ensure_default_shops
+
+    ensure_default_shops(db, tenant.id)
+
     db.commit()
     db.refresh(tenant)
     paths = tenant_access_paths(FYJ_AUTOMOTRIZ_CODE)
