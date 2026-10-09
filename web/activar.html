@@ -62,6 +62,20 @@
     };
     const params = new URLSearchParams(location.search);
     if (params.get("key")) document.getElementById("licKey").value = params.get("key");
+    const pathParts = (location.pathname || "").split("/").filter(Boolean);
+    const brandedCode = pathParts[0] === "acceso" && pathParts[1] ? pathParts[1].toLowerCase() : "";
+    if (brandedCode) {
+      fetch(`/api/branding/${encodeURIComponent(brandedCode)}/profile`)
+        .then((r) => r.json())
+        .then((p) => {
+          if (p.shop_name) {
+            document.title = `Activar · ${p.shop_name}`;
+            const shopInput = document.querySelector('input[name="shop_name"]');
+            if (shopInput && !shopInput.value) shopInput.value = p.shop_name;
+          }
+        })
+        .catch(() => {});
+    }
 
     document.getElementById("actForm").onsubmit = async (e) => {
       e.preventDefault();
@@ -77,9 +91,12 @@
         document.getElementById("actForm").hidden = true;
         document.getElementById("okBox").hidden = false;
         document.getElementById("okMsg").textContent = data.message || "Activado";
-        document.getElementById("okCode").textContent = data.login_hint?.tenant_code || data.tenant?.code || "";
+        const code = data.login_hint?.tenant_code || data.tenant?.code || "";
+        document.getElementById("okCode").textContent = code;
         document.getElementById("okUser").textContent = data.login_hint?.username || "";
-        localStorage.setItem("tp_tenant_code", data.login_hint?.tenant_code || "");
+        localStorage.setItem("tp_tenant_code", code);
+        const goLogin = document.querySelector("#okBox a.btn-primary");
+        if (goLogin && code) goLogin.href = `/acceso/${code}`;
         toast("Taller creado");
       } catch (err) {
         toast(err.message);

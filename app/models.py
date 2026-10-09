@@ -29,9 +29,10 @@ class Tenant(Base):
     license_key: Mapped[str] = mapped_column(String(500), default="")
     license_fp: Mapped[str] = mapped_column(String(64), default="", index=True)
     seats: Mapped[int] = mapped_column(Integer, default=2)
-    expires: Mapped[str] = mapped_column(String(20), default="")
+    expires: Mapped[str] = mapped_column(String(20), default="")  # pagado hasta YYYY-MM-DD
     logo_filename: Mapped[str] = mapped_column(String(255), default="")
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    monthly_fee_crc: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
@@ -303,11 +304,14 @@ class IssuedLicense(Base):
     shop_name: Mapped[str] = mapped_column(String(160), index=True)
     license_key: Mapped[str] = mapped_column(String(500), unique=True)
     seats: Mapped[int] = mapped_column(Integer, default=2)  # dispositivos
-    expires: Mapped[str] = mapped_column(String(20), default="")  # YYYY-MM-DD
+    expires: Mapped[str] = mapped_column(String(20), default="")  # pagado hasta YYYY-MM-DD
     note: Mapped[str] = mapped_column(Text, default="")
     contact_phone: Mapped[str] = mapped_column(String(40), default="")
     contact_name: Mapped[str] = mapped_column(String(120), default="")
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    monthly_fee_crc: Mapped[int] = mapped_column(Integer, default=58000)
+    paid_months_total: Mapped[int] = mapped_column(Integer, default=0)
+    last_paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 

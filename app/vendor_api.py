@@ -31,6 +31,8 @@ from app.license import (
     save_license,
 )
 from app.models import IssuedLicense, LicenseDevice, Tenant, User
+from app.public_brand import tenant_access_paths
+from app.tenancy import slugify
 
 router = APIRouter(prefix="/api/vendor", tags=["vendor"])
 
@@ -42,12 +44,19 @@ class VendorLoginIn(BaseModel):
 
 class LicenseCreateIn(BaseModel):
     shop_name: str
-    expires: str  # YYYY-MM-DD
+    expires: str = ""  # opcional — si vacío, usa meses_prepago
+    months_prepaid: int = Field(default=1, ge=1, le=36)
     seats: int = Field(default=2, ge=1, le=50)
+    monthly_fee_crc: int = Field(default=58000, ge=0)
     note: str = ""
     contact_name: str = ""
     contact_phone: str = ""
     activate_here: bool = False  # activar en esta instancia
+
+
+class RegisterPaymentIn(BaseModel):
+    months: int = Field(default=1, ge=1, le=36)
+    reference: str = ""
 
 
 class ShopUserIn(BaseModel):
@@ -116,6 +125,10 @@ def vendor_overview(db: Session = Depends(get_db), vendor=Depends(get_vendor)):
                 "shop_name": x.shop_name,
                 "seats": x.seats,
                 "expires": x.expires,
+                "paid_until": x.expires,
+                "monthly_fee_crc": getattr(x, "monthly_fee_crc", 0) or 0,
+                "paid_months_total": getattr(x, "paid_months_total", 0) or 0,
+                "last_paid_at": x.last_paid_at.isoformat() if getattr(x, "last_paid_at", None) else None,
                 "note": x.note,
                 "contact_name": x.contact_name,
                 "contact_phone": x.contact_phone,
@@ -123,7 +136,13 @@ def vendor_overview(db: Session = Depends(get_db), vendor=Depends(get_vendor)):
                 "created_at": x.created_at.isoformat() if x.created_at else None,
                 "key_preview": (x.license_key[:18] + "…") if x.license_key else "",
                 "license_key": x.license_key,
-                "activation_url": f"/activar?key={x.license_key}" if x.license_key else "",
+                "activation_url": (
+                    f"/acceso/{slugify(x.shop_name)}/activar?key={x.license_key}"
+                    if x.license_key
+                    else ""
+                ),
+                "access_url": tenant_access_paths(slugify(x.shop_name))["access_url"],
+                "tenant_code": slugify(x.shop_name),
             }
             for x in licenses
         ],
@@ -155,9 +174,17 @@ def vendor_overview(db: Session = Depends(get_db), vendor=Depends(get_vendor)):
 
 @router.post("/licenses")
 def vendor_create_license(payload: LicenseCreateIn, db: Session = Depends(get_db), vendor=Depends(get_vendor)):
+    from app.subscription import expiry_from_months
+
     seats = payload.seats or DEFAULT_LICENSE_SEATS
+    exp = (payload.expires or "").strip()
+    if not exp:
+        exp = expiry_from_months(payload.months_prepaid)
+    note = (payload.note or "").strip()
+    if "mensual" not in note.lower():
+        note = (note + " · Plan mensual").strip(" ·")
     try:
-        key = issue_license(payload.shop_name, payload.expires, seats=seats, note=payload.note)
+        key = issue_license(payload.shop_name, exp, seats=seats, note=note)
         parse_license(key)  # validate
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -165,10 +192,13 @@ def vendor_create_license(payload: LicenseCreateIn, db: Session = Depends(get_db
         shop_name=payload.shop_name.strip(),
         license_key=key,
         seats=seats,
-        expires=payload.expires,
-        note=payload.note or "",
+        expires=exp,
+        note=note,
         contact_name=payload.contact_name or "",
         contact_phone=payload.contact_phone or "",
+        monthly_fee_crc=int(payload.monthly_fee_crc or 58000),
+        paid_months_total=int(payload.months_prepaid or 1),
+        last_paid_at=datetime.utcnow(),
         active=True,
     )
     db.add(row)
@@ -178,17 +208,51 @@ def vendor_create_license(payload: LicenseCreateIn, db: Session = Depends(get_db
     if payload.activate_here:
         save_license(key)
         activated = True
+    paths = tenant_access_paths(slugify(row.shop_name))
+    branded_activar = f"{paths['activar_url']}?key={key}"
     return {
         "ok": True,
         "id": row.id,
         "shop_name": row.shop_name,
+        "tenant_code": paths["code"],
         "seats": row.seats,
         "expires": row.expires,
+        "paid_until": row.expires,
+        "billing": "monthly",
+        "months_prepaid": row.paid_months_total,
         "license_key": key,
-        "activation_url": f"/activar?key={key}",
+        "activation_url": branded_activar,
+        "access_url": paths["access_url"],
+        "login_url": paths["login_url"],
         "activated_here": activated,
-        "message": "Licencia creada. Envíe el link de activación al taller (crea su usuario y no toca otros clientes).",
+        "message": (
+            f"Licencia mensual creada — pagado hasta {row.expires}. "
+            f"Enlace del taller: {paths['access_url']}"
+        ),
     }
+
+
+@router.post("/licenses/{license_id}/register-payment")
+def vendor_register_payment(
+    license_id: int,
+    payload: RegisterPaymentIn,
+    db: Session = Depends(get_db),
+    vendor=Depends(get_vendor),
+):
+    """Cliente pagó la mensualidad — extiende al instante (taller activo sin esperar)."""
+    from app.subscription import renew_issued_license
+
+    row = db.query(IssuedLicense).filter(IssuedLicense.id == license_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Licencia no encontrada")
+    ref = (payload.reference or "").strip()
+    if ref:
+        row.note = ((row.note or "").strip() + f" · Pago {ref}").strip(" ·")
+    try:
+        out = renew_issued_license(db, row, months=payload.months)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, **out}
 
 
 @router.post("/users")

@@ -5,10 +5,15 @@ Taller (cliente final):
   Demo: cliente / VerKatire2026
   Admin taller: admin / DuenoKatire2026
 
-Panel VENDOR (crear licencia / cliente nuevo):
+Panel VENDOR (crear licencia / cliente nuevo) — NO es /login:
   https://katire.onrender.com/vendor
   Usuario: katire
   Clave:   KatireVendor2026
+
+Cliente FyJ Automotriz (entrada con nombre en la URL):
+  https://katire.onrender.com/acceso/fyj-automotriz
+  Primera vez (activar licencia KT1):
+  https://katire.onrender.com/acceso/fyj-automotriz/activar
 
 Activación con clave emitida:
   https://katire.onrender.com/activar

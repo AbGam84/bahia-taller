@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user, hash_password
 from app.config import DATA_DIR, IS_PRODUCTION
 from app.license import license_fingerprint, license_status, load_stored_key, parse_license
-from app.models import ShopSettings, Tenant, User
+from app.models import IssuedLicense, ShopSettings, Tenant, User
 
 TENANT_UPLOADS = DATA_DIR / "tenants"
 TENANT_UPLOADS.mkdir(parents=True, exist_ok=True)
@@ -187,6 +187,7 @@ def activate_tenant(
         while db.query(Tenant).filter(Tenant.code == code).first():
             code = f"{base}-{n}"
             n += 1
+        issued = db.query(IssuedLicense).filter(IssuedLicense.license_key == license_key.strip()).first()
         tenant = Tenant(
             code=code,
             name=name,
@@ -194,6 +195,7 @@ def activate_tenant(
             license_fp=fp,
             seats=int(data.get("seats") or 2),
             expires=str(data.get("exp") or ""),
+            monthly_fee_crc=int(issued.monthly_fee_crc or 0) if issued else 0,
             active=True,
         )
         db.add(tenant)
@@ -264,6 +266,8 @@ def tenant_dict(t: Tenant) -> dict:
         "name": t.name,
         "seats": t.seats,
         "expires": t.expires,
+        "paid_until": t.expires,
+        "monthly_fee_crc": getattr(t, "monthly_fee_crc", 0) or 0,
         "logo_url": f"/api/branding/{t.code}/logo" if t.logo_filename else "/static/brand/logo.png",
         "active": t.active,
         "created_at": t.created_at.isoformat() if isinstance(t.created_at, datetime) else None,

@@ -11,6 +11,9 @@
     @media (max-width: 900px) { .vendor-grid { grid-template-columns: 1fr; } }
     .key-box { word-break: break-all; font-size: 0.78rem; background: rgba(0,0,0,.35); padding: 10px; border-radius: 10px; }
     .vendor-login { max-width: 420px; margin: 10vh auto; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
+    .badge.ok { background: rgba(18,196,160,.2); color: #12c4a0; }
+    .badge.warn { background: rgba(255,140,26,.2); color: #ff8c1a; }
   </style>
 </head>
 <body>
@@ -41,12 +44,14 @@
 
     <div class="vendor-grid" style="margin-top:16px">
       <div class="panel">
-        <h2>Nueva licencia (taller cliente)</h2>
-        <p class="muted">Por defecto <strong>2 dispositivos</strong> por cliente.</p>
+        <h2>Nueva licencia mensual</h2>
+        <p class="muted">Cobra cada mes. Al registrar el pago en la tabla, el taller queda al día <strong>al instante</strong> (sin reactivar link).</p>
         <form id="licForm" class="form-grid">
           <label class="full">Nombre del taller<input name="shop_name" required placeholder="Ej. Autorespuesto" /></label>
-          <label>Vence (YYYY-MM-DD)<input name="expires" required placeholder="2027-07-21" /></label>
+          <label>Meses pagados al crear<input name="months_prepaid" type="number" min="1" max="36" value="1" required /></label>
+          <label>Cuota mensual (₡)<input name="monthly_fee_crc" type="number" min="0" step="1000" value="58000" /></label>
           <label>Dispositivos<input name="seats" type="number" min="1" max="50" value="2" /></label>
+          <label>Vence manual (opcional)<input name="expires" placeholder="YYYY-MM-DD — dejar vacío = mensual" /></label>
           <label>Contacto<input name="contact_name" /></label>
           <label>WhatsApp<input name="contact_phone" placeholder="+506..." /></label>
           <label class="full">Nota<textarea name="note" rows="2" placeholder="Plan mensual, etc."></textarea></label>
@@ -84,7 +89,7 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Taller</th><th>Disp.</th><th>Vence</th><th>Contacto</th><th>Clave / link</th></tr></thead>
+          <thead><tr><th>Taller</th><th>Cuota</th><th>Pagado hasta</th><th>Estado</th><th>Contacto</th><th>Pago / clave</th></tr></thead>
           <tbody id="licBody"></tbody>
         </table>
       </div>
@@ -132,6 +137,14 @@
       el.classList.add("show");
       setTimeout(() => el.classList.remove("show"), 3200);
     };
+    const todayIso = () => new Date().toISOString().slice(0, 10);
+    const billingBadge = (expires) => {
+      if (!expires) return `<span class="muted">—</span>`;
+      if (expires < todayIso()) return `<span class="badge warn">Vencida</span>`;
+      return `<span class="badge ok">Al día</span>`;
+    };
+    const crc = (n) => "₡" + Number(n || 0).toLocaleString("es-CR");
+
     const tok = () => localStorage.getItem("kv_token");
     const api = async (path, opts = {}) => {
       const headers = Object.assign({}, opts.headers || {});
@@ -160,23 +173,26 @@
         <div class="stat"><div class="label">Dispositivos activos</div><div class="value">${d.devices_active}</div></div>`;
       document.getElementById("licBody").innerHTML = (d.licenses || []).map((x) => `
         <tr>
-          <td><strong>${x.shop_name}</strong><br><span class="muted">${x.note || ""}</span></td>
-          <td>${x.seats}</td>
-          <td>${x.expires}</td>
+          <td><strong>${x.shop_name}</strong><br><span class="muted">${x.seats} disp. · ${x.paid_months_total || 0} mes(es) pagados</span></td>
+          <td>${crc(x.monthly_fee_crc)}/mes</td>
+          <td><strong>${x.paid_until || x.expires || "—"}</strong></td>
+          <td>${billingBadge(x.paid_until || x.expires)}</td>
           <td>${x.contact_name || "—"}<br><span class="muted">${x.contact_phone || ""}</span></td>
           <td>
-            <div class="key-box">${x.license_key || x.key_preview}</div>
-            ${x.activation_url ? `<a href="${x.activation_url}" target="_blank">Link activación</a>` : ""}
+            <button class="btn btn-ok" type="button" data-pay="${x.id}" title="Extiende 1 mes y actualiza el taller en servidor">Cliente pagó +1 mes</button>
+            <div class="key-box" style="margin-top:8px">${x.license_key || x.key_preview}</div>
+            ${x.access_url ? `<a href="${x.access_url}" target="_blank">URL taller</a><br>` : ""}
+            ${x.activation_url ? `<a href="${x.activation_url}" target="_blank">Activar</a>` : ""}
           </td>
-        </tr>`).join("") || `<tr><td colspan="5">Sin licencias aún</td></tr>`;
+        </tr>`).join("") || `<tr><td colspan="6">Sin licencias aún</td></tr>`;
       const tenantBox = document.getElementById("tenantBody");
       if (tenantBox) {
         tenantBox.innerHTML = (d.tenants || []).map((t) => `
           <tr>
             <td><strong>${t.name}</strong><br><code>${t.code}</code></td>
             <td>${t.seats}</td>
-            <td>${t.expires || "—"}</td>
-            <td>${t.active ? "Activo" : "Off"}</td>
+            <td>${t.paid_until || t.expires || "—"}</td>
+            <td>${t.active ? billingBadge(t.paid_until || t.expires) : `<span class="badge warn">Off</span>`}</td>
           </tr>`).join("") || `<tr><td colspan="4">Sin talleres</td></tr>`;
       }      document.getElementById("userBody").innerHTML = (d.users || []).map((u) => `
         <tr>
@@ -191,6 +207,19 @@
           <td>${dev.active ? `<button class="btn btn-warn" data-rev="${dev.id}" type="button">Liberar</button>` : "—"}</td>
         </tr>`).join("") || `<tr><td colspan="4">Ningún dispositivo registrado</td></tr>`;
 
+      document.querySelectorAll("[data-pay]").forEach((btn) => {
+        btn.onclick = async () => {
+          const ref = prompt("Referencia del pago (SINPE, factura…) — opcional:") || "";
+          try {
+            const res = await api(`/api/vendor/licenses/${btn.dataset.pay}/register-payment`, {
+              method: "POST",
+              body: JSON.stringify({ months: 1, reference: ref }),
+            });
+            toast(res.message || "Pago registrado — taller actualizado");
+            loadOverview();
+          } catch (e) { toast(e.message); }
+        };
+      });
       document.querySelectorAll("[data-pw]").forEach((btn) => {
         btn.onclick = async () => {
           const password = prompt("Nueva clave (mín. 6):");
@@ -235,16 +264,22 @@
       const fd = new FormData(e.target);
       const body = Object.fromEntries(fd.entries());
       body.seats = Number(body.seats || 2);
+      body.months_prepaid = Number(body.months_prepaid || 1);
+      body.monthly_fee_crc = Number(body.monthly_fee_crc || 58000);
+      if (!(body.expires || "").trim()) delete body.expires;
       body.activate_here = fd.get("activate_here") === "on";
       try {
         const res = await api("/api/vendor/licenses", { method: "POST", body: JSON.stringify(body) });
         const box = document.getElementById("licResult");
         box.hidden = false;
-        box.innerHTML = `<p><strong>Licencia lista para ${res.shop_name}</strong> · ${res.seats} dispositivos</p>
+        const access = res.access_url || (res.tenant_code ? `/acceso/${res.tenant_code}` : "/login");
+        box.innerHTML = `<p><strong>Licencia mensual — ${res.shop_name}</strong> · pagado hasta <strong>${res.paid_until || res.expires}</strong> · ${res.seats} dispositivos</p>
+          <p><strong>URL del cliente (compartir):</strong><br>
+          <a href="${location.origin}${access}" target="_blank">${location.origin}${access}</a></p>
           <div class="key-box">${res.license_key}</div>
-          <p><strong>Link de instalación:</strong><br>
+          <p><strong>Primera instalación:</strong><br>
           <a href="${location.origin}${res.activation_url}" target="_blank">${location.origin}${res.activation_url}</a></p>
-          <p class="muted">El taller abre el link, crea usuario/clave y queda aislado de los demás clientes.</p>`;
+          <p class="muted">El taller guarda la URL con su nombre. Primera vez: activar → luego entrar con usuario/clave.</p>`;
         toast("Licencia emitida");
         e.target.reset();
         e.target.seats.value = 2;

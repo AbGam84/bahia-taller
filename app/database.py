@@ -89,3 +89,14 @@ def migrate_schema() -> None:
         ):
             if table in tables and "tenant_id" not in col_names(table):
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN tenant_id INTEGER DEFAULT 1"))
+        if "tenants" in tables:
+            if "monthly_fee_crc" not in col_names("tenants"):
+                conn.execute(text("ALTER TABLE tenants ADD COLUMN monthly_fee_crc INTEGER DEFAULT 0"))
+        if "issued_licenses" in tables:
+            ic = col_names("issued_licenses")
+            if "monthly_fee_crc" not in ic:
+                conn.execute(text("ALTER TABLE issued_licenses ADD COLUMN monthly_fee_crc INTEGER DEFAULT 58000"))
+            if "paid_months_total" not in ic:
+                conn.execute(text("ALTER TABLE issued_licenses ADD COLUMN paid_months_total INTEGER DEFAULT 0"))
+            if "last_paid_at" not in ic:
+                conn.execute(text("ALTER TABLE issued_licenses ADD COLUMN last_paid_at DATETIME"))

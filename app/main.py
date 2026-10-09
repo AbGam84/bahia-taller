@@ -135,6 +135,7 @@ async def license_and_docs_guard(request, call_next):
         or path.startswith("/api/vendor")
         or path.startswith("/api/public")
         or path.startswith("/api/product")
+        or path.startswith("/acceso/")
         or path in ("/", "/login", "/admin", "/vendor", "/activar", "/favicon.ico")
     )
     # Ya no bloqueamos toda la API con una sola licencia de instancia:
@@ -178,6 +179,12 @@ def on_startup():
 
         ensure_default_tenant(db)
         seed_if_empty(db)
+        try:
+            from app.bootstrap_clients import ensure_fyj_automotriz_ready
+
+            ensure_fyj_automotriz_ready(db)
+        except Exception:
+            pass
     finally:
         db.close()
 
@@ -2085,8 +2092,18 @@ def login_page():
     return FileResponse(WEB_DIR / "login.html")
 
 
+@app.get("/acceso/{tenant_code}")
+def branded_login_page(tenant_code: str):
+    return FileResponse(WEB_DIR / "login.html")
+
+
 @app.get("/activar")
 def activar_page():
+    return FileResponse(WEB_DIR / "activar.html")
+
+
+@app.get("/acceso/{tenant_code}/activar")
+def branded_activar_page(tenant_code: str):
     return FileResponse(WEB_DIR / "activar.html")
 
 
@@ -2111,6 +2128,13 @@ def onboard_activate(payload: dict, db: Session = Depends(get_db)):
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/branding/{code}/profile")
+def branding_profile(code: str, db: Session = Depends(get_db)):
+    from app.public_brand import public_tenant_profile
+
+    return public_tenant_profile(db, code, public_base=PUBLIC_BASE_URL)
 
 
 @app.get("/api/branding/{code}/logo")
