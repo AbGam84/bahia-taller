@@ -13,6 +13,7 @@ from app.models import (
     Estimate,
     EstimateLine,
     InspectionCheck,
+    Part,
     Reception,
     ServiceCatalog,
     Vehicle,
@@ -24,6 +25,7 @@ from app.services import (
     next_code,
     part_dict,
     reception_dict,
+    vehicle_dict,
     work_order_dict,
 )
 
@@ -355,6 +357,152 @@ def owner_analytics(db: Session, tenant_id: int | None = None) -> dict:
         }
     )
     return base
+
+
+def _score_part_match(p: Part, brand: str, model: str, plate: str) -> int:
+    blob = f"{p.name} {p.brand} {p.compatible_with} {p.category}".lower()
+    score = 0
+    for t in [brand, model, plate]:
+        t = (t or "").strip().lower()
+        if t and t in blob:
+            score += 1
+    return score
+
+
+def parts_reference_by_plate(
+    db: Session,
+    tenant_id: int,
+    plate: str,
+    brand_hint: str = "",
+    model_hint: str = "",
+) -> dict:
+    """Historial de repuestos en OTs de este vehículo + sugerencias de bodega."""
+    plate_norm = (plate or "").upper().strip()
+    empty = {
+        "plate": plate_norm,
+        "found_vehicle": False,
+        "vehicle": None,
+        "visits_count": 0,
+        "history_parts": [],
+        "suggested_parts": [],
+    }
+    if len(plate_norm.replace("-", "")) < 3:
+        return empty
+
+    vehicle = (
+        db.query(Vehicle)
+        .options(joinedload(Vehicle.customer))
+        .join(Customer)
+        .filter(Customer.tenant_id == tenant_id, Vehicle.plate == plate_norm)
+        .first()
+    )
+    if not vehicle:
+        compact = plate_norm.replace("-", "").replace(" ", "")
+        vehicle = (
+            db.query(Vehicle)
+            .options(joinedload(Vehicle.customer))
+            .join(Customer)
+            .filter(
+                Customer.tenant_id == tenant_id,
+                Vehicle.plate.ilike(compact),
+            )
+            .first()
+        )
+
+    brand = (vehicle.brand if vehicle else brand_hint or "").strip()
+    model = (vehicle.model if vehicle else model_hint or "").strip()
+
+    history_parts: list[dict] = []
+    visits_count = 0
+    if vehicle:
+        visits_count = (
+            db.query(Reception)
+            .filter(Reception.vehicle_id == vehicle.id, Reception.tenant_id == tenant_id)
+            .count()
+        )
+        rows = (
+            db.query(WorkOrderLine, Reception, Part)
+            .join(WorkOrder, WorkOrderLine.work_order_id == WorkOrder.id)
+            .join(Reception, WorkOrder.reception_id == Reception.id)
+            .outerjoin(Part, WorkOrderLine.part_id == Part.id)
+            .filter(Reception.vehicle_id == vehicle.id, Reception.tenant_id == tenant_id)
+            .order_by(Reception.created_at.desc())
+            .limit(250)
+            .all()
+        )
+        agg: dict[str, dict] = {}
+        for line, rec, part in rows:
+            desc = (line.description or "").strip()
+            if part:
+                key = f"p{part.id}"
+                name = part.name
+                sku = part.sku
+                part_id = part.id
+                stock_qty = part.stock_qty
+                sale_price = line.unit_price or part.sale_price
+            else:
+                if not desc or desc.lower() in ("repuesto", "pieza"):
+                    continue
+                key = f"d:{desc.lower()}"
+                name = desc
+                sku = ""
+                part_id = None
+                stock_qty = None
+                sale_price = line.unit_price
+            bucket = agg.get(key)
+            used_at = rec.created_at.isoformat() if rec.created_at else None
+            if not bucket:
+                agg[key] = {
+                    "part_id": part_id,
+                    "sku": sku,
+                    "name": name,
+                    "times_used": 1,
+                    "last_used_at": used_at,
+                    "last_reception_code": rec.code,
+                    "last_quantity": line.quantity,
+                    "stock_qty": stock_qty,
+                    "sale_price": sale_price,
+                }
+            else:
+                bucket["times_used"] += 1
+        history_parts = sorted(
+            agg.values(),
+            key=lambda x: (-x["times_used"], x.get("last_used_at") or ""),
+        )[:25]
+
+    parts = (
+        db.query(Part)
+        .options(joinedload(Part.preferred_supplier))
+        .filter(Part.active.is_(True), Part.tenant_id == tenant_id)
+        .order_by(Part.name)
+        .limit(400)
+        .all()
+    )
+    suggested: list[dict] = []
+    history_ids = {h["part_id"] for h in history_parts if h.get("part_id")}
+    for p in parts:
+        score = _score_part_match(p, brand, model, plate_norm)
+        if p.id in history_ids:
+            score += 2
+        if not brand and not model:
+            continue
+        if score <= 0:
+            continue
+        item = part_dict(p)
+        item["match_score"] = score
+        item["source"] = "bodega"
+        suggested.append(item)
+    suggested.sort(key=lambda x: (-x["match_score"], x["name"]))
+    suggested = suggested[:20]
+
+    result = dict(empty)
+    result["plate"] = plate_norm
+    result["found_vehicle"] = vehicle is not None
+    result["vehicle"] = vehicle_dict(vehicle) if vehicle else None
+    result["visits_count"] = visits_count
+    result["history_parts"] = history_parts
+    result["suggested_parts"] = suggested
+    return result
 
 
 def vehicle_history(db: Session, vehicle_id: int) -> list[dict]:

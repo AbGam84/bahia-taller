@@ -31,6 +31,7 @@ from app.pro import (
     owner_analytics,
     public_payload,
     seed_inspection,
+    parts_reference_by_plate,
     vehicle_history,
 )
 from app.models import (
@@ -1687,6 +1688,20 @@ def add_service_to_wo(
 @app.get("/api/vehicles/{vehicle_id}/history")
 def vehicle_history_api(vehicle_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     return vehicle_history(db, vehicle_id)
+
+
+@app.get("/api/plates/{plate}/parts-reference")
+def plate_parts_reference(
+    plate: str,
+    brand: str = "",
+    model: str = "",
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Al ingresar placa: repuestos usados antes en este carro y stock compatible."""
+    from app.tenancy import tenant_id_of
+
+    return parts_reference_by_plate(db, tenant_id_of(user), plate, brand, model)
 
 
 @app.get("/api/appointments")

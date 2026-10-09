@@ -434,6 +434,182 @@ function initIntakeVehicleOptions() {
   });
 }
 
+let platePartsLookupTimer = null;
+let platePartsLookupSeq = 0;
+
+function setSelectValue(selectEl, value) {
+  if (!selectEl || !value) return false;
+  const v = String(value).trim();
+  for (const opt of selectEl.options) {
+    if (opt.value === v || opt.textContent === v) {
+      selectEl.value = opt.value;
+      return true;
+    }
+  }
+  return false;
+}
+
+function applyVehicleHintsFromPlateRef(data) {
+  const form = document.getElementById("receptionForm");
+  const v = data?.vehicle;
+  if (!form || !v) return;
+  const cust = v.customer || {};
+  const nameIn = form.querySelector('[name="customer_name"]');
+  const phoneIn = form.querySelector('[name="customer_phone"]');
+  const idIn = form.querySelector('[name="customer_id_number"]');
+  if (nameIn && !nameIn.value.trim() && cust.name) nameIn.value = cust.name;
+  if (phoneIn && !phoneIn.value.trim() && cust.phone) phoneIn.value = cust.phone;
+  if (idIn && !idIn.value.trim() && cust.id_number) idIn.value = cust.id_number;
+
+  const brand = document.getElementById("intakeBrand");
+  const model = document.getElementById("intakeModel");
+  const modelOther = document.getElementById("intakeModelOther");
+  const year = document.getElementById("intakeYear");
+  const color = document.getElementById("intakeColor");
+  if (brand && v.brand && !brand.value) {
+    if (setSelectValue(brand, v.brand)) {
+      brand.dispatchEvent(new Event("change"));
+    }
+  }
+  if (model && v.model) {
+    const ok = setSelectValue(model, v.model);
+    if (!ok && modelOther) {
+      modelOther.style.display = "block";
+      modelOther.required = true;
+      modelOther.value = v.model;
+      if ([...model.options].some((o) => o.value === "Otro")) model.value = "Otro";
+    }
+  }
+  if (year && v.year && !year.value) setSelectValue(year, String(v.year));
+  if (color && v.color && !color.value) setSelectValue(color, v.color);
+}
+
+function renderPlatePartsReference(data) {
+  const box = document.getElementById("platePartsRefBox");
+  const meta = document.getElementById("platePartsRefMeta");
+  const body = document.getElementById("platePartsRefBody");
+  if (!box || !meta || !body) return;
+
+  const plate = data?.plate || "";
+  const hist = data?.history_parts || [];
+  const sugg = data?.suggested_parts || [];
+  if (!plate || (!hist.length && !sugg.length && !data?.found_vehicle)) {
+    box.hidden = true;
+    body.innerHTML = "";
+    return;
+  }
+  box.hidden = false;
+  const v = data.vehicle;
+  if (data.found_vehicle && v) {
+    meta.textContent = `${v.brand} ${v.model}${v.year ? ` · ${v.year}` : ""} · ${data.visits_count || 0} visita(s) en este taller`;
+  } else if (sugg.length) {
+    meta.textContent = "Placa nueva aquí — sugerencias según marca/modelo y bodega";
+  } else {
+    meta.textContent = "Sin repuestos previos registrados para esta placa";
+  }
+
+  if (!hist.length && !sugg.length) {
+    body.innerHTML = `<p class="muted" style="margin:0;font-size:0.85rem">Este vehículo ya estuvo en el taller; cuando use repuestos en OT quedarán listados aquí.</p>`;
+    return;
+  }
+
+  const rowHist = hist
+    .map((h) => {
+      const stock =
+        h.stock_qty == null
+          ? "—"
+          : h.stock_qty <= 0
+            ? `<span class="badge badge-low">sin stock</span>`
+            : `<span class="badge badge-ok">${h.stock_qty}</span>`;
+      return `<tr>
+        <td><strong>${esc(h.name)}</strong>${h.sku ? `<br><span class="muted">${esc(h.sku)}</span>` : ""}</td>
+        <td>${h.times_used}×</td>
+        <td>${stock}</td>
+        <td class="money">${h.sale_price ? money(h.sale_price) : "—"}</td>
+        <td><span class="muted">${esc(h.last_reception_code || "")}</span></td>
+      </tr>`;
+    })
+    .join("");
+
+  const rowSugg = sugg
+    .slice(0, 12)
+    .map(
+      (p) => `<tr>
+        <td><strong>${esc(p.name)}</strong><br><span class="muted">${esc(p.sku)} · ${esc(p.location || "—")}</span></td>
+        <td>${p.low_stock || p.stock_qty <= 0 ? `<span class="badge badge-low">${p.stock_qty}</span>` : `<span class="badge badge-ok">${p.stock_qty}</span>`}</td>
+        <td class="money">${money(p.sale_price)}</td>
+      </tr>`
+    )
+    .join("");
+
+  body.innerHTML = `
+    ${
+      hist.length
+        ? `<p style="margin:0 0 6px;font-size:0.82rem"><strong>Ya usó en este carro</strong></p>
+    <div class="table-wrap" style="margin-bottom:12px">
+      <table><thead><tr><th>Repuesto</th><th>Veces</th><th>Stock</th><th>Precio</th><th>Última OT</th></tr></thead>
+      <tbody>${rowHist}</tbody></table>
+    </div>`
+        : ""
+    }
+    ${
+      sugg.length
+        ? `<p style="margin:0 0 6px;font-size:0.82rem"><strong>En bodega (compatible)</strong></p>
+    <div class="table-wrap">
+      <table><thead><tr><th>Repuesto</th><th>Stock</th><th>Precio</th></tr></thead>
+      <tbody>${rowSugg}</tbody></table>
+    </div>`
+        : ""
+    }`;
+}
+
+async function fetchPlatePartsReference() {
+  const plateIn = document.getElementById("intakePlate");
+  const brand = document.getElementById("intakeBrand");
+  const model = document.getElementById("intakeModel");
+  const modelOther = document.getElementById("intakeModelOther");
+  if (!plateIn) return;
+  const plate = String(plateIn.value || "")
+    .toUpperCase()
+    .trim();
+  if (plate.replace(/[-\s]/g, "").length < 3) {
+    renderPlatePartsReference(null);
+    return;
+  }
+  const modelVal =
+    model?.value === "Otro" ? String(modelOther?.value || "").trim() : String(model?.value || "").trim();
+  const seq = ++platePartsLookupSeq;
+  try {
+    const q = new URLSearchParams();
+    if (brand?.value) q.set("brand", brand.value);
+    if (modelVal) q.set("model", modelVal);
+    const data = await api(`/api/plates/${encodeURIComponent(plate)}/parts-reference?${q.toString()}`);
+    if (seq !== platePartsLookupSeq) return;
+    applyVehicleHintsFromPlateRef(data);
+    renderPlatePartsReference(data);
+  } catch (err) {
+    if (seq !== platePartsLookupSeq) return;
+    renderPlatePartsReference(null);
+    console.warn("parts-reference", err);
+  }
+}
+
+function schedulePlatePartsReference() {
+  clearTimeout(platePartsLookupTimer);
+  platePartsLookupTimer = setTimeout(() => fetchPlatePartsReference(), 450);
+}
+
+function initPlatePartsReference() {
+  const plateIn = document.getElementById("intakePlate");
+  if (!plateIn || plateIn.dataset.bound === "1") return;
+  plateIn.dataset.bound = "1";
+  plateIn.addEventListener("input", schedulePlatePartsReference);
+  plateIn.addEventListener("blur", () => fetchPlatePartsReference());
+  ["intakeBrand", "intakeModel", "intakeModelOther"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("change", schedulePlatePartsReference);
+  });
+}
+
 function renderPhotoPreviews() {
   const grid = document.getElementById("photoPreviewGrid");
   if (!grid) return;
@@ -2203,6 +2379,7 @@ function bindUI() {
   };
   safeInit(initZones, "Zonas");
   safeInit(initIntakeVehicleOptions, "Marcas");
+  safeInit(initPlatePartsReference, "Referencia placa");
   safeInit(initArrivalPhotos, "Fotos");
   safeInit(initSignaturePad, "Firma");
   loadSettings().catch((err) => toast(err.message || "No se pudo cargar identidad"));

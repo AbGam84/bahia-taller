@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Katire — taller + factura electrónica CR</title>
-  <link rel="stylesheet" href="/static/css/app.css?v=20260722p" />
+  <link rel="stylesheet" href="/static/css/app.css?v=20260722q" />
 </head>
 <body>
   <div class="app-shell">
@@ -147,8 +147,15 @@
                 <input name="received_by" id="receivedBy" />
               </label>
               <label>Placa
-                <input name="plate" required placeholder="GAA-123" style="text-transform:uppercase" />
+                <input name="plate" id="intakePlate" required placeholder="GAA-123" style="text-transform:uppercase" autocomplete="off" />
               </label>
+              <div class="full" id="platePartsRefBox" hidden>
+                <div class="panel" style="margin:0;padding:12px 14px;border:1px solid var(--line);background:rgba(0,0,0,0.12)">
+                  <strong style="font-size:0.9rem">Referencia de repuestos</strong>
+                  <p id="platePartsRefMeta" class="muted" style="margin:6px 0 10px;font-size:0.82rem"></p>
+                  <div id="platePartsRefBody"></div>
+                </div>
+              </div>
               <label>Marca
                 <select name="brand" id="intakeBrand" required>
                   <option value="">Seleccione marca…</option>
@@ -597,7 +604,7 @@
       }
     })();
   </script>
-  <script src="/static/js/app.js?v=20260722p"></script>
+  <script src="/static/js/app.js?v=20260722q"></script>
   <script src="/static/js/ficha.js?v=20260722p"></script>
   <script src="/static/js/taller-dvi.js?v=20260722p"></script>
 </body>
