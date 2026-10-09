@@ -1703,6 +1703,8 @@ async function loadFichaByPlate() {
   if (brand) params.set("brand", brand);
   if (model) params.set("model", model);
   if (year) params.set("year", year);
+  const q = document.getElementById("consultaQuery")?.value?.trim() || "";
+  if (q) params.set("q", q);
   const btn = document.getElementById("consultaPlateOnlyBtn");
   try {
     if (btn) {
