@@ -1893,6 +1893,8 @@ def health():
         db_ok = False
 
     lic = license_status()
+    from app.cr_registry_client import registry_status
+
     persistent = IS_PRODUCTION and str(DATA_DIR).startswith("/var/")
     return {
         "ok": db_ok,
@@ -1904,7 +1906,8 @@ def health():
         "license_ok": lic.get("ok"),
         "license_shop": lic.get("shop"),
         "storage": {"data_dir": str(DATA_DIR), "persistent": persistent},
-        "build": "20260722s",
+        "build": "20261010c",
+        "cr_registry": registry_status(),
         "copyright": COPYRIGHT,
     }
 

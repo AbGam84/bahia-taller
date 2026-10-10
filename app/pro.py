@@ -421,18 +421,17 @@ def parts_reference_by_plate(
     if not vehicle:
         hints_complete = bool(brand_hint.strip() and model_hint.strip() and year_from_hint)
         if not hints_complete:
-            from app.cr_registry_client import lookup_vehicle_by_plate, registry_configured
+            from app.cr_registry_client import lookup_vehicle_by_plate
 
-            if registry_configured():
-                reg = lookup_vehicle_by_plate(plate_norm)
-                if reg.get("ok") and reg.get("found"):
-                    registry_vehicle = reg
-                    if not brand:
-                        brand = (reg.get("brand") or "").strip()
-                    if not model:
-                        model = (reg.get("model") or reg.get("model_full") or "").strip()
-                    if not year_from_hint and reg.get("year"):
-                        year_from_hint = str(reg.get("year"))
+            reg = lookup_vehicle_by_plate(plate_norm)
+            if reg.get("ok") and reg.get("found"):
+                registry_vehicle = reg
+                if not brand:
+                    brand = (reg.get("brand") or "").strip()
+                if not model:
+                    model = (reg.get("model") or reg.get("model_full") or "").strip()
+                if not year_from_hint and reg.get("year"):
+                    year_from_hint = str(reg.get("year"))
 
     history_parts: list[dict] = []
     visits_count = 0
@@ -538,9 +537,10 @@ def parts_reference_by_plate(
         y = 0
     result["registry_vehicle"] = registry_vehicle
     result["cr_registry"] = registry_vehicle
-    from app.cr_registry_client import registry_configured
+    from app.cr_registry_client import plate_lookup_enabled, registry_configured
 
-    result["cr_registry_available"] = registry_configured()
+    result["cr_registry_available"] = plate_lookup_enabled()
+    result["cr_registry_live"] = registry_configured()
     result["vehicle_identity"] = vehicle_identity_payload(
         plate_norm,
         vehicle=vdict,

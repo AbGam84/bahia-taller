@@ -1,6 +1,13 @@
 """Pruebas locales del cliente Registro CR (sin red)."""
 
-from app.cr_registry_client import _split_plate_for_api, _title_model, _vehicle_only_payload
+import os
+
+from app.cr_registry_client import (
+    _split_plate_for_api,
+    _title_model,
+    _vehicle_only_payload,
+    lookup_vehicle_by_plate,
+)
 
 
 def test_split_plate_cl_prefix():
@@ -31,3 +38,14 @@ def test_vehicle_only_payload_strips_owner_block():
     assert out["model"] == "Corolla"
     assert out["year"] == "2018"
     assert "NO DEBE" not in str(out)
+
+
+def test_demo_plate_without_api_key(monkeypatch):
+    monkeypatch.delenv("RNP_API_KEY", raising=False)
+    from app import config
+
+    monkeypatch.setattr(config, "RNP_API_KEY", "")
+    out = lookup_vehicle_by_plate("DEMO003", use_cache=False)
+    assert out.get("ok") is True
+    assert out.get("model") == "Corolla"
+    assert out.get("demo") is True

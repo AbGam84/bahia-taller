@@ -19,19 +19,90 @@ from app.config import RNP_API_BASE, RNP_API_KEY, RNP_PLATE_CLASS
 _CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _CACHE_TTL_SEC = 86_400
 
+# Placas de prueba egobytes — funcionan sin RNP_API_KEY (demostración en taller).
+_DEMO_VEHICLES: dict[str, dict[str, Any]] = {
+    "DEMO001": {
+        "brand": "TOYOTA",
+        "model_full": "COROLLA XLI",
+        "year": "2015",
+        "color": "Gris",
+        "vin": "JTDBT923000DEMO001",
+        "fuel": "GASOLINA",
+        "engine_displacement": "1800 C.C",
+    },
+    "DEMO002": {
+        "brand": "NISSAN",
+        "model_full": "SENTRA EX",
+        "year": "2017",
+        "color": "Blanco",
+        "vin": "3N1AB7AP0HYDEMO002",
+        "fuel": "GASOLINA",
+        "engine_displacement": "1600 C.C",
+    },
+    "DEMO003": {
+        "brand": "TOYOTA",
+        "model_full": "COROLLA XLI",
+        "year": "2018",
+        "color": "Blanco",
+        "vin": "JTDBT923000DEMO003",
+        "fuel": "GASOLINA",
+        "engine_displacement": "1800 C.C",
+    },
+    "DEMO004": {
+        "brand": "HONDA",
+        "model_full": "CB190R",
+        "year": "2020",
+        "color": "Rojo",
+        "vin": "9C2MDEMO004000001",
+        "fuel": "GASOLINA",
+        "engine_displacement": "190 C.C",
+    },
+}
+
 
 def registry_configured() -> bool:
     return bool(RNP_API_KEY)
+
+
+def plate_lookup_enabled() -> bool:
+    """Hay lookup por placa (demo local o Registro con clave)."""
+    return registry_configured() or bool(_DEMO_VEHICLES)
+
+
+def _demo_lookup(plate: str) -> dict[str, Any] | None:
+    key = _norm_plate(plate)
+    row = _DEMO_VEHICLES.get(key)
+    if not row:
+        return None
+    return {
+        "ok": True,
+        "found": True,
+        "brand": row["brand"],
+        "model": _title_model(row["model_full"]),
+        "model_full": row["model_full"],
+        "year": str(row["year"]),
+        "color": row.get("color") or "",
+        "vin": (row.get("vin") or "").upper(),
+        "fuel": row.get("fuel") or "",
+        "engine_displacement": row.get("engine_displacement") or "",
+        "engine_number": "",
+        "provider": "demo_registro_cr",
+        "owner_stored": False,
+        "demo": True,
+    }
 
 
 def registry_status() -> dict:
     if not registry_configured():
         return {
             "configured": False,
-            "provider": "registro_nacional_cr_api",
+            "connected": True,
+            "demo_mode": True,
+            "demo_plates": sorted(_DEMO_VEHICLES.keys()),
+            "provider": "demo_registro_cr",
             "message": (
-                "Agregue RNP_API_KEY en el servidor (Registro Nacional CR API — egobytes). "
-                "Prueba gratis: placas DEMO001–DEMO004."
+                "Modo demo: use placas DEMO001–DEMO004 para ver OEM por placa. "
+                "Para placas reales agregue RNP_API_KEY (Registro Nacional CR API — egobytes)."
             ),
         }
     probe = lookup_vehicle_by_plate("DEMO003", use_cache=False)
@@ -123,8 +194,16 @@ def lookup_vehicle_by_plate(plate: str, *, use_cache: bool = True) -> dict[str, 
         "provider": "registro_nacional_cr_api",
         "message": "",
     }
+    demo = _demo_lookup(plate)
+    if demo:
+        cache_key = f"demo:{_norm_plate(plate)}"
+        _CACHE[cache_key] = (time.time(), demo)
+        return demo
+
     if not registry_configured():
-        empty["message"] = "RNP_API_KEY no configurada"
+        empty["message"] = (
+            "Placa no demo. Configure RNP_API_KEY en Render o use DEMO001–DEMO004 para probar."
+        )
         return empty
 
     segment, clase = _split_plate_for_api(plate)

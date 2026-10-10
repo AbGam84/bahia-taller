@@ -40,3 +40,8 @@ services:
         value: VerKatire2026
       - key: PUBLIC_BASE_URL
         value: https://katire.onrender.com
+      # Placa → marca/modelo/año (egobytes). Sin clave: solo placas DEMO001–DEMO004.
+      - key: RNP_API_BASE
+        value: https://rnp.egobytes.com
+      - key: RNP_API_KEY
+        sync: false
