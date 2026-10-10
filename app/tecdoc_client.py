@@ -173,13 +173,17 @@ def enrich_parts(
                 }
                 break
 
-    queries = []
+    queries: list[str] = []
     if part_hint:
+        queries.append(f"{part_hint} {brand} {model}".strip())
         queries.append(part_hint)
     if brand or model:
+        queries.append(f"{brand} {model} {year or ''} repuesto".strip())
         queries.append(f"{brand} {model} {year or ''}".strip())
+    if vin and not queries:
+        queries.append(vin)
     seen: set[str] = set()
-    for q in queries:
+    for q in queries[:4]:
         for row in search_articles(q, linkage_target_id=int(linkage_id) if linkage_id else None):
             key = (row.get("oem_code"), row.get("name"))
             if key in seen:

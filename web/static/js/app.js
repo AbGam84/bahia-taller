@@ -502,6 +502,50 @@ function intakeVehicleQueryParams() {
   return params;
 }
 
+function oemSourceLabel(source) {
+  if (source === "historial_ot") return "Su taller";
+  if (source === "tecdoc") return "TecDoc";
+  if (source === "catalogo_universal") return "Tipo universal";
+  if (source === "catalogo_referencia") return "OEM fábrica";
+  return "Referencia";
+}
+
+function oemPartRowHtml(p) {
+  const oemRaw = String(p.oem_code || "—");
+  const canCopy = oemRaw && !/consultar oem/i.test(oemRaw) && oemRaw !== "—";
+  const copyBtn = canCopy
+    ? `<button type="button" class="btn btn-ghost" style="padding:2px 6px;font-size:0.7rem" data-copy-oem="${hrefAttr(oemRaw)}">Copiar</button>`
+    : "";
+  const links = (p.network_links || [])
+    .slice(0, 2)
+    .map(
+      (l) =>
+        `<a class="btn btn-ghost" style="padding:3px 6px;font-size:0.68rem;margin:1px" href="${hrefAttr(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`
+    )
+    .join("");
+  return `<tr>
+    <td>${esc(p.category || "")}</td>
+    <td><strong>${esc(p.name || "")}</strong>${p.times_used ? `<br><span class="muted">Usado ${p.times_used}× en taller</span>` : ""}</td>
+    <td><code>${esc(oemRaw)}</code> ${copyBtn}</td>
+    <td class="row-actions">${links || "—"}</td>
+    <td class="muted">${oemSourceLabel(p.source)}</td>
+  </tr>`;
+}
+
+function renderOemPartsTable(parts, wrapEl) {
+  if (!wrapEl) return;
+  if (!parts.length) {
+    wrapEl.innerHTML = `<div class="empty-state"><strong>Sin coincidencias</strong>Pruebe otro término en el filtro</div>`;
+    return;
+  }
+  wrapEl.innerHTML = `<table><thead><tr><th>Sistema</th><th>Pieza</th><th>Código OEM</th><th>Buscar</th><th>Origen</th></tr></thead><tbody>${parts
+    .map((p) => oemPartRowHtml(p))
+    .join("")}</tbody></table>`;
+  bindOemCopyButtons(wrapEl);
+}
+
+let lastIntakeOemParts = [];
+
 function bindOemCopyButtons(root) {
   (root || document).querySelectorAll("[data-copy-oem]").forEach((btn) => {
     btn.onclick = async () => {
@@ -551,23 +595,22 @@ function renderIntakeOemDossier(dossier, ref) {
       "Referencia OEM de fábrica por pieza. Confirme con VIN/motor antes de comprar.";
   }
 
-  const parts = (dossier?.oem_parts || []).filter((p) => (p.oem_code || p.name || "").trim());
-  if (!parts.length) {
-    oemWrap.innerHTML = `<div class="empty-state"><strong>${esc(dossier?.message || "Complete marca, modelo y año abajo")}</strong>
-      <p class="muted" style="margin:8px 0 0">El catálogo OEM se arma con esos datos del vehículo de esta placa. Si el carro ya estuvo aquí, se autocompletan.</p></div>`;
+  lastIntakeOemParts = (dossier?.oem_parts || []).filter((p) => (p.oem_code || p.name || "").trim());
+  const filterQ = document.getElementById("plateOemFilter")?.value?.trim().toLowerCase() || "";
+  let parts = lastIntakeOemParts;
+  if (filterQ) {
+    parts = parts.filter(
+      (p) =>
+        (p.name || "").toLowerCase().includes(filterQ) ||
+        (p.category || "").toLowerCase().includes(filterQ) ||
+        (p.oem_code || "").toLowerCase().includes(filterQ)
+    );
+  }
+  if (!lastIntakeOemParts.length) {
+    oemWrap.innerHTML = `<div class="empty-state"><strong>${esc(dossier?.message || "Cargando…")}</strong>
+      <p class="muted" style="margin:8px 0 0">Escriba la placa y complete marca/modelo/año si el carro es nuevo.</p></div>`;
   } else {
-    oemWrap.innerHTML = `<table><thead><tr><th>Sistema</th><th>Pieza</th><th>Código OEM fábrica</th><th>Origen</th></tr></thead><tbody>${parts
-      .map((p) => {
-        const oemRaw = String(p.oem_code || "—");
-        return `<tr>
-          <td>${esc(p.category || "")}</td>
-          <td><strong>${esc(p.name || "")}</strong>${p.times_used ? `<br><span class="muted">Usado ${p.times_used}× en taller</span>` : ""}</td>
-          <td><code>${esc(oemRaw)}</code> <button type="button" class="btn btn-ghost" style="padding:2px 6px;font-size:0.7rem" data-copy-oem="${hrefAttr(oemRaw)}">Copiar</button></td>
-          <td class="muted">${p.source === "historial_ot" ? "Su taller" : p.source === "tecdoc" ? "TecDoc" : "Catálogo CR"}</td>
-        </tr>`;
-      })
-      .join("")}</tbody></table>`;
-    bindOemCopyButtons(oemWrap);
+    renderOemPartsTable(parts, oemWrap);
   }
 
   if (meta) {
@@ -690,6 +733,8 @@ async function fetchPlatePartsReference() {
       `/api/plates/${encodeURIComponent(plate)}/ficha-oem?${fichaParams.toString()}`
     );
     if (seq !== platePartsLookupSeq) return;
+    window.__lastIntakeDossier = dossier;
+    window.__lastIntakeRef = data;
     renderPlatePartsReference(data, dossier);
   } catch (err) {
     if (seq !== platePartsLookupSeq) return;
@@ -711,6 +756,11 @@ function initPlatePartsReference() {
   plateIn.addEventListener("blur", () => fetchPlatePartsReference());
   ["intakeBrand", "intakeModel", "intakeModelOther", "intakeYear"].forEach((id) => {
     document.getElementById(id)?.addEventListener("change", schedulePlatePartsReference);
+  });
+  document.getElementById("plateOemFilter")?.addEventListener("input", () => {
+    const dossier = window.__lastIntakeDossier;
+    const ref = window.__lastIntakeRef;
+    if (dossier) renderIntakeOemDossier(dossier, ref);
   });
   document.getElementById("plateOpenConsultaBtn")?.addEventListener("click", () => {
     const plate = String(document.getElementById("intakePlate")?.value || "")
@@ -1785,44 +1835,30 @@ function renderFichaOem(dossier) {
       )
       .join("");
   }
+  window.__lastConsultaDossier = dossier;
   const filterQ = document.getElementById("consultaQuery")?.value?.trim().toLowerCase() || "";
+  const localQ = document.getElementById("consultaOemFilter")?.value?.trim().toLowerCase() || "";
   let parts = dossier.oem_parts || [];
-  if (filterQ) {
+  const applyFilter = (q) => {
+    if (!q) return;
     parts = parts.filter(
       (p) =>
-        (p.name || "").toLowerCase().includes(filterQ) ||
-        (p.oem_code || "").toLowerCase().includes(filterQ) ||
-        (p.category || "").toLowerCase().includes(filterQ)
+        (p.name || "").toLowerCase().includes(q) ||
+        (p.oem_code || "").toLowerCase().includes(q) ||
+        (p.category || "").toLowerCase().includes(q)
     );
-  }
+  };
+  applyFilter(filterQ);
+  applyFilter(localQ);
   const wrap = document.getElementById("consultaOemTableWrap");
   if (!wrap) return;
   const totalParts = (dossier.oem_parts || []).length;
   if (!parts.length) {
-    wrap.innerHTML = `<div class="empty-state"><strong>${totalParts ? `Ninguna pieza coincide con el filtro (${totalParts} en catálogo)` : "Sin catálogo OEM para esta placa aún"}</strong>
-      <p class="muted" style="margin:8px 0 0">${esc(dossier.message || "Complete marca, modelo y año y vuelva a consultar, o use las repuesteras abajo.")}</p></div>`;
+    wrap.innerHTML = `<div class="empty-state"><strong>${totalParts ? `Ninguna pieza coincide (${totalParts} en listado)` : "Sin listado aún"}</strong>
+      <p class="muted" style="margin:8px 0 0">${esc(dossier.message || "Cargue la placa y marca/modelo/año.")}</p></div>`;
   } else {
-    wrap.innerHTML = `<table><thead><tr><th>Sistema</th><th>Pieza</th><th>Código OEM</th><th>Origen</th><th>Red</th></tr></thead><tbody>${parts
-      .map((p) => {
-        const oemRaw = String(p.oem_code || "");
-        const links = (p.network_links || [])
-          .slice(0, 3)
-          .map(
-            (l) =>
-              `<a class="btn btn-ghost" style="padding:4px 8px;font-size:0.72rem;margin:2px" href="${hrefAttr(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`
-          )
-          .join("");
-        return `<tr>
-        <td>${esc(p.category)}</td>
-        <td><strong>${esc(p.name)}</strong>${p.times_used ? `<br><span class="muted">Usado ${p.times_used}× en taller</span>` : ""}</td>
-        <td><code>${esc(oemRaw)}</code> <button type="button" class="btn btn-ghost" style="padding:2px 6px;font-size:0.7rem" data-copy-oem="${hrefAttr(oemRaw)}">Copiar</button></td>
-        <td><span class="muted">${p.source === "historial_ot" ? "Su taller" : p.source === "tecdoc" ? "TecDoc" : "OEM fábrica"}</span></td>
-        <td class="row-actions">${links || "—"}</td>
-      </tr>`;
-      })
-      .join("")}</tbody></table>`;
+    renderOemPartsTable(parts, wrap);
   }
-  bindOemCopyButtons(wrap);
 }
 
 async function loadFichaByPlate() {
@@ -2041,6 +2077,9 @@ function initConsultaRepuesto() {
     if (plate.replace(/[-\s]/g, "").length >= 3) loadFichaByPlate();
   });
   document.getElementById("consultaPlateOnlyBtn")?.addEventListener("click", () => loadFichaByPlate());
+  document.getElementById("consultaOemFilter")?.addEventListener("input", () => {
+    if (window.__lastConsultaDossier) renderFichaOem(window.__lastConsultaDossier);
+  });
 }
 
 async function runMarketSearch() {

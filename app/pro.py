@@ -552,6 +552,8 @@ def parts_consulta(
     if vehicle:
         brand = brand or (vehicle.get("brand") or "")
         model = model or (vehicle.get("model") or "")
+        if not (year or "").strip() and vehicle.get("year"):
+            year = str(vehicle.get("year"))
 
     veh_label_parts = [p for p in [plate_norm, brand, model, (year or "").strip()] if p]
     vehicle_label = " ".join(veh_label_parts)
@@ -568,11 +570,17 @@ def parts_consulta(
     sq_lower = search_q.lower()
     for p in parts:
         score = _score_warehouse_part(p, search_q, brand, model)
-        blob = f"{p.name} {p.sku} {p.compatible_with}".lower()
+        blob = f"{p.name} {p.sku} {p.compatible_with} {p.category} {p.brand}".lower()
         if sq_lower and sq_lower not in blob and score <= 0:
             continue
-        if not sq_lower and (brand or model) and score <= 0:
-            continue
+        if not sq_lower and (brand or model):
+            b = brand.lower()
+            m = model.lower()
+            veh_match = (b and b in blob) or (m and m in blob) or score > 0
+            if not veh_match and not plate_norm:
+                continue
+            if not veh_match and plate_norm and score <= 0:
+                continue
         item = part_dict(p)
         item["match_score"] = score
         warehouse.append(item)

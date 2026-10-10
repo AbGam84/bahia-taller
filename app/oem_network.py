@@ -142,7 +142,7 @@ def vehicle_technical_dossier(
         empty["error"] = "Placa muy corta"
         return empty
 
-    ref = parts_reference_by_plate(db, tenant_id, plate_norm, brand_hint, model_hint)
+    ref = parts_reference_by_plate(db, tenant_id, plate_norm, brand_hint, model_hint, year_hint)
     vehicle = ref.get("vehicle")
     brand = brand_hint or (vehicle.get("brand") if vehicle else "") or ""
     model = model_hint or (vehicle.get("model") if vehicle else "") or ""
@@ -276,10 +276,11 @@ def vehicle_technical_dossier(
         else None
     )
     from app.tecdoc_client import enrich_parts, tecdoc_configured
+    from app.universal_parts import merge_oem_lists, universal_parts_for_vehicle
 
     tecdoc_meta: dict = {}
     try:
-        if tecdoc_configured() or (vehicle and (vehicle.get("vin") or "").strip()):
+        if tecdoc_configured():
             tec_parts, tecdoc_meta = enrich_parts(
                 brand=brand,
                 model=model,
@@ -292,8 +293,29 @@ def vehicle_technical_dossier(
                 name = row.get("name") or ""
                 row["network_links"] = network_links_for_part(code, name, brand, model, year_str, shops)
                 oem_parts.append(row)
+        else:
+            from app.tecdoc_client import tecdoc_status
+
+            tecdoc_meta = {"tecdoc": tecdoc_status()}
     except Exception:
-        tecdoc_meta = {"tecdoc": {"configured": False, "connected": False}}
+        from app.tecdoc_client import tecdoc_status
+
+        tecdoc_meta = {"tecdoc": tecdoc_status()}
+
+    existing_names = {_norm(p.get("name") or "") for p in oem_parts}
+    universal = universal_parts_for_vehicle(
+        brand,
+        model,
+        year_str,
+        plate=plate_norm,
+        part_hint=(part_hint or "").strip(),
+        existing_names=existing_names,
+        network_links_fn=lambda code, name, b, m, y: network_links_for_part(
+            code, name, b, m, y, shops
+        ),
+    )
+    if universal:
+        oem_parts = merge_oem_lists(oem_parts, universal)
 
     from app.part_shops import build_whatsapp_order
     from app.services import get_settings
@@ -308,20 +330,31 @@ def vehicle_technical_dossier(
         item["whatsapp_link"] = build_whatsapp_order(s, search_text, veh_whatsapp, from_shop=shop_label)
         shop_cards.append(item)
 
-    if not ref.get("found_vehicle") and not profile:
+    oem_with_code = sum(
+        1
+        for p in oem_parts
+        if (p.get("oem_code") or "").strip()
+        and "consultar oem" not in (p.get("oem_code") or "").lower()
+        and p.get("oem_code") != "—"
+    )
+    universal_count = sum(1 for p in oem_parts if p.get("source") == "catalogo_universal")
+
+    if not ref.get("found_vehicle") and not brand and not model:
         result_message = (
-            "Placa no registrada en su taller. Elija marca, modelo y año arriba y pulse otra vez "
-            "Consultar — o registre el vehículo en Ingreso."
+            f"Placa {plate_norm}: listado de {len(oem_parts)} tipos de repuesto. "
+            "Indique marca, modelo y año para afinar códigos OEM de fábrica."
         )
-    elif not profile:
+    elif not brand and not model:
         result_message = (
-            f"Vehículo encontrado ({brand} {model}). Sin catálogo OEM para esa combinación — "
-            "use los enlaces de repuesteras abajo."
+            f"{len(oem_parts)} tipos de repuesto — complete marca/modelo/año para códigos OEM exactos."
         )
     elif not oem_parts:
-        result_message = "Catálogo listo pero sin filas — limpie el filtro «Repuesto» si escribió algo."
+        result_message = "Sin filas — limpie el filtro «Repuesto» o escriba otro término."
     else:
-        result_message = f"{len(oem_parts)} referencia(s) de pieza / OEM."
+        result_message = (
+            f"{len(oem_parts)} repuestos listados ({oem_with_code} con código OEM, "
+            f"{universal_count} tipos universales). Use el filtro para buscar pieza."
+        )
 
     if tecdoc_meta.get("tecdoc", {}).get("configured"):
         result["disclaimer"] = (
@@ -335,6 +368,8 @@ def vehicle_technical_dossier(
         )
 
     result["oem_parts"] = oem_parts
+    result["oem_parts_count"] = len(oem_parts)
+    result["oem_coded_count"] = oem_with_code
     result["history_parts"] = ref.get("history_parts") or []
     result["network_intro"] = intro
     result["shops"] = shop_cards
