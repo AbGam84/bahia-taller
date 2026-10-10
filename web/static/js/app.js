@@ -601,9 +601,24 @@ function persistConsultaPlateVehicle() {
   });
 }
 
+function isRealOemCode(code) {
+  const c = String(code || "").trim();
+  if (!c || c === "—") return false;
+  return !/consultar/i.test(c) && !/^vin/i.test(c);
+}
+
+function sortPartsOemFirst(parts) {
+  return [...parts].sort((a, b) => {
+    const ar = isRealOemCode(a.oem_code) ? 1 : 0;
+    const br = isRealOemCode(b.oem_code) ? 1 : 0;
+    return br - ar || String(a.category).localeCompare(String(b.category));
+  });
+}
+
 function oemPartRowHtml(p, hideCategory = false) {
   const oemRaw = String(p.oem_code || "—");
-  const canCopy = oemRaw && !/consultar oem/i.test(oemRaw) && oemRaw !== "—";
+  const realOem = isRealOemCode(oemRaw);
+  const canCopy = realOem;
   const copyBtn = canCopy
     ? `<button type="button" class="btn btn-ghost" style="padding:2px 6px;font-size:0.7rem" data-copy-oem="${hrefAttr(oemRaw)}">Copiar</button>`
     : "";
@@ -616,7 +631,6 @@ function oemPartRowHtml(p, hideCategory = false) {
     .join("");
   const sysCell = hideCategory ? "" : `<td>${esc(p.category || "")}</td>`;
   const displayName = (p.factory_name || p.name || "").trim();
-  const realOem = oemRaw && !/consultar oem/i.test(oemRaw);
   return `<tr>
     ${sysCell}
     <td><strong>${esc(displayName)}</strong>${realOem ? `<br><span class="badge badge-ok" style="font-size:0.65rem">OEM fábrica</span>` : ""}${p.part_info ? `<br><span class="muted">${esc(p.part_info)}</span>` : ""}${p.times_used ? `<br><span class="muted">Usado ${p.times_used}× en taller</span>` : ""}</td>
@@ -636,8 +650,14 @@ function localGroupPartsBySystem(parts) {
   return [...map.entries()].map(([system, rows]) => ({ system, parts: rows, count: rows.length }));
 }
 
-function renderOemPartsTable(parts, wrapEl, vehicleSystems) {
+function renderOemPartsTable(parts, wrapEl, vehicleSystems, options = {}) {
   if (!wrapEl) return;
+  if (options.oemFirst !== false) {
+    parts = sortPartsOemFirst(parts);
+  }
+  if (options.onlyCoded) {
+    parts = parts.filter((p) => isRealOemCode(p.oem_code));
+  }
   if (!parts.length) {
     wrapEl.innerHTML = `<div class="empty-state"><strong>Sin coincidencias</strong>Pruebe otro término en el filtro</div>`;
     return;
@@ -1855,12 +1875,19 @@ function consultaModelValue() {
 
 let consultaFichaTimer = null;
 
+async function consultaPlateFullFlow() {
+  const plate = String(document.getElementById("consultaPlate")?.value || "")
+    .toUpperCase()
+    .trim();
+  if (plate.replace(/[-\s]/g, "").length < 3) return;
+  applyPlateHintsToConsulta(loadPlateVehicleHints(plate));
+  await applyConsultaFromPlate();
+  await loadFichaByPlate();
+}
+
 function scheduleConsultaFichaReload() {
   clearTimeout(consultaFichaTimer);
-  consultaFichaTimer = setTimeout(() => {
-    persistConsultaPlateVehicle();
-    loadFichaByPlate();
-  }, 500);
+  consultaFichaTimer = setTimeout(() => consultaPlateFullFlow(), 600);
 }
 
 async function applyConsultaFromPlate() {
@@ -2008,6 +2035,19 @@ function renderFichaOem(dossier) {
       .join("");
   }
   window.__lastConsultaDossier = dossier;
+  const statsEl = document.getElementById("consultaOemStats");
+  const coded = dossier.oem_coded_count ?? (dossier.oem_parts || []).filter((p) => isRealOemCode(p.oem_code)).length;
+  const total = dossier.oem_parts_count ?? (dossier.oem_parts || []).length;
+  if (statsEl) {
+    statsEl.hidden = false;
+    if (coded > 0) {
+      statsEl.className = "oem-stats-bar";
+      statsEl.innerHTML = `<strong>${coded}</strong> códigos OEM originales de fábrica · ${total} componentes listados`;
+    } else {
+      statsEl.className = "oem-stats-bar warn";
+      statsEl.innerHTML = `<strong>Sin códigos OEM aún</strong> — seleccione <strong>marca y modelo</strong> (y año si puede) y pulse <strong>Consultar placa y ver códigos OEM</strong>.`;
+    }
+  }
   const filterQ = document.getElementById("consultaQuery")?.value?.trim().toLowerCase() || "";
   const localQ = document.getElementById("consultaOemFilter")?.value?.trim().toLowerCase() || "";
   let parts = dossier.oem_parts || [];
@@ -2029,7 +2069,10 @@ function renderFichaOem(dossier) {
     wrap.innerHTML = `<div class="empty-state"><strong>${totalParts ? `Ninguna pieza coincide (${totalParts} en listado)` : "Sin listado aún"}</strong>
       <p class="muted" style="margin:8px 0 0">${esc(dossier.message || "Cargue la placa y marca/modelo/año.")}</p></div>`;
   } else {
-    renderOemPartsTable(parts, wrap, dossier.vehicle_systems);
+    renderOemPartsTable(parts, wrap, dossier.vehicle_systems, {
+      oemFirst: document.getElementById("consultaOemPrioritize")?.checked !== false,
+      onlyCoded: !!document.getElementById("consultaOemOnlyCoded")?.checked,
+    });
   }
 }
 
@@ -2040,6 +2083,13 @@ async function loadFichaByPlate() {
   if (plate.replace(/[-\s]/g, "").length < 3) {
     toast("Escriba la placa del vehículo");
     return;
+  }
+  applyPlateHintsToConsulta(loadPlateVehicleHints(plate));
+  const brand = document.getElementById("consultaBrand")?.value || "";
+  const model = consultaModelValue();
+  if (!brand || !model) {
+    toast("Seleccione marca y modelo para ver códigos OEM originales");
+    document.getElementById("consultaBrand")?.focus();
   }
   persistConsultaPlateVehicle();
   const params = consultaFichaParams();
@@ -2237,15 +2287,14 @@ function initConsultaRepuesto() {
     runPartsConsulta();
   });
   const plateIn = document.getElementById("consultaPlate");
-  plateIn?.addEventListener("input", () => {
-    applyConsultaFromPlate();
-    scheduleConsultaFichaReload();
+  plateIn?.addEventListener("input", () => scheduleConsultaFichaReload());
+  plateIn?.addEventListener("blur", () => consultaPlateFullFlow());
+  document.getElementById("consultaPlateOnlyBtn")?.addEventListener("click", () => consultaPlateFullFlow());
+  ["consultaOemOnlyCoded", "consultaOemPrioritize"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("change", () => {
+      if (window.__lastConsultaDossier) renderFichaOem(window.__lastConsultaDossier);
+    });
   });
-  plateIn?.addEventListener("blur", () => {
-    applyConsultaFromPlate();
-    loadFichaByPlate();
-  });
-  document.getElementById("consultaPlateOnlyBtn")?.addEventListener("click", () => loadFichaByPlate());
   document.getElementById("consultaVin")?.addEventListener("change", scheduleConsultaFichaReload);
   ["consultaBrand", "consultaModel", "consultaModelOther", "consultaYear"].forEach((id) => {
     document.getElementById(id)?.addEventListener("change", scheduleConsultaFichaReload);

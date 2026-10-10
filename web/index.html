@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Katire — taller + factura electrónica CR</title>
-  <link rel="stylesheet" href="/static/css/app.css?v=20260723a" />
+  <link rel="stylesheet" href="/static/css/app.css?v=20260723d" />
 </head>
 <body>
   <div class="app-shell">
@@ -395,22 +395,9 @@
             <label>Placa <span class="muted">(no necesita estar registrada)</span>
               <input id="consultaPlate" name="plate" placeholder="GAA-123" style="text-transform:uppercase" autocomplete="off" />
             </label>
-            <label class="full">VIN <span class="muted">(opcional — OEM original sin dar de alta el carro)</span>
-              <input id="consultaVin" name="vin" placeholder="17 caracteres" maxlength="17" style="text-transform:uppercase" autocomplete="off" />
-            </label>
-            <label class="full" style="align-self:end">
-              <button class="btn btn-primary" type="button" id="consultaPlateOnlyBtn" style="width:100%">Consultar placa ahora</button>
-            </label>
-            <div class="full" id="consultaGuestBanner" hidden style="padding:10px 14px;border-radius:12px;border:1px solid rgba(255,176,32,0.45);background:rgba(255,176,32,0.08)">
-              <strong>Consulta real sin registro</strong>
-              <p class="muted" style="margin:6px 0 0;font-size:0.82rem">Placa nueva en su taller. Complete marca, modelo, año o VIN para ver <strong>códigos OEM de fábrica</strong> por pieza. No crea ingreso.</p>
-            </div>
-            <label class="full">Buscar repuesto <span class="muted">(filtra motor, frenos, suspensión…)</span>
-              <input id="consultaQuery" name="q" placeholder="Ej. pastillas, filtro, amortiguador, embrague, batería…" autocomplete="off" />
-            </label>
-            <label>Marca
-              <select id="consultaBrand" name="brand">
-                <option value="">Cualquiera / escriba abajo</option>
+            <label>Marca <span class="muted">(requerida para códigos OEM)</span>
+              <select id="consultaBrand" name="brand" required>
+                <option value="">Seleccione marca…</option>
                 <option>Toyota</option>
                 <option>Nissan</option>
                 <option>Hyundai</option>
@@ -439,6 +426,19 @@
                 <option value="">—</option>
               </select>
             </label>
+            <label class="full">VIN <span class="muted">(opcional — afina códigos de fábrica)</span>
+              <input id="consultaVin" name="vin" placeholder="17 caracteres" maxlength="17" style="text-transform:uppercase" autocomplete="off" />
+            </label>
+            <label class="full" style="align-self:end">
+              <button class="btn btn-primary" type="button" id="consultaPlateOnlyBtn" style="width:100%">Consultar placa y ver códigos OEM</button>
+            </label>
+            <div class="full" id="consultaGuestBanner" hidden style="padding:10px 14px;border-radius:12px;border:1px solid rgba(255,176,32,0.45);background:rgba(255,176,32,0.08)">
+              <strong>Consulta sin registro</strong>
+              <p class="muted" style="margin:6px 0 0;font-size:0.82rem">Placa nueva. Elija <strong>marca y modelo</strong> arriba y pulse otra vez consultar para ver los <strong>códigos OEM originales</strong>.</p>
+            </div>
+            <label class="full">Buscar repuesto <span class="muted">(filtra motor, frenos, suspensión…)</span>
+              <input id="consultaQuery" name="q" placeholder="Ej. pastillas, filtro, amortiguador, embrague, batería…" autocomplete="off" />
+            </label>
             <div class="full row-actions" style="margin-top:4px">
               <button class="btn btn-primary" type="submit" id="consultaSearchBtn">Consultar repuesto</button>
             </div>
@@ -451,6 +451,15 @@
           <p id="consultaOemDisclaimer" class="muted" style="font-size:0.82rem;margin:0 0 10px"></p>
           <div id="consultaNetworkIntro" class="row-actions" style="margin-bottom:12px;flex-wrap:wrap"></div>
           <h3 style="margin:0 0 8px;font-size:0.95rem">Componentes del vehículo por sistema · OEM de fábrica</h3>
+          <div id="consultaOemStats" class="oem-stats-bar" hidden></div>
+          <label class="row-actions" style="margin:0 0 8px;font-size:0.82rem;cursor:pointer">
+            <input type="checkbox" id="consultaOemPrioritize" checked style="width:auto" />
+            Ordenar: primero piezas con código OEM original
+          </label>
+          <label class="row-actions" style="margin:0 0 8px;font-size:0.82rem;cursor:pointer">
+            <input type="checkbox" id="consultaOemOnlyCoded" style="width:auto" />
+            Ver solo piezas que ya tienen código OEM
+          </label>
           <input id="consultaOemFilter" type="search" placeholder="Filtrar listado sin volver a consultar…" style="width:100%;max-width:420px;margin-bottom:8px" autocomplete="off" />
           <div class="table-wrap oem-scroll" id="consultaOemTableWrap">
             <div class="empty-state"><strong>Sin catálogo para esta combinación</strong>Indique marca/modelo/año o registre el VIN en Ingreso</div>
@@ -709,7 +718,7 @@
       }
     })();
   </script>
-  <script src="/static/js/app.js?v=20260723c"></script>
+  <script src="/static/js/app.js?v=20260723d"></script>
   <script src="/static/js/ficha.js?v=20260722p"></script>
   <script src="/static/js/taller-dvi.js?v=20260722p"></script>
 </body>

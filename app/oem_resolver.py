@@ -97,7 +97,7 @@ def best_catalog_match(component_name: str, category: str, catalog: list[dict]) 
         if sc > best_score and code and not is_placeholder_oem(code):
             best_score = sc
             best = row
-    return best if best_score >= 5 else None
+    return best if best_score >= 4 else None
 
 
 def apply_real_oem_codes(parts: list[dict], brand: str, model: str, year: int) -> list[dict]:

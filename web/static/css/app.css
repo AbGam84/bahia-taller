@@ -1298,3 +1298,22 @@ details.oem-system-block summary {
 details.oem-system-block summary::-webkit-details-marker {
   display: none;
 }
+
+.oem-stats-bar {
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  background: rgba(18, 196, 160, 0.12);
+  border: 1px solid rgba(18, 196, 160, 0.35);
+  font-size: 0.88rem;
+}
+.oem-stats-bar.warn {
+  background: rgba(255, 176, 32, 0.12);
+  border-color: rgba(255, 176, 32, 0.45);
+}
+code.oem-factory-code {
+  color: #ffb020;
+  font-weight: 800;
+  font-size: 0.92rem;
+  letter-spacing: 0.02em;
+}
