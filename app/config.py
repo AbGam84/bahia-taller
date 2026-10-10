@@ -76,3 +76,9 @@ TECDOC_PROVIDER_ID = _env("TECDOC_PROVIDER_ID", "")
 TECDOC_BASE_URL = _env("TECDOC_BASE_URL", "https://webservice.tecalliance.services")
 TECDOC_ARTICLE_COUNTRY = _env("TECDOC_ARTICLE_COUNTRY", "CR")
 TECDOC_LANG = _env("TECDOC_LANG", "es")
+
+# Registro Nacional CR (consulta por placa — Registro Nacional CR API / egobytes)
+RNP_API_KEY = _env("RNP_API_KEY", "")
+RNP_API_BASE = _env("RNP_API_BASE", "https://rnp.egobytes.com")
+# Opcional: CL (carga liviana), MOT (moto). Si la placa trae prefijo CL/MOT se detecta solo.
+RNP_PLATE_CLASS = _env("RNP_PLATE_CLASS", "")

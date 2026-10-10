@@ -63,9 +63,11 @@ def vehicle_identity_payload(
     year: int | str,
     vin_decode: dict | None = None,
     registered: bool = False,
+    registry: dict | None = None,
 ) -> dict:
     """Nombre visible del vehículo al consultar por placa."""
     vin_decode = vin_decode or {}
+    reg = registry if registry and registry.get("ok") and registry.get("found") else None
     customer_name = ""
     color = ""
     vin_reg = ""
@@ -73,15 +75,40 @@ def vehicle_identity_payload(
         customer_name = (vehicle.get("customer") or {}).get("name") or ""
         color = vehicle.get("color") or ""
         vin_reg = vehicle.get("vin") or ""
-    b = normalize_brand(brand or vin_decode.get("make") or (vehicle.get("brand") if vehicle else "") or "")
-    m = (model or vin_decode.get("model") or (vehicle.get("model") if vehicle else "") or "").strip()
-    y = year or vin_decode.get("model_year") or (vehicle.get("year") if vehicle else "") or ""
+    if reg:
+        color = color or (reg.get("color") or "")
+        vin_reg = vin_reg or (reg.get("vin") or "")
+    b = normalize_brand(
+        brand
+        or (reg.get("brand") if reg else "")
+        or vin_decode.get("make")
+        or (vehicle.get("brand") if vehicle else "")
+        or ""
+    )
+    m = (
+        model
+        or (reg.get("model") if reg else "")
+        or vin_decode.get("model")
+        or (vehicle.get("model") if vehicle else "")
+        or ""
+    ).strip()
+    y = (
+        year
+        or (reg.get("year") if reg else "")
+        or vin_decode.get("model_year")
+        or (vehicle.get("year") if vehicle else "")
+        or ""
+    )
     y_str = str(y).strip() if y else ""
     parts = [p for p in [b, m, y_str] if p]
     display_name = " ".join(parts) if parts else ""
     if registered and display_name:
         source = "taller"
         source_label = "Registrado en su taller"
+    elif reg and display_name:
+        source = "registro_cr"
+        source_label = "Identificado por placa (Registro CR · sin propietario)"
+        customer_name = ""
     elif vin_decode.get("make") and not registered:
         source = "vin"
         source_label = "Identificado por VIN"
@@ -234,17 +261,32 @@ def vehicle_technical_dossier(
     ref = parts_reference_by_plate(db, tenant_id, plate_norm, brand_hint, model_hint, year_hint)
     vehicle = ref.get("vehicle")
     registered = bool(ref.get("found_vehicle"))
-    brand = normalize_brand(brand_hint or (vehicle.get("brand") if vehicle else "") or "")
-    model = (model_hint or (vehicle.get("model") if vehicle else "") or "").strip()
+    reg = ref.get("registry_vehicle") or {}
+    brand = normalize_brand(
+        brand_hint
+        or (vehicle.get("brand") if vehicle else "")
+        or (reg.get("brand") if reg.get("ok") else "")
+        or ""
+    )
+    model = (
+        model_hint
+        or (vehicle.get("model") if vehicle else "")
+        or (reg.get("model") if reg.get("ok") else "")
+        or ""
+    ).strip()
     year = 0
     if year_hint and str(year_hint).isdigit():
         year = int(year_hint)
     elif vehicle and vehicle.get("year"):
         year = int(vehicle.get("year") or 0)
+    elif reg.get("ok") and reg.get("year") and str(reg.get("year")).isdigit():
+        year = int(reg.get("year"))
 
     vin_raw = (vin_hint or "").strip().upper()
     if not vin_raw and vehicle and (vehicle.get("vin") or "").strip():
         vin_raw = (vehicle.get("vin") or "").strip().upper()
+    if not vin_raw and reg.get("ok") and (reg.get("vin") or "").strip():
+        vin_raw = (reg.get("vin") or "").strip().upper()
 
     vin_decode = {}
     if len(vin_raw) >= 11:
@@ -282,6 +324,13 @@ def vehicle_technical_dossier(
                 "vin_consulta": vin_raw or "",
             }
         )
+        if reg.get("ok"):
+            if reg.get("color"):
+                specs["color"] = reg.get("color")
+            if reg.get("fuel"):
+                specs["combustible_registro"] = reg.get("fuel")
+            if reg.get("engine_displacement"):
+                specs["motor_registro"] = reg.get("engine_displacement")
 
     if vin_decode:
         specs["vin_decodificado"] = vin_decode
@@ -507,7 +556,10 @@ def vehicle_technical_dossier(
         year=year or year_str,
         vin_decode=vin_decode,
         registered=registered,
+        registry=reg if reg.get("ok") else None,
     )
+    result["registry_vehicle"] = reg if reg.get("ok") else None
+    result["cr_registry_available"] = ref.get("cr_registry_available")
     result["vehicle_systems"] = group_parts_by_system(oem_parts)
     result["oem_parts"] = oem_parts
     result["oem_parts_count"] = len(oem_parts)

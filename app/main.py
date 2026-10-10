@@ -1728,6 +1728,13 @@ def tecdoc_status_api(user: User = Depends(get_current_user)):
     return tecdoc_status()
 
 
+@app.get("/api/cr-registry/status")
+def cr_registry_status_api(user: User = Depends(get_current_user)):
+    from app.cr_registry_client import registry_status
+
+    return registry_status()
+
+
 @app.get("/api/plates/{plate}/ficha-oem")
 def plate_ficha_oem(
     plate: str,
