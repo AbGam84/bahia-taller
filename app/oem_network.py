@@ -54,6 +54,59 @@ _BRAND_CANON = {
 }
 
 
+def vehicle_identity_payload(
+    plate: str,
+    *,
+    vehicle: dict | None,
+    brand: str,
+    model: str,
+    year: int | str,
+    vin_decode: dict | None = None,
+    registered: bool = False,
+) -> dict:
+    """Nombre visible del vehículo al consultar por placa."""
+    vin_decode = vin_decode or {}
+    customer_name = ""
+    color = ""
+    vin_reg = ""
+    if vehicle:
+        customer_name = (vehicle.get("customer") or {}).get("name") or ""
+        color = vehicle.get("color") or ""
+        vin_reg = vehicle.get("vin") or ""
+    b = normalize_brand(brand or vin_decode.get("make") or (vehicle.get("brand") if vehicle else "") or "")
+    m = (model or vin_decode.get("model") or (vehicle.get("model") if vehicle else "") or "").strip()
+    y = year or vin_decode.get("model_year") or (vehicle.get("year") if vehicle else "") or ""
+    y_str = str(y).strip() if y else ""
+    parts = [p for p in [b, m, y_str] if p]
+    display_name = " ".join(parts) if parts else ""
+    if registered and display_name:
+        source = "taller"
+        source_label = "Registrado en su taller"
+    elif vin_decode.get("make") and not registered:
+        source = "vin"
+        source_label = "Identificado por VIN"
+    elif display_name:
+        source = "consulta"
+        source_label = "Datos de esta consulta"
+    else:
+        source = "pendiente"
+        source_label = "Complete marca, modelo y año"
+        display_name = f"Placa {plate}"
+    return {
+        "plate": plate,
+        "display_name": display_name,
+        "brand": b,
+        "model": m,
+        "year": y_str,
+        "color": color,
+        "vin": vin_reg,
+        "customer_name": customer_name,
+        "identity_source": source,
+        "identity_label": source_label,
+        "registered_in_shop": registered,
+    }
+
+
 def normalize_brand(brand: str) -> str:
     b = (brand or "").strip()
     if not b:
@@ -446,6 +499,15 @@ def vehicle_technical_dossier(
 
     result["registered_in_shop"] = registered
     result["guest_consult"] = not registered
+    result["vehicle_identity"] = vehicle_identity_payload(
+        plate_norm,
+        vehicle=vehicle,
+        brand=brand,
+        model=model,
+        year=year or year_str,
+        vin_decode=vin_decode,
+        registered=registered,
+    )
     result["vehicle_systems"] = group_parts_by_system(oem_parts)
     result["oem_parts"] = oem_parts
     result["oem_parts_count"] = len(oem_parts)

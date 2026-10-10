@@ -1317,3 +1317,35 @@ code.oem-factory-code {
   font-size: 0.92rem;
   letter-spacing: 0.02em;
 }
+
+.vehicle-identity-card {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(18, 196, 160, 0.4);
+  background: linear-gradient(135deg, rgba(18, 196, 160, 0.14), rgba(0, 0, 0, 0.2));
+  margin-bottom: 4px;
+}
+.vehicle-identity-card.pending {
+  border-color: rgba(255, 176, 32, 0.45);
+  background: linear-gradient(135deg, rgba(255, 176, 32, 0.1), rgba(0, 0, 0, 0.15));
+}
+.vehicle-identity-card .vi-plate {
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--foam);
+  opacity: 0.85;
+}
+.vehicle-identity-card .vi-name {
+  margin: 4px 0 6px;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--foam);
+  line-height: 1.2;
+}
+.vehicle-identity-card .vi-meta {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--foam);
+  opacity: 0.88;
+}

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Katire — taller + factura electrónica CR</title>
-  <link rel="stylesheet" href="/static/css/app.css?v=20260723d" />
+  <link rel="stylesheet" href="/static/css/app.css?v=20260723e" />
 </head>
 <body>
   <div class="app-shell">
@@ -154,6 +154,7 @@
               <label>Placa
                 <input name="plate" id="intakePlate" required placeholder="GAA-123" style="text-transform:uppercase" autocomplete="off" />
               </label>
+              <div class="full" id="intakeVehicleIdentity" hidden></div>
               <div class="full" id="platePartsRefBox" hidden>
                 <div class="panel" style="margin:0;padding:12px 14px;border:1px solid var(--line);background:rgba(0,0,0,0.12)">
                   <div class="panel-head" style="margin-bottom:8px;padding:0">
@@ -395,6 +396,7 @@
             <label>Placa <span class="muted">(no necesita estar registrada)</span>
               <input id="consultaPlate" name="plate" placeholder="GAA-123" style="text-transform:uppercase" autocomplete="off" />
             </label>
+            <div class="full" id="consultaVehicleIdentity" hidden></div>
             <label>Marca <span class="muted">(requerida para códigos OEM)</span>
               <select id="consultaBrand" name="brand" required>
                 <option value="">Seleccione marca…</option>
@@ -718,7 +720,7 @@
       }
     })();
   </script>
-  <script src="/static/js/app.js?v=20260723d"></script>
+  <script src="/static/js/app.js?v=20260723e"></script>
   <script src="/static/js/ficha.js?v=20260722p"></script>
   <script src="/static/js/taller-dvi.js?v=20260722p"></script>
 </body>

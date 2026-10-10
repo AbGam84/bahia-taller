@@ -504,6 +504,22 @@ def parts_reference_by_plate(
     result["visits_count"] = visits_count
     result["history_parts"] = history_parts
     result["suggested_parts"] = suggested
+    from app.oem_network import vehicle_identity_payload
+
+    vdict = result["vehicle"]
+    y = 0
+    if year_hint and str(year_hint).isdigit():
+        y = int(year_hint)
+    elif vdict and vdict.get("year"):
+        y = int(vdict.get("year") or 0)
+    result["vehicle_identity"] = vehicle_identity_payload(
+        plate_norm,
+        vehicle=vdict,
+        brand=brand,
+        model=model,
+        year=y or year_hint,
+        registered=vehicle is not None,
+    )
     return result
 
 
