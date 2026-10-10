@@ -28,7 +28,36 @@ def _load_catalog() -> dict:
     return json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
 
 
+_BRAND_CANON = {
+    "toyota": "Toyota",
+    "nissan": "Nissan",
+    "hyundai": "Hyundai",
+    "kia": "Kia",
+    "suzuki": "Suzuki",
+    "honda": "Honda",
+    "mazda": "Mazda",
+    "mitsubishi": "Mitsubishi",
+    "chevrolet": "Chevrolet",
+    "chevy": "Chevrolet",
+    "ford": "Ford",
+    "volkswagen": "Volkswagen",
+    "vw": "Volkswagen",
+    "isuzu": "Isuzu",
+    "great wall": "Great Wall",
+    "byd": "BYD",
+}
+
+
+def normalize_brand(brand: str) -> str:
+    b = (brand or "").strip()
+    if not b:
+        return ""
+    key = _norm(b)
+    return _BRAND_CANON.get(key, b[:1].upper() + b[1:] if b else "")
+
+
 def match_oem_profile(brand: str, model: str, year: int = 0) -> dict | None:
+    brand = normalize_brand(brand)
     b = _norm(brand)
     m = _norm(model)
     if not b or not m:
@@ -118,6 +147,7 @@ def vehicle_technical_dossier(
     model_hint: str = "",
     year_hint: str = "",
     part_hint: str = "",
+    vin_hint: str = "",
 ) -> dict:
     from app.pro import parts_reference_by_plate
     from app.part_shops import shop_dict
@@ -144,17 +174,29 @@ def vehicle_technical_dossier(
 
     ref = parts_reference_by_plate(db, tenant_id, plate_norm, brand_hint, model_hint, year_hint)
     vehicle = ref.get("vehicle")
-    brand = brand_hint or (vehicle.get("brand") if vehicle else "") or ""
-    model = model_hint or (vehicle.get("model") if vehicle else "") or ""
+    registered = bool(ref.get("found_vehicle"))
+    brand = normalize_brand(brand_hint or (vehicle.get("brand") if vehicle else "") or "")
+    model = (model_hint or (vehicle.get("model") if vehicle else "") or "").strip()
     year = 0
     if year_hint and str(year_hint).isdigit():
         year = int(year_hint)
     elif vehicle and vehicle.get("year"):
         year = int(vehicle.get("year") or 0)
 
+    vin_raw = (vin_hint or "").strip().upper()
+    if not vin_raw and vehicle and (vehicle.get("vin") or "").strip():
+        vin_raw = (vehicle.get("vin") or "").strip().upper()
+
     vin_decode = {}
-    if vehicle and (vehicle.get("vin") or "").strip():
-        vin_decode = decode_vin_nhtsa(vehicle.get("vin") or "")
+    if len(vin_raw) >= 11:
+        vin_decode = decode_vin_nhtsa(vin_raw)
+        if vin_decode.get("make") and not brand_hint:
+            brand = normalize_brand(vin_decode.get("make") or brand)
+        if vin_decode.get("model") and not model_hint:
+            model = (vin_decode.get("model") or model).strip()
+        vy = vin_decode.get("model_year") or ""
+        if str(vy).isdigit() and not year_hint:
+            year = int(vy)
 
     profile = match_oem_profile(brand, model, year)
     specs = dict(profile.get("specs") or {}) if profile else {}
@@ -172,10 +214,20 @@ def vehicle_technical_dossier(
         if vehicle.get("customer"):
             specs["cliente"] = vehicle["customer"].get("name") or ""
     else:
-        specs.update({"placa": plate_norm, "marca": brand, "modelo": model, "año": year or year_hint})
+        specs.update(
+            {
+                "placa": plate_norm,
+                "marca": brand,
+                "modelo": model,
+                "año": year or year_hint,
+                "vin_consulta": vin_raw or "",
+            }
+        )
 
     if vin_decode:
         specs["vin_decodificado"] = vin_decode
+    elif vin_raw:
+        specs["vin_registrado"] = vin_raw
 
     last_km = 0
     if vehicle and vehicle.get("id"):
@@ -210,6 +262,7 @@ def vehicle_technical_dossier(
                     "name": name,
                     "oem_code": code,
                     "source": "catalogo_referencia",
+                    "part_info": "Pieza original OEM de fábrica (catálogo CR)",
                     "network_links": network_links_for_part(code, name, brand, model, year_str, shops),
                 }
             )
@@ -276,7 +329,12 @@ def vehicle_technical_dossier(
         else None
     )
     from app.tecdoc_client import enrich_parts, tecdoc_configured
-    from app.universal_parts import merge_oem_lists, universal_parts_for_vehicle
+    from app.universal_parts import (
+        group_parts_by_system,
+        merge_oem_lists,
+        overlay_factory_oem,
+        universal_parts_for_vehicle,
+    )
 
     tecdoc_meta: dict = {}
     try:
@@ -285,7 +343,7 @@ def vehicle_technical_dossier(
                 brand=brand,
                 model=model,
                 year=year,
-                vin=(vehicle.get("vin") if vehicle else "") or "",
+                vin=vin_raw or (vehicle.get("vin") if vehicle else "") or "",
                 part_hint=(part_hint or "").strip(),
             )
             for row in tec_parts:
@@ -316,6 +374,7 @@ def vehicle_technical_dossier(
     )
     if universal:
         oem_parts = merge_oem_lists(oem_parts, universal)
+    oem_parts = overlay_factory_oem(oem_parts, profile)
 
     from app.part_shops import build_whatsapp_order
     from app.services import get_settings
@@ -339,14 +398,20 @@ def vehicle_technical_dossier(
     )
     universal_count = sum(1 for p in oem_parts if p.get("source") == "catalogo_universal")
 
-    if not ref.get("found_vehicle") and not brand and not model:
+    sys_n = len(group_parts_by_system(oem_parts))
+    if not registered and not brand and not model:
         result_message = (
-            f"Placa {plate_norm}: listado de {len(oem_parts)} tipos de repuesto. "
-            "Indique marca, modelo y año para afinar códigos OEM de fábrica."
+            f"Placa {plate_norm} (sin registro): {sys_n} sistemas, {len(oem_parts)} componentes del vehículo. "
+            "Marca, modelo, año o VIN → códigos OEM originales de fábrica en cada pieza."
+        )
+    elif not registered:
+        result_message = (
+            f"Consulta sin registro · placa {plate_norm} · {brand} {model} {year_str}. "
+            f"{oem_with_code} códigos OEM de fábrica en {len(oem_parts)} piezas listadas."
         )
     elif not brand and not model:
         result_message = (
-            f"{len(oem_parts)} tipos de repuesto — complete marca/modelo/año para códigos OEM exactos."
+            f"{len(oem_parts)} tipos de repuesto — complete marca/modelo/año o VIN para OEM exactos."
         )
     elif not oem_parts:
         result_message = "Sin filas — limpie el filtro «Repuesto» o escriba otro término."
@@ -367,6 +432,9 @@ def vehicle_technical_dossier(
             "Para catálogo OEM completo active TecDoc (TECDOC_API_KEY en servidor)."
         )
 
+    result["registered_in_shop"] = registered
+    result["guest_consult"] = not registered
+    result["vehicle_systems"] = group_parts_by_system(oem_parts)
     result["oem_parts"] = oem_parts
     result["oem_parts_count"] = len(oem_parts)
     result["oem_coded_count"] = oem_with_code

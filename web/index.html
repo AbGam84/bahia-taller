@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Katire — taller + factura electrónica CR</title>
-  <link rel="stylesheet" href="/static/css/app.css?v=20260722x" />
+  <link rel="stylesheet" href="/static/css/app.css?v=20260723a" />
 </head>
 <body>
   <div class="app-shell">
@@ -162,7 +162,7 @@
                   </div>
                   <p id="platePartsRefMeta" class="muted" style="margin:0 0 10px;font-size:0.82rem"></p>
                   <div id="plateVehicleSpecs" class="stats" style="margin-bottom:10px"></div>
-                  <h3 style="margin:0 0 6px;font-size:0.88rem">Todos los tipos de repuesto (OEM / referencia)</h3>
+                  <h3 style="margin:0 0 6px;font-size:0.88rem">Componentes del vehículo por sistema (motor, embrague, frenos…)</h3>
                   <p id="plateOemHint" class="muted" style="margin:0 0 8px;font-size:0.78rem"></p>
                   <input id="plateOemFilter" type="search" placeholder="Filtrar: frenos, motor, filtro, embrague…" style="width:100%;margin-bottom:8px" autocomplete="off" />
                   <div class="table-wrap oem-scroll" id="plateOemTableWrap">
@@ -392,12 +392,19 @@
         <div class="panel" style="margin-bottom:16px">
           <h2>Vehículo y repuesto</h2>
           <form id="consultaRepuestoForm" class="form-grid">
-            <label>Placa <span class="muted">(empiece aquí)</span>
+            <label>Placa <span class="muted">(no necesita estar registrada)</span>
               <input id="consultaPlate" name="plate" placeholder="GAA-123" style="text-transform:uppercase" autocomplete="off" />
             </label>
-            <label class="full" style="align-self:end">
-              <button class="btn btn-primary" type="button" id="consultaPlateOnlyBtn" style="width:100%">Cargar ficha por placa</button>
+            <label class="full">VIN <span class="muted">(opcional — OEM original sin dar de alta el carro)</span>
+              <input id="consultaVin" name="vin" placeholder="17 caracteres" maxlength="17" style="text-transform:uppercase" autocomplete="off" />
             </label>
+            <label class="full" style="align-self:end">
+              <button class="btn btn-primary" type="button" id="consultaPlateOnlyBtn" style="width:100%">Consultar placa ahora</button>
+            </label>
+            <div class="full" id="consultaGuestBanner" hidden style="padding:10px 14px;border-radius:12px;border:1px solid rgba(255,176,32,0.45);background:rgba(255,176,32,0.08)">
+              <strong>Consulta real sin registro</strong>
+              <p class="muted" style="margin:6px 0 0;font-size:0.82rem">Placa nueva en su taller. Complete marca, modelo, año o VIN para ver <strong>códigos OEM de fábrica</strong> por pieza. No crea ingreso.</p>
+            </div>
             <label class="full">Buscar repuesto <span class="muted">(filtra motor, frenos, suspensión…)</span>
               <input id="consultaQuery" name="q" placeholder="Ej. pastillas, filtro, amortiguador, embrague, batería…" autocomplete="off" />
             </label>
@@ -443,7 +450,7 @@
           <div id="consultaSpecsGrid" class="stats" style="margin-bottom:12px"></div>
           <p id="consultaOemDisclaimer" class="muted" style="font-size:0.82rem;margin:0 0 10px"></p>
           <div id="consultaNetworkIntro" class="row-actions" style="margin-bottom:12px;flex-wrap:wrap"></div>
-          <h3 style="margin:0 0 8px;font-size:0.95rem">Piezas y código de fabricación (OEM)</h3>
+          <h3 style="margin:0 0 8px;font-size:0.95rem">Componentes del vehículo por sistema · OEM de fábrica</h3>
           <input id="consultaOemFilter" type="search" placeholder="Filtrar listado sin volver a consultar…" style="width:100%;max-width:420px;margin-bottom:8px" autocomplete="off" />
           <div class="table-wrap oem-scroll" id="consultaOemTableWrap">
             <div class="empty-state"><strong>Sin catálogo para esta combinación</strong>Indique marca/modelo/año o registre el VIN en Ingreso</div>
@@ -702,7 +709,7 @@
       }
     })();
   </script>
-  <script src="/static/js/app.js?v=20260722x"></script>
+  <script src="/static/js/app.js?v=20260723a"></script>
   <script src="/static/js/ficha.js?v=20260722p"></script>
   <script src="/static/js/taller-dvi.js?v=20260722p"></script>
 </body>

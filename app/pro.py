@@ -526,6 +526,7 @@ def parts_consulta(
     brand: str = "",
     model: str = "",
     year: str = "",
+    vin: str = "",
 ) -> dict:
     """Unifica bodega, historial del vehículo y repuesteras externas."""
     from app.part_shops import (
@@ -612,7 +613,14 @@ def parts_consulta(
         from app.oem_network import vehicle_technical_dossier
 
         dossier = vehicle_technical_dossier(
-            db, tenant_id, plate_norm, brand, model, (year or "").strip(), search_q
+            db,
+            tenant_id,
+            plate_norm,
+            brand,
+            model,
+            (year or "").strip(),
+            search_q,
+            vin_hint=(vin or "").strip(),
         )
 
     return {

@@ -1279,6 +1279,22 @@ tr.row-hit td {
 }
 
 .table-wrap.oem-scroll {
-  max-height: min(420px, 55vh);
+  max-height: min(520px, 60vh);
   overflow: auto;
+}
+
+details.oem-system-block {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-bottom: 10px;
+  padding: 4px 10px 2px;
+  background: rgba(0, 0, 0, 0.12);
+}
+details.oem-system-block summary {
+  cursor: pointer;
+  padding: 8px 4px;
+  list-style: none;
+}
+details.oem-system-block summary::-webkit-details-marker {
+  display: none;
 }

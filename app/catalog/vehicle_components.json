@@ -1,0 +1,260 @@
+{
+  "version": 1,
+  "note": "Componentes de referencia por sistema — cualquier vehículo consultado por placa",
+  "systems": [
+    {
+      "name": "Motor",
+      "components": [
+        "Bloque motor",
+        "Culata",
+        "Pistón",
+        "Anillos pistón",
+        "Biela",
+        "Cigüeñal",
+        "Carter",
+        "Tapa válvulas",
+        "Válvula admisión",
+        "Válvula escape",
+        "Árbol de levas",
+        "Cadena / correa distribución",
+        "Tensor distribución",
+        "Guía cadena distribución",
+        "Bomba de aceite",
+        "Filtro de aceite",
+        "Aceite motor (especificación)",
+        "Filtro de aire",
+        "Cuerpo mariposa / aceleración",
+        "Sensor MAF / flujo aire",
+        "Múltiple admisión",
+        "Múltiple escape",
+        "Junta culata",
+        "Junta tapa válvulas",
+        "Junta carter",
+        "Soporte motor",
+        "Soporte transmisión",
+        "Válvula PCV",
+        "Sensor detonación",
+        "Sensor temperatura motor"
+      ]
+    },
+    {
+      "name": "Sistema de embrague",
+      "components": [
+        "Kit embrague completo",
+        "Disco embrague",
+        "Plato de presión",
+        "Collarin / release bearing",
+        "Horquilla embrague",
+        "Cable embrague",
+        "Cilindro maestro embrague",
+        "Cilindro esclavo embrague",
+        "Líquido hidráulico embrague",
+        "Volante motor (flywheel)",
+        "Bujes pedal embrague"
+      ]
+    },
+    {
+      "name": "Transmisión",
+      "components": [
+        "Caja manual / automática (conjunto)",
+        "Aceite caja manual",
+        "Aceite transmisión automática",
+        "Filtro ATF",
+        "Convertidor de par",
+        "Solenoide caja automática",
+        "Semi-eje delantero",
+        "Semi-eje trasero",
+        "Junta homocinética",
+        "Fuelle homocinética",
+        "Soporte caja",
+        "Palanca selectora",
+        "Sensor velocidad VSS"
+      ]
+    },
+    {
+      "name": "Diferencial y tracción",
+      "components": [
+        "Diferencial delantero",
+        "Diferencial trasero",
+        "Aceite diferencial",
+        "Cardán / eje propulsor",
+        "Cruceta cardán",
+        "Soporte cardán",
+        "Transfer case (4x4)",
+        "Bloqueo diferencial"
+      ]
+    },
+    {
+      "name": "Refrigeración",
+      "components": [
+        "Radiador",
+        "Tapa radiador",
+        "Manguera superior radiador",
+        "Manguera inferior radiador",
+        "Termostato",
+        "Bomba de agua",
+        "Depósito expansión",
+        "Ventilador radiador",
+        "Motor ventilador",
+        "Sensor temperatura refrigerante",
+        "Anticongelante"
+      ]
+    },
+    {
+      "name": "Combustible",
+      "components": [
+        "Tanque combustible",
+        "Tapa tanque",
+        "Bomba combustible",
+        "Filtro combustible",
+        "Riel inyectores",
+        "Inyectores",
+        "Regulador presión combustible",
+        "Sensor nivel combustible",
+        "Canister / EVAP"
+      ]
+    },
+    {
+      "name": "Encendido",
+      "components": [
+        "Bujías (juego)",
+        "Cable bujía",
+        "Bobina encendido",
+        "Módulo encendido",
+        "Distribuidor (si aplica)",
+        "Rotor distribuidor",
+        "Tapa distribuidor"
+      ]
+    },
+    {
+      "name": "Frenos",
+      "components": [
+        "Pastillas freno delanteras",
+        "Pastillas freno traseras",
+        "Discos freno delanteros",
+        "Discos freno traseros",
+        "Zapatas freno traseras",
+        "Tambor freno trasero",
+        "Caliper delantero",
+        "Caliper trasero",
+        "Manguera freno",
+        "Líquido de frenos",
+        "Bomba de freno",
+        "Servofreno / booster",
+        "Freno de mano cable",
+        "Pastillas freno de mano",
+        "Sensor ABS delantero",
+        "Sensor ABS trasero",
+        "Módulo ABS"
+      ]
+    },
+    {
+      "name": "Dirección",
+      "components": [
+        "Cremallera dirección",
+        "Bomba dirección hidráulica",
+        "Líquido dirección",
+        "Columna dirección",
+        "Terminal dirección",
+        "Barra central dirección",
+        "Brazo pitman (si aplica)",
+        "Rótula dirección"
+      ]
+    },
+    {
+      "name": "Suspensión",
+      "components": [
+        "Amortiguador delantero",
+        "Amortiguador trasero",
+        "Resorte delantero",
+        "Resorte trasero",
+        "Barra estabilizadora",
+        "Link estabilizadora",
+        "Buje barra estabilizadora",
+        "Brazo control / meseta",
+        "Buje brazo",
+        "Rotula suspensión",
+        "Rodamiento rueda delantero",
+        "Rodamiento rueda trasero",
+        "Punta eje",
+        "Soporte amortiguador"
+      ]
+    },
+    {
+      "name": "Escape",
+      "components": [
+        "Múltiple escape",
+        "Catalizador",
+        "Sensor oxígeno upstream",
+        "Sensor oxígeno downstream",
+        "Silenciador intermedio",
+        "Silenciador final",
+        "Sonda lambda",
+        "Junta escape"
+      ]
+    },
+    {
+      "name": "Climatización",
+      "components": [
+        "Compresor A/C",
+        "Condensador A/C",
+        "Evaporador A/C",
+        "Filtro cabina / polen",
+        "Gas refrigerante",
+        "Manguera A/C alta presión",
+        "Manguera A/C baja presión",
+        "Válvula expansión",
+        "Motor ventilador cabina"
+      ]
+    },
+    {
+      "name": "Eléctrico",
+      "components": [
+        "Batería",
+        "Alternador",
+        "Motor de arranque",
+        "Regulador voltaje",
+        "Caja fusibles",
+        "Relay arranque",
+        "Relay faros",
+        "Bulbo intermitente",
+        "Foco delantero",
+        "Foco trasero",
+        "Luz stop",
+        "Sensor reversa",
+        "Motor limpiaparabrisas",
+        "Escobilla / plumilla",
+        "Bocina"
+      ]
+    },
+    {
+      "name": "Carrocería",
+      "components": [
+        "Parabrisas",
+        "Vidrio puerta",
+        "Espejo retrovisor",
+        "Manija puerta exterior",
+        "Manija puerta interior",
+        "Cerradura puerta",
+        "Bisagra puerta",
+        "Bisagra capó",
+        "Amortiguador portón",
+        "Parachoque delantero",
+        "Parachoque trasero",
+        "Emblema / grama"
+      ]
+    },
+    {
+      "name": "Llantas y rines",
+      "components": [
+        "Neumático delantero",
+        "Neumático trasero",
+        "Rin / aro",
+        "Válvula rin",
+        "Tapa válvula",
+        "Tuerca rin",
+        "Calcomanía presión neumáticos"
+      ]
+    }
+  ]
+}

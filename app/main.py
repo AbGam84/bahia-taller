@@ -1709,6 +1709,7 @@ def parts_consulta_api(
     brand: str = "",
     model: str = "",
     year: str = "",
+    vin: str = "",
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -1717,7 +1718,7 @@ def parts_consulta_api(
 
     if not (q or "").strip() and not (plate or "").strip():
         raise HTTPException(status_code=400, detail="Escriba la placa o qué repuesto busca")
-    return parts_consulta(db, tenant_id_of(user), q or "", plate, brand, model, year)
+    return parts_consulta(db, tenant_id_of(user), q or "", plate, brand, model, year, vin)
 
 
 @app.get("/api/tecdoc/status")
@@ -1734,6 +1735,7 @@ def plate_ficha_oem(
     model: str = "",
     year: str = "",
     q: str = "",
+    vin: str = "",
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -1741,7 +1743,9 @@ def plate_ficha_oem(
     from app.oem_network import vehicle_technical_dossier
     from app.tenancy import tenant_id_of
 
-    return vehicle_technical_dossier(db, tenant_id_of(user), plate, brand, model, year, q)
+    return vehicle_technical_dossier(
+        db, tenant_id_of(user), plate, brand, model, year, q, vin_hint=vin
+    )
 
 
 @app.get("/api/plates/{plate}/parts-reference")

@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import re
+from functools import lru_cache
+from pathlib import Path
 from urllib.parse import quote_plus
+
+COMPONENTS_PATH = Path(__file__).resolve().parent / "catalog" / "vehicle_components.json"
 
 # Sistemas y piezas habituales (cualquier marca). OEM exacto viene de catálogo CR, TecDoc o VIN.
 UNIVERSAL_PART_TYPES: list[tuple[str, str]] = [
@@ -117,6 +122,38 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", (s or "").strip().lower())
 
 
+@lru_cache(maxsize=1)
+def _load_component_systems() -> list[tuple[str, str]]:
+    """(sistema, componente) desde JSON; fallback a lista legacy."""
+    if COMPONENTS_PATH.is_file():
+        data = json.loads(COMPONENTS_PATH.read_text(encoding="utf-8"))
+        rows: list[tuple[str, str]] = []
+        for block in data.get("systems") or []:
+            sys_name = (block.get("name") or "General").strip()
+            for comp in block.get("components") or []:
+                name = (comp or "").strip()
+                if name:
+                    rows.append((sys_name, name))
+        if rows:
+            return rows
+    return list(UNIVERSAL_PART_TYPES)
+
+
+def group_parts_by_system(parts: list[dict]) -> list[dict]:
+    groups: dict[str, list[dict]] = {}
+    order: list[str] = []
+    for p in parts:
+        sys_name = (p.get("category") or "General").strip()
+        if sys_name not in groups:
+            groups[sys_name] = []
+            order.append(sys_name)
+        groups[sys_name].append(p)
+    return [
+        {"system": name, "count": len(groups[name]), "parts": groups[name]}
+        for name in order
+    ]
+
+
 def universal_parts_for_vehicle(
     brand: str,
     model: str,
@@ -142,7 +179,7 @@ def universal_parts_for_vehicle(
     taken = {_norm(x) for x in (existing_names or set())}
     out: list[dict] = []
 
-    for category, name in UNIVERSAL_PART_TYPES:
+    for category, name in _load_component_systems():
         nkey = _norm(name)
         if nkey in taken:
             continue
@@ -169,10 +206,43 @@ def universal_parts_for_vehicle(
                 "name": name,
                 "oem_code": "Consultar OEM (VIN/motor)",
                 "source": "catalogo_universal",
+                "part_info": f"Componente del sistema {category}",
                 "network_links": links[:6],
             }
         )
     return out
+
+
+def overlay_factory_oem(parts: list[dict], profile: dict | None) -> list[dict]:
+    """Pone código OEM de fábrica en filas universales cuando coincide el catálogo CR."""
+    if not profile:
+        return parts
+    catalog: dict[str, dict] = {}
+    for row in profile.get("parts") or []:
+        key = _norm(row.get("name") or "")
+        if key:
+            catalog[key] = row
+    for p in parts:
+        src = p.get("source") or ""
+        if src not in ("catalogo_universal", "catalogo_referencia"):
+            continue
+        n = _norm(p.get("name") or "")
+        if not n:
+            continue
+        matched = catalog.get(n)
+        if not matched:
+            for ck, crow in catalog.items():
+                if ck in n or n in ck:
+                    matched = crow
+                    break
+        if not matched:
+            continue
+        code = (matched.get("oem_code") or "").strip()
+        if code and "consultar" not in code.lower():
+            p["oem_code"] = code
+            p["source"] = "catalogo_referencia"
+            p["part_info"] = "Código OEM original de fábrica (referencia Costa Rica)"
+    return parts
 
 
 def merge_oem_lists(primary: list[dict], extra: list[dict]) -> list[dict]:

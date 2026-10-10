@@ -499,6 +499,11 @@ function intakeVehicleQueryParams() {
   if (brand) params.set("brand", brand);
   if (model) params.set("model", model);
   if (year) params.set("year", year);
+  const plate = String(document.getElementById("intakePlate")?.value || "")
+    .toUpperCase()
+    .trim();
+  const mem = loadPlateVehicleHints(plate);
+  if (mem?.vin) params.set("vin", mem.vin);
   return params;
 }
 
@@ -510,7 +515,93 @@ function oemSourceLabel(source) {
   return "Referencia";
 }
 
-function oemPartRowHtml(p) {
+const PLATE_VEH_STORAGE = "katire_plate_vehicle_v1";
+
+function plateStorageKey(plate) {
+  return String(plate || "")
+    .toUpperCase()
+    .replace(/[\s-]/g, "");
+}
+
+function readPlateVehicleStore() {
+  try {
+    return JSON.parse(localStorage.getItem(PLATE_VEH_STORAGE) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function loadPlateVehicleHints(plate) {
+  const k = plateStorageKey(plate);
+  if (k.length < 3) return null;
+  return readPlateVehicleStore()[k] || null;
+}
+
+function savePlateVehicleHints(plate, data) {
+  const k = plateStorageKey(plate);
+  if (k.length < 3) return;
+  const store = readPlateVehicleStore();
+  store[k] = { ...(store[k] || {}), ...data, updatedAt: Date.now() };
+  localStorage.setItem(PLATE_VEH_STORAGE, JSON.stringify(store));
+}
+
+function consultaVinValue() {
+  return String(document.getElementById("consultaVin")?.value || "")
+    .trim()
+    .toUpperCase();
+}
+
+function consultaFichaParams() {
+  const params = new URLSearchParams();
+  const brand = document.getElementById("consultaBrand")?.value || "";
+  const model = consultaModelValue();
+  const year = document.getElementById("consultaYear")?.value || "";
+  const vin = consultaVinValue();
+  if (brand) params.set("brand", brand);
+  if (model) params.set("model", model);
+  if (year) params.set("year", year);
+  if (vin) params.set("vin", vin);
+  const q = document.getElementById("consultaQuery")?.value?.trim() || "";
+  if (q) params.set("q", q);
+  return params;
+}
+
+function applyPlateHintsToConsulta(hints) {
+  if (!hints) return;
+  const b = document.getElementById("consultaBrand");
+  const m = document.getElementById("consultaModel");
+  const mo = document.getElementById("consultaModelOther");
+  const y = document.getElementById("consultaYear");
+  const vinIn = document.getElementById("consultaVin");
+  if (b && hints.brand && !b.value) {
+    setSelectValue(b, hints.brand);
+    b.dispatchEvent(new Event("change"));
+  }
+  if (m && hints.model) {
+    if (!setSelectValue(m, hints.model) && mo) {
+      mo.style.display = "block";
+      mo.value = hints.model;
+      if ([...m.options].some((o) => o.value === "Otro")) m.value = "Otro";
+    }
+  }
+  if (y && hints.year && !y.value) setSelectValue(y, String(hints.year));
+  if (vinIn && hints.vin && !vinIn.value) vinIn.value = hints.vin;
+}
+
+function persistConsultaPlateVehicle() {
+  const plate = String(document.getElementById("consultaPlate")?.value || "")
+    .toUpperCase()
+    .trim();
+  if (plate.replace(/[-\s]/g, "").length < 3) return;
+  savePlateVehicleHints(plate, {
+    brand: document.getElementById("consultaBrand")?.value || "",
+    model: consultaModelValue(),
+    year: document.getElementById("consultaYear")?.value || "",
+    vin: consultaVinValue(),
+  });
+}
+
+function oemPartRowHtml(p, hideCategory = false) {
   const oemRaw = String(p.oem_code || "—");
   const canCopy = oemRaw && !/consultar oem/i.test(oemRaw) && oemRaw !== "—";
   const copyBtn = canCopy
@@ -523,24 +614,57 @@ function oemPartRowHtml(p) {
         `<a class="btn btn-ghost" style="padding:3px 6px;font-size:0.68rem;margin:1px" href="${hrefAttr(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`
     )
     .join("");
+  const sysCell = hideCategory ? "" : `<td>${esc(p.category || "")}</td>`;
   return `<tr>
-    <td>${esc(p.category || "")}</td>
-    <td><strong>${esc(p.name || "")}</strong>${p.times_used ? `<br><span class="muted">Usado ${p.times_used}× en taller</span>` : ""}</td>
+    ${sysCell}
+    <td><strong>${esc(p.name || "")}</strong>${p.part_info ? `<br><span class="muted">${esc(p.part_info)}</span>` : ""}${p.times_used ? `<br><span class="muted">Usado ${p.times_used}× en taller</span>` : ""}</td>
     <td><code>${esc(oemRaw)}</code> ${copyBtn}</td>
     <td class="row-actions">${links || "—"}</td>
     <td class="muted">${oemSourceLabel(p.source)}</td>
   </tr>`;
 }
 
-function renderOemPartsTable(parts, wrapEl) {
+function localGroupPartsBySystem(parts) {
+  const map = new Map();
+  for (const p of parts) {
+    const sys = p.category || "General";
+    if (!map.has(sys)) map.set(sys, []);
+    map.get(sys).push(p);
+  }
+  return [...map.entries()].map(([system, rows]) => ({ system, parts: rows, count: rows.length }));
+}
+
+function renderOemPartsTable(parts, wrapEl, vehicleSystems) {
   if (!wrapEl) return;
   if (!parts.length) {
     wrapEl.innerHTML = `<div class="empty-state"><strong>Sin coincidencias</strong>Pruebe otro término en el filtro</div>`;
     return;
   }
-  wrapEl.innerHTML = `<table><thead><tr><th>Sistema</th><th>Pieza</th><th>Código OEM</th><th>Buscar</th><th>Origen</th></tr></thead><tbody>${parts
-    .map((p) => oemPartRowHtml(p))
-    .join("")}</tbody></table>`;
+  let groups = localGroupPartsBySystem(parts);
+  if (vehicleSystems?.length) {
+    const order = vehicleSystems.map((g) => g.system);
+    groups.sort((a, b) => {
+      const ia = order.indexOf(a.system);
+      const ib = order.indexOf(b.system);
+      return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
+    });
+  }
+  const blocks = groups
+    .filter((g) => g.parts.length)
+    .map(
+      (g) => `<details class="oem-system-block" open>
+      <summary><strong>${esc(g.system)}</strong> <span class="muted">· ${g.parts.length} componente(s)</span></summary>
+      <div class="table-wrap" style="margin:8px 0 12px">
+        <table><thead><tr><th>Componente</th><th>Código OEM fábrica</th><th>Buscar</th><th>Origen</th></tr></thead>
+        <tbody>${g.parts.map((p) => oemPartRowHtml(p, true)).join("")}</tbody></table>
+      </div></details>`
+    )
+    .join("");
+  wrapEl.innerHTML =
+    blocks ||
+    `<table><thead><tr><th>Sistema</th><th>Componente</th><th>Código OEM</th><th>Buscar</th><th>Origen</th></tr></thead><tbody>${parts
+      .map((p) => oemPartRowHtml(p))
+      .join("")}</tbody></table>`;
   bindOemCopyButtons(wrapEl);
 }
 
@@ -610,15 +734,18 @@ function renderIntakeOemDossier(dossier, ref) {
     oemWrap.innerHTML = `<div class="empty-state"><strong>${esc(dossier?.message || "Cargando…")}</strong>
       <p class="muted" style="margin:8px 0 0">Escriba la placa y complete marca/modelo/año si el carro es nuevo.</p></div>`;
   } else {
-    renderOemPartsTable(parts, oemWrap);
+    renderOemPartsTable(parts, oemWrap, dossier?.vehicle_systems);
   }
 
   if (meta) {
     const visits = ref?.visits_count ?? dossier?.visits_count ?? 0;
+    const sysCount = (dossier?.vehicle_systems || []).length;
     const head =
       dossier?.message ||
       `${specs.marca || ""} ${specs.modelo || ""}${specs.año ? ` · ${specs.año}` : ""}`.trim();
-    meta.textContent = head ? `${head} · ${visits} visita(s) en su taller` : `Placa ${dossier?.plate || ""}`;
+    meta.textContent = head
+      ? `${head}${sysCount ? ` · ${sysCount} sistemas` : ""} · ${visits} visita(s) en taller`
+      : `Placa ${dossier?.plate || ""}`;
   }
 }
 
@@ -728,6 +855,33 @@ async function fetchPlatePartsReference() {
     const data = await api(`/api/plates/${encodeURIComponent(plate)}/parts-reference?${q.toString()}`);
     if (seq !== platePartsLookupSeq) return;
     applyVehicleHintsFromPlateRef(data);
+    const mem = loadPlateVehicleHints(plate);
+    if (mem && !data?.found_vehicle) {
+      const b = document.getElementById("intakeBrand");
+      const m = document.getElementById("intakeModel");
+      const mo = document.getElementById("intakeModelOther");
+      const y = document.getElementById("intakeYear");
+      if (b && mem.brand && !b.value) {
+        setSelectValue(b, mem.brand);
+        b.dispatchEvent(new Event("change"));
+      }
+      if (m && mem.model && !m.value) {
+        if (!setSelectValue(m, mem.model) && mo) {
+          mo.style.display = "block";
+          mo.value = mem.model;
+          if ([...m.options].some((o) => o.value === "Otro")) m.value = "Otro";
+        }
+      }
+      if (y && mem.year && !y.value) setSelectValue(y, String(mem.year));
+    }
+    savePlateVehicleHints(plate, {
+      brand: document.getElementById("intakeBrand")?.value || mem?.brand || "",
+      model:
+        document.getElementById("intakeModel")?.value === "Otro"
+          ? document.getElementById("intakeModelOther")?.value || ""
+          : document.getElementById("intakeModel")?.value || mem?.model || "",
+      year: document.getElementById("intakeYear")?.value || mem?.year || "",
+    });
     const fichaParams = intakeVehicleQueryParams();
     const dossier = await api(
       `/api/plates/${encodeURIComponent(plate)}/ficha-oem?${fichaParams.toString()}`
@@ -1697,26 +1851,38 @@ function consultaModelValue() {
   return String(model.value || "").trim();
 }
 
+let consultaFichaTimer = null;
+
+function scheduleConsultaFichaReload() {
+  clearTimeout(consultaFichaTimer);
+  consultaFichaTimer = setTimeout(() => {
+    persistConsultaPlateVehicle();
+    loadFichaByPlate();
+  }, 500);
+}
+
 async function applyConsultaFromPlate() {
   const plateIn = document.getElementById("consultaPlate");
   const meta = document.getElementById("consultaVehicleMeta");
+  const guest = document.getElementById("consultaGuestBanner");
   if (!plateIn || !meta) return;
   const plate = String(plateIn.value || "")
     .toUpperCase()
     .trim();
   if (plate.replace(/[-\s]/g, "").length < 3) {
     meta.textContent = "";
+    if (guest) guest.hidden = true;
     return;
   }
+  applyPlateHintsToConsulta(loadPlateVehicleHints(plate));
   try {
-    const brand = document.getElementById("consultaBrand")?.value || "";
-    const model = consultaModelValue();
-    const q = new URLSearchParams();
-    if (brand) q.set("brand", brand);
-    if (model) q.set("model", model);
+    const q = consultaFichaParams();
+    q.delete("q");
+    q.delete("vin");
     const data = await api(`/api/plates/${encodeURIComponent(plate)}/parts-reference?${q.toString()}`);
     const v = data.vehicle;
     if (v) {
+      if (guest) guest.hidden = true;
       const b = document.getElementById("consultaBrand");
       const m = document.getElementById("consultaModel");
       const mo = document.getElementById("consultaModelOther");
@@ -1735,7 +1901,9 @@ async function applyConsultaFromPlate() {
       if (y && v.year) setSelectValue(y, String(v.year));
       meta.textContent = `${v.brand} ${v.model}${v.year ? ` · ${v.year}` : ""} · ${data.visits_count || 0} visita(s) en su taller`;
     } else {
-      meta.textContent = "Placa no registrada aún — puede indicar marca/modelo manualmente";
+      if (guest) guest.hidden = false;
+      meta.textContent =
+        "Placa no registrada — consulta real activa: indique marca, modelo, año o VIN para OEM de fábrica";
     }
   } catch (_) {
     meta.textContent = "";
@@ -1781,6 +1949,8 @@ function renderFichaOem(dossier) {
     return;
   }
   panel.hidden = false;
+  const guest = document.getElementById("consultaGuestBanner");
+  if (guest) guest.hidden = !dossier.guest_consult;
   const specs = dossier.specifications || {};
   const grid = document.getElementById("consultaSpecsGrid");
   const specEntries = [
@@ -1857,7 +2027,7 @@ function renderFichaOem(dossier) {
     wrap.innerHTML = `<div class="empty-state"><strong>${totalParts ? `Ninguna pieza coincide (${totalParts} en listado)` : "Sin listado aún"}</strong>
       <p class="muted" style="margin:8px 0 0">${esc(dossier.message || "Cargue la placa y marca/modelo/año.")}</p></div>`;
   } else {
-    renderOemPartsTable(parts, wrap);
+    renderOemPartsTable(parts, wrap, dossier.vehicle_systems);
   }
 }
 
@@ -1869,20 +2039,13 @@ async function loadFichaByPlate() {
     toast("Escriba la placa del vehículo");
     return;
   }
-  const brand = document.getElementById("consultaBrand")?.value || "";
-  const model = consultaModelValue();
-  const year = document.getElementById("consultaYear")?.value || "";
-  const params = new URLSearchParams();
-  if (brand) params.set("brand", brand);
-  if (model) params.set("model", model);
-  if (year) params.set("year", year);
-  const q = document.getElementById("consultaQuery")?.value?.trim() || "";
-  if (q) params.set("q", q);
+  persistConsultaPlateVehicle();
+  const params = consultaFichaParams();
   const btn = document.getElementById("consultaPlateOnlyBtn");
   try {
     if (btn) {
       btn.disabled = true;
-      btn.textContent = "Cargando ficha…";
+      btn.textContent = "Consultando…";
     }
     const dossier = await api(`/api/plates/${encodeURIComponent(plate)}/ficha-oem?${params.toString()}`);
     renderFichaOem(dossier);
@@ -1920,7 +2083,7 @@ async function loadFichaByPlate() {
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = "Cargar ficha por placa";
+      btn.textContent = "Consultar placa ahora";
     }
   }
 }
@@ -2011,7 +2174,10 @@ async function runPartsConsulta() {
       btn.disabled = true;
       btn.textContent = "Consultando…";
     }
+    persistConsultaPlateVehicle();
     const params = new URLSearchParams({ q, plate, brand, model, year });
+    const vin = consultaVinValue();
+    if (vin) params.set("vin", vin);
     const data = await api(`/api/parts/consulta?${params.toString()}`);
     renderConsultaResults(data);
   } catch (err) {
@@ -2069,14 +2235,19 @@ function initConsultaRepuesto() {
     runPartsConsulta();
   });
   const plateIn = document.getElementById("consultaPlate");
+  plateIn?.addEventListener("input", () => {
+    applyConsultaFromPlate();
+    scheduleConsultaFichaReload();
+  });
   plateIn?.addEventListener("blur", () => {
     applyConsultaFromPlate();
-    const plate = String(plateIn.value || "")
-      .toUpperCase()
-      .trim();
-    if (plate.replace(/[-\s]/g, "").length >= 3) loadFichaByPlate();
+    loadFichaByPlate();
   });
   document.getElementById("consultaPlateOnlyBtn")?.addEventListener("click", () => loadFichaByPlate());
+  document.getElementById("consultaVin")?.addEventListener("change", scheduleConsultaFichaReload);
+  ["consultaBrand", "consultaModel", "consultaModelOther", "consultaYear"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("change", scheduleConsultaFichaReload);
+  });
   document.getElementById("consultaOemFilter")?.addEventListener("input", () => {
     if (window.__lastConsultaDossier) renderFichaOem(window.__lastConsultaDossier);
   });
