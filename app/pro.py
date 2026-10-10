@@ -593,7 +593,9 @@ def parts_consulta(
 
     plate_ref = None
     if plate_norm or brand or model:
-        plate_ref = parts_reference_by_plate(db, tenant_id, plate_norm, brand, model)
+        plate_ref = parts_reference_by_plate(
+            db, tenant_id, plate_norm, brand, model, (year or "").strip()
+        )
 
     vehicle = plate_ref.get("vehicle") if plate_ref else None
     if vehicle:
@@ -601,6 +603,15 @@ def parts_consulta(
         model = model or (vehicle.get("model") or "")
         if not (year or "").strip() and vehicle.get("year"):
             year = str(vehicle.get("year"))
+    if plate_ref:
+        vi = plate_ref.get("vehicle_identity") or {}
+        brand = brand or (vi.get("brand") or "").strip()
+        model = model or (vi.get("model") or "").strip()
+        if not (year or "").strip() and vi.get("year"):
+            year = str(vi.get("year"))
+        if not (vin or "").strip():
+            reg = plate_ref.get("registry_vehicle") or {}
+            vin = (vin or vi.get("vin") or reg.get("vin") or "").strip()
 
     veh_label_parts = [p for p in [plate_norm, brand, model, (year or "").strip()] if p]
     vehicle_label = " ".join(veh_label_parts)

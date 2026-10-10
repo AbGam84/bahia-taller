@@ -397,8 +397,8 @@
               <input id="consultaPlate" name="plate" placeholder="GAA-123" style="text-transform:uppercase" autocomplete="off" />
             </label>
             <div class="full" id="consultaVehicleIdentity" hidden></div>
-            <label>Marca <span class="muted">(requerida para códigos OEM)</span>
-              <select id="consultaBrand" name="brand" required>
+            <label>Marca <span class="muted">(o la trae la placa si hay RNP_API_KEY)</span>
+              <select id="consultaBrand" name="brand">
                 <option value="">Seleccione marca…</option>
                 <option>Toyota</option>
                 <option>Nissan</option>
@@ -436,7 +436,7 @@
             </label>
             <div class="full" id="consultaGuestBanner" hidden style="padding:10px 14px;border-radius:12px;border:1px solid rgba(255,176,32,0.45);background:rgba(255,176,32,0.08)">
               <strong>Consulta sin registro</strong>
-              <p class="muted" style="margin:6px 0 0;font-size:0.82rem">Placa nueva. Elija <strong>marca y modelo</strong> arriba y pulse otra vez consultar para ver los <strong>códigos OEM originales</strong>.</p>
+              <p class="muted" style="margin:6px 0 0;font-size:0.82rem">Placa nueva. Con <strong>RNP_API_KEY</strong> en el servidor la marca/modelo/año se llenan solos; si no, elíjalos arriba y vuelva a consultar para ver <strong>códigos OEM</strong>.</p>
             </div>
             <label class="full">Buscar repuesto <span class="muted">(filtra motor, frenos, suspensión…)</span>
               <input id="consultaQuery" name="q" placeholder="Ej. pastillas, filtro, amortiguador, embrague, batería…" autocomplete="off" />
@@ -720,7 +720,7 @@
       }
     })();
   </script>
-  <script src="/static/js/app.js?v=20261010a"></script>
+  <script src="/static/js/app.js?v=20261010b"></script>
   <script src="/static/js/ficha.js?v=20260722p"></script>
   <script src="/static/js/taller-dvi.js?v=20260722p"></script>
 </body>

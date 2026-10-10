@@ -593,6 +593,39 @@ function consultaFichaParams() {
   return params;
 }
 
+function applyIdentityToConsultaForm(identity) {
+  if (!identity) return;
+  applyPlateHintsToConsulta({
+    brand: identity.brand,
+    model: identity.model,
+    year: identity.year,
+    vin: identity.vin,
+    display_name: identity.display_name,
+  });
+  if (identity.plate) renderVehicleIdentityCard(identity);
+}
+
+async function prefetchPlateIdentityForConsulta(plate) {
+  const q = new URLSearchParams();
+  const brand = document.getElementById("consultaBrand")?.value || "";
+  const model = consultaModelValue();
+  const year = document.getElementById("consultaYear")?.value || "";
+  if (brand) q.set("brand", brand);
+  if (model) q.set("model", model);
+  if (year) q.set("year", year);
+  const data = await api(`/api/plates/${encodeURIComponent(plate)}/parts-reference?${q.toString()}`);
+  if (data?.vehicle_identity) applyIdentityToConsultaForm(data.vehicle_identity);
+  else if (data?.registry_vehicle?.ok) {
+    applyPlateHintsToConsulta({
+      brand: data.registry_vehicle.brand,
+      model: data.registry_vehicle.model,
+      year: data.registry_vehicle.year,
+      vin: data.registry_vehicle.vin,
+    });
+  }
+  return data;
+}
+
 function applyPlateHintsToConsulta(hints) {
   if (!hints) return;
   const b = document.getElementById("consultaBrand");
@@ -2158,7 +2191,14 @@ function renderFichaOem(dossier) {
       statsEl.innerHTML = `<strong>${coded}</strong> códigos OEM originales de fábrica · ${total} componentes listados`;
     } else {
       statsEl.className = "oem-stats-bar warn";
-      statsEl.innerHTML = `<strong>Sin códigos OEM aún</strong> — seleccione <strong>marca y modelo</strong> (y año si puede) y pulse <strong>Consultar placa y ver códigos OEM</strong>.`;
+      const reg = dossier.cr_registry_available;
+      const id = dossier.vehicle_identity || {};
+      const hasVeh = !!(id.brand && id.model);
+      statsEl.innerHTML = reg
+        ? `<strong>0 códigos OEM</strong> — la placa no devolvió marca/modelo del Registro o falta <code>RNP_API_KEY</code> en Render. Pruebe <strong>DEMO003</strong> o elija marca/modelo/año arriba.`
+        : hasVeh
+          ? `<strong>0 códigos OEM</strong> para ${esc(id.display_name || "")} — confirme <strong>año</strong> o <strong>VIN</strong>, o active Registro por placa (<code>RNP_API_KEY</code>).`
+          : `<strong>Sin códigos OEM aún</strong> — elija <strong>marca y modelo</strong> (y año) o configure consulta por placa en el servidor.`;
     }
   }
   const filterQ = document.getElementById("consultaQuery")?.value?.trim().toLowerCase() || "";
@@ -2198,20 +2238,31 @@ async function loadFichaByPlate() {
     return;
   }
   applyPlateHintsToConsulta(loadPlateVehicleHints(plate));
-  const brand = document.getElementById("consultaBrand")?.value || "";
-  const model = consultaModelValue();
-  if (!brand || !model) {
-    toast("Seleccione marca y modelo para ver códigos OEM originales");
-    document.getElementById("consultaBrand")?.focus();
-  }
-  persistConsultaPlateVehicle();
-  const params = consultaFichaParams();
   const btn = document.getElementById("consultaPlateOnlyBtn");
   try {
     if (btn) {
       btn.disabled = true;
       btn.textContent = "Consultando…";
     }
+    let plateRef = null;
+    try {
+      plateRef = await prefetchPlateIdentityForConsulta(plate);
+    } catch (_) {
+      /* ficha-oem también resuelve en servidor */
+    }
+    const brand = document.getElementById("consultaBrand")?.value || "";
+    const model = consultaModelValue();
+    if (!brand || !model) {
+      const vi = plateRef?.vehicle_identity;
+      if (!vi?.brand || !vi?.model) {
+        toast(
+          "Sin marca/modelo: active RNP_API_KEY en Render o elija marca, modelo y año arriba"
+        );
+        document.getElementById("consultaBrand")?.focus();
+      }
+    }
+    persistConsultaPlateVehicle();
+    const params = consultaFichaParams();
     const dossier = await api(`/api/plates/${encodeURIComponent(plate)}/ficha-oem?${params.toString()}`);
     renderFichaOem(dossier);
     renderConsultaShopCards(dossier);
