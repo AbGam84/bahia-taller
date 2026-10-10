@@ -24,8 +24,14 @@ def _norm(s: str) -> str:
 @lru_cache(maxsize=1)
 def _load_catalog() -> dict:
     if not CATALOG_PATH.is_file():
-        return {"profiles": []}
-    return json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
+        base: dict = {"profiles": []}
+    else:
+        base = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
+    from app.cr_catalog_merge import enrich_manual_profile_parts, merged_profiles
+
+    manual = enrich_manual_profile_parts(base.get("profiles") or [])
+    base["profiles"] = merged_profiles(manual)
+    return base
 
 
 _BRAND_CANON = {
@@ -378,10 +384,10 @@ def vehicle_technical_dossier(
 
     from app.oem_resolver import apply_real_oem_codes, fill_tecdoc_oem_gaps
 
-    if brand and model:
+    if brand:
         oem_parts = apply_real_oem_codes(oem_parts, brand, model, year)
         oem_parts = fill_tecdoc_oem_gaps(
-            oem_parts, brand, model, year, vin_raw, max_lookups=12
+            oem_parts, brand, model, year, vin_raw, max_lookups=20
         )
 
     from app.part_shops import build_whatsapp_order

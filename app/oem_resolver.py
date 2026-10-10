@@ -101,11 +101,17 @@ def best_catalog_match(component_name: str, category: str, catalog: list[dict]) 
 
 
 def apply_real_oem_codes(parts: list[dict], brand: str, model: str, year: int) -> list[dict]:
+    from app.cr_catalog_merge import parts_from_brand_template
     from app.oem_network import normalize_brand
 
-    if not normalize_brand(brand) or not (model or "").strip():
+    brand = normalize_brand(brand)
+    if not brand:
         return parts
-    catalog = catalog_rows_for_vehicle(brand, model, year)
+    if not (model or "").strip():
+        template_rows = parts_from_brand_template(brand)
+        catalog = template_rows
+    else:
+        catalog = catalog_rows_for_vehicle(brand, model, year)
     if not catalog:
         return parts
     for p in parts:
