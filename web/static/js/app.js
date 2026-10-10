@@ -615,10 +615,12 @@ function oemPartRowHtml(p, hideCategory = false) {
     )
     .join("");
   const sysCell = hideCategory ? "" : `<td>${esc(p.category || "")}</td>`;
+  const displayName = (p.factory_name || p.name || "").trim();
+  const realOem = oemRaw && !/consultar oem/i.test(oemRaw);
   return `<tr>
     ${sysCell}
-    <td><strong>${esc(p.name || "")}</strong>${p.part_info ? `<br><span class="muted">${esc(p.part_info)}</span>` : ""}${p.times_used ? `<br><span class="muted">Usado ${p.times_used}× en taller</span>` : ""}</td>
-    <td><code>${esc(oemRaw)}</code> ${copyBtn}</td>
+    <td><strong>${esc(displayName)}</strong>${realOem ? `<br><span class="badge badge-ok" style="font-size:0.65rem">OEM fábrica</span>` : ""}${p.part_info ? `<br><span class="muted">${esc(p.part_info)}</span>` : ""}${p.times_used ? `<br><span class="muted">Usado ${p.times_used}× en taller</span>` : ""}</td>
+    <td>${realOem ? `<code class="oem-factory-code">${esc(oemRaw)}</code>` : `<span class="muted">${esc(oemRaw)}</span>`} ${copyBtn}</td>
     <td class="row-actions">${links || "—"}</td>
     <td class="muted">${oemSourceLabel(p.source)}</td>
   </tr>`;
@@ -655,7 +657,7 @@ function renderOemPartsTable(parts, wrapEl, vehicleSystems) {
       (g) => `<details class="oem-system-block" open>
       <summary><strong>${esc(g.system)}</strong> <span class="muted">· ${g.parts.length} componente(s)</span></summary>
       <div class="table-wrap" style="margin:8px 0 12px">
-        <table><thead><tr><th>Componente</th><th>Código OEM fábrica</th><th>Buscar</th><th>Origen</th></tr></thead>
+        <table><thead><tr><th>Nombre original (pieza)</th><th>Código OEM original</th><th>Buscar</th><th>Origen</th></tr></thead>
         <tbody>${g.parts.map((p) => oemPartRowHtml(p, true)).join("")}</tbody></table>
       </div></details>`
     )

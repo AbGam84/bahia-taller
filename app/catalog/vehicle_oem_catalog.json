@@ -32,7 +32,32 @@
         {"category": "Motor", "name": "Termostato", "oem_code": "90916-03093"},
         {"category": "Frenos", "name": "Líquido de frenos DOT3 (ref.)", "oem_code": "00475-1BF0B"},
         {"category": "Suspensión", "name": "Amortiguador trasero (ref.)", "oem_code": "48531-02290"},
-        {"category": "Encendido", "name": "Bobina encendido (ref.)", "oem_code": "90919-02258"}
+        {"category": "Encendido", "name": "Bobina encendido (ref.)", "oem_code": "90919-02258"},
+        {"category": "Sistema de embrague", "name": "Kit embrague completo", "oem_code": "31210-02191"},
+        {"category": "Sistema de embrague", "name": "Disco embrague", "oem_code": "31250-02160"},
+        {"category": "Sistema de embrague", "name": "Plato de presión", "oem_code": "31210-02191"},
+        {"category": "Sistema de embrague", "name": "Collarin / release bearing", "oem_code": "31230-02120"},
+        {"category": "Sistema de embrague", "name": "Horquilla embrague", "oem_code": "31236-02120"},
+        {"category": "Motor", "name": "Bomba de agua", "oem_code": "16100-09671"},
+        {"category": "Motor", "name": "Radiador", "oem_code": "16400-02131"},
+        {"category": "Motor", "name": "Filtro de combustible", "oem_code": "23300-09460"},
+        {"category": "Motor", "name": "Bujías (juego)", "oem_code": "90919-01253"},
+        {"category": "Motor", "name": "Bobina de encendido", "oem_code": "90919-02258"},
+        {"category": "Motor", "name": "Correa de distribución", "oem_code": "13568-02130"},
+        {"category": "Motor", "name": "Tensor distribución", "oem_code": "13540-02130"},
+        {"category": "Refrigeración", "name": "Termostato", "oem_code": "90916-03093"},
+        {"category": "Refrigeración", "name": "Bomba de agua", "oem_code": "16100-09671"},
+        {"category": "Refrigeración", "name": "Radiador", "oem_code": "16400-02131"},
+        {"category": "Frenos", "name": "Discos freno delanteros", "oem_code": "43512-02280"},
+        {"category": "Frenos", "name": "Pastillas freno traseras", "oem_code": "04466-02190"},
+        {"category": "Suspensión", "name": "Amortiguador delantero", "oem_code": "48520-02290"},
+        {"category": "Suspensión", "name": "Amortiguador trasero", "oem_code": "48531-02290"},
+        {"category": "Transmisión", "name": "Filtro caja automática", "oem_code": "35330-02030"},
+        {"category": "Transmisión", "name": "Aceite transmisión automática", "oem_code": "08886-02105"},
+        {"category": "Climatización", "name": "Filtro cabina / polen", "oem_code": "87139-02090"},
+        {"category": "Eléctrico", "name": "Batería", "oem_code": "28800-02140"},
+        {"category": "Eléctrico", "name": "Alternador", "oem_code": "27060-02130"},
+        {"category": "Eléctrico", "name": "Motor de arranque", "oem_code": "28100-02140"}
       ]
     },
     {
@@ -83,7 +108,16 @@
       "parts": [
         {"category": "Motor", "name": "Filtro de aceite", "oem_code": "15208-65F0E"},
         {"category": "Motor", "name": "Filtro de aire", "oem_code": "16546-1HK0A"},
-        {"category": "Frenos", "name": "Pastillas freno delanteras", "oem_code": "D1060-1HA0A"}
+        {"category": "Frenos", "name": "Pastillas freno delanteras", "oem_code": "D1060-1HA0A"},
+        {"category": "Sistema de embrague", "name": "Kit embrague completo", "oem_code": "30100-1KA0A"},
+        {"category": "Sistema de embrague", "name": "Disco embrague", "oem_code": "30100-1KA0A"},
+        {"category": "Sistema de embrague", "name": "Plato de presión", "oem_code": "30210-1KA0A"},
+        {"category": "Motor", "name": "Filtro de combustible", "oem_code": "16400-1HA0A"},
+        {"category": "Motor", "name": "Bujías (juego)", "oem_code": "22401-1KT0A"},
+        {"category": "Motor", "name": "Bobina de encendido", "oem_code": "22448-1KA0A"},
+        {"category": "Refrigeración", "name": "Radiador", "oem_code": "21410-1KA0A"},
+        {"category": "Frenos", "name": "Discos freno delanteros", "oem_code": "40206-1KA0A"},
+        {"category": "Suspensión", "name": "Amortiguador delantero", "oem_code": "56210-1KA0A"}
       ]
     },
     {

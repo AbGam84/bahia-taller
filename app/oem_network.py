@@ -376,6 +376,14 @@ def vehicle_technical_dossier(
         oem_parts = merge_oem_lists(oem_parts, universal)
     oem_parts = overlay_factory_oem(oem_parts, profile)
 
+    from app.oem_resolver import apply_real_oem_codes, fill_tecdoc_oem_gaps
+
+    if brand and model:
+        oem_parts = apply_real_oem_codes(oem_parts, brand, model, year)
+        oem_parts = fill_tecdoc_oem_gaps(
+            oem_parts, brand, model, year, vin_raw, max_lookups=12
+        )
+
     from app.part_shops import build_whatsapp_order
     from app.services import get_settings
 
@@ -389,12 +397,10 @@ def vehicle_technical_dossier(
         item["whatsapp_link"] = build_whatsapp_order(s, search_text, veh_whatsapp, from_shop=shop_label)
         shop_cards.append(item)
 
+    from app.oem_resolver import is_placeholder_oem
+
     oem_with_code = sum(
-        1
-        for p in oem_parts
-        if (p.get("oem_code") or "").strip()
-        and "consultar oem" not in (p.get("oem_code") or "").lower()
-        and p.get("oem_code") != "—"
+        1 for p in oem_parts if not is_placeholder_oem((p.get("oem_code") or ""))
     )
     universal_count = sum(1 for p in oem_parts if p.get("source") == "catalogo_universal")
 
