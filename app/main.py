@@ -1749,13 +1749,14 @@ def plate_parts_reference(
     plate: str,
     brand: str = "",
     model: str = "",
+    year: str = "",
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     """Al ingresar placa: repuestos usados antes en este carro y stock compatible."""
     from app.tenancy import tenant_id_of
 
-    return parts_reference_by_plate(db, tenant_id_of(user), plate, brand, model)
+    return parts_reference_by_plate(db, tenant_id_of(user), plate, brand, model, year)
 
 
 @app.get("/api/appointments")

@@ -156,9 +156,18 @@
               </label>
               <div class="full" id="platePartsRefBox" hidden>
                 <div class="panel" style="margin:0;padding:12px 14px;border:1px solid var(--line);background:rgba(0,0,0,0.12)">
-                  <strong style="font-size:0.9rem">Referencia de repuestos</strong>
-                  <p id="platePartsRefMeta" class="muted" style="margin:6px 0 10px;font-size:0.82rem"></p>
-                  <div id="platePartsRefBody"></div>
+                  <div class="panel-head" style="margin-bottom:8px;padding:0">
+                    <strong style="font-size:0.95rem">Ficha del vehículo · códigos OEM de fábrica</strong>
+                    <button type="button" class="btn btn-ghost" id="plateOpenConsultaBtn" style="padding:4px 10px;font-size:0.75rem">Consulta completa ★</button>
+                  </div>
+                  <p id="platePartsRefMeta" class="muted" style="margin:0 0 10px;font-size:0.82rem"></p>
+                  <div id="plateVehicleSpecs" class="stats" style="margin-bottom:10px"></div>
+                  <h3 style="margin:0 0 6px;font-size:0.88rem">Piezas y código de fabricación (OEM)</h3>
+                  <p id="plateOemHint" class="muted" style="margin:0 0 8px;font-size:0.78rem"></p>
+                  <div class="table-wrap" id="plateOemTableWrap">
+                    <div class="empty-state"><strong>Escriba la placa</strong>Se cargará la ficha según marca, modelo y año</div>
+                  </div>
+                  <div id="platePartsRefBody" style="margin-top:12px"></div>
                 </div>
               </div>
               <label>Marca
@@ -433,7 +442,7 @@
           <div id="consultaSpecsGrid" class="stats" style="margin-bottom:12px"></div>
           <p id="consultaOemDisclaimer" class="muted" style="font-size:0.82rem;margin:0 0 10px"></p>
           <div id="consultaNetworkIntro" class="row-actions" style="margin-bottom:12px;flex-wrap:wrap"></div>
-          <h3 style="margin:0 0 8px;font-size:0.95rem">Piezas y código OEM de referencia</h3>
+          <h3 style="margin:0 0 8px;font-size:0.95rem">Piezas y código de fabricación (OEM)</h3>
           <div class="table-wrap" id="consultaOemTableWrap">
             <div class="empty-state"><strong>Sin catálogo para esta combinación</strong>Indique marca/modelo/año o registre el VIN en Ingreso</div>
           </div>
@@ -691,7 +700,7 @@
       }
     })();
   </script>
-  <script src="/static/js/app.js?v=20260722v"></script>
+  <script src="/static/js/app.js?v=20260722w"></script>
   <script src="/static/js/ficha.js?v=20260722p"></script>
   <script src="/static/js/taller-dvi.js?v=20260722p"></script>
 </body>

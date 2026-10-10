@@ -376,6 +376,7 @@ def parts_reference_by_plate(
     plate: str,
     brand_hint: str = "",
     model_hint: str = "",
+    year_hint: str = "",
 ) -> dict:
     """Historial de repuestos en OTs de este vehículo + sugerencias de bodega."""
     plate_norm = (plate or "").upper().strip()

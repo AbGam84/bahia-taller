@@ -43,7 +43,7 @@ def match_oem_profile(brand: str, model: str, year: int = 0) -> dict | None:
             continue
         y_min = int(profile.get("year_min") or 0)
         y_max = int(profile.get("year_max") or 9999)
-        if year and (year < y_min or year > y_max):
+        if year and (year < y_min - 2 or year > y_max + 2):
             continue
         score = 2 + (1 if year and y_min <= year <= y_max else 0)
         if score > best_score:

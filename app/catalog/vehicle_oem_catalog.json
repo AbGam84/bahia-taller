@@ -26,7 +26,13 @@
         {"category": "Frenos", "name": "Pastillas freno delanteras", "oem_code": "04465-02220"},
         {"category": "Frenos", "name": "Discos freno delanteros (par ref.)", "oem_code": "43512-02280"},
         {"category": "Suspensión", "name": "Amortiguador delantero (ref.)", "oem_code": "48520-02290"},
-        {"category": "Transmisión", "name": "Filtro caja automática (ref.)", "oem_code": "35330-02030"}
+        {"category": "Transmisión", "name": "Filtro caja automática (ref.)", "oem_code": "35330-02030"},
+        {"category": "Climatización", "name": "Filtro de cabina", "oem_code": "87139-02090"},
+        {"category": "Motor", "name": "Correa de accesorios", "oem_code": "90916-02564"},
+        {"category": "Motor", "name": "Termostato", "oem_code": "90916-03093"},
+        {"category": "Frenos", "name": "Líquido de frenos DOT3 (ref.)", "oem_code": "00475-1BF0B"},
+        {"category": "Suspensión", "name": "Amortiguador trasero (ref.)", "oem_code": "48531-02290"},
+        {"category": "Encendido", "name": "Bobina encendido (ref.)", "oem_code": "90919-02258"}
       ]
     },
     {
