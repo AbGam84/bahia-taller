@@ -27,6 +27,28 @@ def slugify(text: str) -> str:
     return (text or "taller")[:36]
 
 
+# Enlaces cortos / errores de tipeo (login y /acceso/{code})
+TENANT_CODE_ALIASES: dict[str, str] = {
+    "katire": "auto-repuestos-katire",
+    "autorespuestos-katire": "auto-repuestos-katire",
+    "auto-repuesto-katire": "auto-repuestos-katire",
+    "auto-repuestos": "auto-repuestos-katire",
+    "repuestos-katire": "auto-repuestos-katire",
+}
+
+
+def normalize_tenant_code(raw: str) -> str:
+    c = slugify((raw or "").strip()) or (raw or "").strip().lower()
+    return TENANT_CODE_ALIASES.get(c, c)
+
+
+def get_active_tenant_by_code(db: Session, raw_code: str) -> Tenant | None:
+    code = normalize_tenant_code(raw_code)
+    if not code:
+        return None
+    return db.query(Tenant).filter(Tenant.code == code, Tenant.active.is_(True)).first()
+
+
 def tenant_id_of(user: User) -> int:
     tid = getattr(user, "tenant_id", None) or 0
     if not tid:

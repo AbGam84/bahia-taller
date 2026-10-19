@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Katire — acceso licenciado</title>
-  <link rel="stylesheet" href="/static/css/app.css?v=20260722s" />
+  <link rel="stylesheet" href="/static/css/app.css?v=20261019a" />
 </head>
 <body class="login-page">
   <section class="login-hero" aria-label="Katire">
@@ -94,11 +94,22 @@
       } catch (_) {}
     }
 
+    const TENANT_ALIASES = {
+      katire: "auto-repuestos-katire",
+      "auto-repuestos": "auto-repuestos-katire",
+      "auto-repuesto-katire": "auto-repuestos-katire",
+    };
+
+    function normalizeTenantCode(raw) {
+      const c = (raw || "").trim().toLowerCase();
+      return TENANT_ALIASES[c] || c;
+    }
+
     function tenantCodeFromPath() {
       const parts = (location.pathname || "").split("/").filter(Boolean);
-      if (parts[0] === "acceso" && parts[1]) return parts[1].toLowerCase();
+      if (parts[0] === "acceso" && parts[1]) return normalizeTenantCode(parts[1]);
       const q = new URLSearchParams(location.search);
-      return (q.get("t") || q.get("empresa") || q.get("tenant") || "").trim().toLowerCase();
+      return normalizeTenantCode(q.get("t") || q.get("empresa") || q.get("tenant") || "");
     }
 
     async function applyBranding(code) {
@@ -108,8 +119,12 @@
         else document.getElementById("tenantCode").value = "";
         return;
       }
-      document.getElementById("tenantCode").value = code;
-      localStorage.setItem("tp_tenant_code", code);
+      const canon = normalizeTenantCode(code);
+      document.getElementById("tenantCode").value = canon;
+      localStorage.setItem("tp_tenant_code", canon);
+      if (canon !== (code || "").trim().toLowerCase() && location.pathname.startsWith("/acceso/")) {
+        history.replaceState(null, "", `/acceso/${canon}`);
+      }
       try {
         const res = await fetch(`/api/branding/${encodeURIComponent(code)}/profile`);
         const p = await res.json();
@@ -197,7 +212,7 @@
       const fd = new FormData(e.target);
       const pathCode = tenantCodeFromPath();
       const fromForm = (fd.get("tenant_code") || "").toString().trim().toLowerCase();
-      const tenant_code = pathCode || fromForm;
+      const tenant_code = normalizeTenantCode(pathCode || fromForm);
       if (!tenant_code) {
         toast("Use el enlace de su taller (…/acceso/su-taller). Si no lo tiene, escriba a Katire.");
         return;

@@ -1,7 +1,8 @@
 Buenas, Norma. Le activamos *Katire* para *Auto Repuestos Katire* (venta de repuestos, bodega, patio y facturación).
 
 🔗 *Entrar al sistema* (guarde este enlace):
-https://katire.onrender.com/acceso/auto-repuestos-katire
+https://katire.onrender.com/acceso/katire
+(mismo taller; también funciona …/acceso/auto-repuestos-katire)
 
 *Dueña (administración):*
 Usuario: norma

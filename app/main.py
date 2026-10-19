@@ -209,19 +209,26 @@ def login(payload: LoginIn, db: Session = Depends(get_db)):
     from app.models import Tenant
     from app.tenancy import tenant_dict, tenant_license_status
 
+    from app.tenancy import get_active_tenant_by_code, normalize_tenant_code
+
     uname = (payload.username or "").strip().lower()
     q = db.query(User).filter(User.username == uname, User.active.is_(True))
-    tenant = None
-    code = (payload.tenant_code or "").strip().lower()
-    if code:
-        tenant = db.query(Tenant).filter(Tenant.code == code, Tenant.active.is_(True)).first()
-        if not tenant:
-            raise HTTPException(status_code=401, detail="Código de taller incorrecto")
-        user = q.filter(User.tenant_id == tenant.id).first()
-    else:
-        user = q.first()
-        if user:
-            tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
+    raw_code = (payload.tenant_code or "").strip()
+    tenant = get_active_tenant_by_code(db, raw_code) if raw_code else None
+    user = q.filter(User.tenant_id == tenant.id).first() if tenant else None
+    if not user:
+        matches = q.all()
+        if len(matches) == 1:
+            user = matches[0]
+            tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id, Tenant.active.is_(True)).first()
+        elif raw_code and not tenant:
+            raise HTTPException(
+                status_code=401,
+                detail=(
+                    "Código de taller incorrecto. Use el enlace: "
+                    "https://katire.onrender.com/acceso/auto-repuestos-katire"
+                ),
+            )
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
     if not tenant:
@@ -2184,12 +2191,19 @@ def index():
 
 @app.get("/login")
 def login_page():
-    return FileResponse(WEB_DIR / "login.html")
+    return FileResponse(WEB_DIR / "login.html", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/acceso/{tenant_code}")
 def branded_login_page(tenant_code: str):
-    return FileResponse(WEB_DIR / "login.html")
+    from fastapi.responses import RedirectResponse
+
+    from app.tenancy import normalize_tenant_code
+
+    canonical = normalize_tenant_code(tenant_code)
+    if canonical and canonical != (tenant_code or "").strip().lower():
+        return RedirectResponse(url=f"/acceso/{canonical}", status_code=302)
+    return FileResponse(WEB_DIR / "login.html", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/activar")
