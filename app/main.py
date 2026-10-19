@@ -193,8 +193,9 @@ def on_startup():
             from app.part_shops import ensure_shops_for_all_tenants
 
             ensure_shops_for_all_tenants(db)
-            from app.production_hardening import disable_legacy_public_logins
+            from app.production_hardening import disable_legacy_public_logins, prune_automated_test_devices
 
+            prune_automated_test_devices(db)
             disable_legacy_public_logins(db)
         except Exception:
             pass

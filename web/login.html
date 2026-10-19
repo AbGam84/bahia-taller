@@ -195,7 +195,13 @@
     document.getElementById("loginForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
-      const tenant_code = (fd.get("tenant_code") || "autorespuesto").toString().trim().toLowerCase();
+      const pathCode = tenantCodeFromPath();
+      const fromForm = (fd.get("tenant_code") || "").toString().trim().toLowerCase();
+      const tenant_code = pathCode || fromForm;
+      if (!tenant_code) {
+        toast("Use el enlace de su taller (…/acceso/su-taller). Si no lo tiene, escriba a Katire.");
+        return;
+      }
       try {
         const res = await fetch("/api/auth/login", {
           method: "POST",
@@ -218,6 +224,12 @@
             showLicense(true);
           }
           throw new Error(data.detail || "Active la licencia para trabajar");
+        }
+        if (res.status === 403) {
+          throw new Error(
+            data.detail ||
+              "Límite de dispositivos. Pida a Katire liberar un equipo (WhatsApp +506 6370-6546)."
+          );
         }
         if (!res.ok) throw new Error(data.detail || "No se pudo entrar");
         localStorage.setItem("tp_token", data.access_token);

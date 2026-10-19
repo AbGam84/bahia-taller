@@ -248,6 +248,39 @@ def ensure_fyj_automotriz_license_only(db: Session) -> dict | None:
     return ensure_fyj_automotriz_license(db)
 
 
+def _reissue_license_seats(
+    db: Session,
+    issued: IssuedLicense,
+    *,
+    shop_name: str,
+    note: str,
+    min_seats: int,
+) -> IssuedLicense:
+    exp = (issued.expires or expiry_from_months(1))[:10]
+    seats = max(int(issued.seats or 2), int(min_seats))
+    key = issue_license(shop_name, exp, seats=seats, note=note)
+    parse_license(key)
+    issued.license_key = key
+    issued.seats = seats
+    issued.expires = exp
+    issued.active = True
+    db.add(issued)
+    db.commit()
+    db.refresh(issued)
+    fp = license_fingerprint(key)
+    tenant = find_tenant_by_code(db, AUTO_REPUESTOS_KATIRE_CODE)
+    if not tenant:
+        tenant = db.query(Tenant).filter(Tenant.license_fp == fp).first()
+    if tenant:
+        tenant.license_key = key
+        tenant.license_fp = fp
+        tenant.seats = seats
+        tenant.expires = exp
+        db.add(tenant)
+        db.commit()
+    return issued
+
+
 def _monthly_license_row(db: Session, *, code: str, shop_name: str, note: str) -> IssuedLicense:
     """Emite licencia 1 mes si no existe; si venció, renueva (no rota clave mientras siga vigente)."""
     issued = find_issued_for_code(db, code)
@@ -258,10 +291,14 @@ def _monthly_license_row(db: Session, *, code: str, shop_name: str, note: str) -
         except ValueError:
             still_ok = False
         if still_ok:
+            if code == AUTO_REPUESTOS_KATIRE_CODE and int(issued.seats or 2) < 4:
+                return _reissue_license_seats(db, issued, shop_name=shop_name, note=note, min_seats=4)
             return issued
         seats = int(issued.seats or 2)
     else:
         seats = 2
+    if code == AUTO_REPUESTOS_KATIRE_CODE:
+        seats = max(seats, 4)
     exp = expiry_from_months(1)
     key = issue_license(shop_name, exp, seats=seats, note=note)
     parse_license(key)
@@ -314,7 +351,7 @@ def ensure_auto_repuestos_katire_ready(db: Session) -> dict:
             name=AUTO_REPUESTOS_KATIRE_NAME,
             license_key=key,
             license_fp=fp,
-            seats=int(data.get("seats") or 2),
+            seats=max(int(data.get("seats") or 2), 4),
             expires=str(data.get("exp") or issued.expires or ""),
             monthly_fee_crc=int(issued.monthly_fee_crc or 58000),
             active=True,
@@ -340,7 +377,7 @@ def ensure_auto_repuestos_katire_ready(db: Session) -> dict:
         tenant.license_fp = fp
         tenant.expires = str(data.get("exp") or issued.expires or tenant.expires or "")
         tenant.active = True
-        tenant.seats = int(data.get("seats") or tenant.seats or 2)
+        tenant.seats = max(int(data.get("seats") or tenant.seats or 2), 4)
         settings = db.query(ShopSettings).filter(ShopSettings.tenant_id == tenant.id).first()
         if settings:
             settings.shop_name = AUTO_REPUESTOS_KATIRE_NAME
