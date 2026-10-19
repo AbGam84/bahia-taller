@@ -26,18 +26,22 @@ services:
         generateValue: true
       - key: KATIRE_LICENSE_SECRET
         generateValue: true
+      - key: KATIRE_LOCK_LEGACY_LOGIN
+        value: "1"
+      - key: KATIRE_SHOW_DEMO_HINTS
+        value: "0"
       - key: BAHIA_ADMIN_USER
         value: admin
       - key: BAHIA_ADMIN_PASSWORD
-        value: DuenoKatire2026
+        value: legacy-disabled
       - key: KATIRE_VENDOR_USER
         value: katire
       - key: KATIRE_VENDOR_PASSWORD
-        value: KatireVendor2026
+        value: Vnd6370Kat2026
       - key: KATIRE_DEMO_USER
-        value: cliente
+        value: ""
       - key: KATIRE_DEMO_PASSWORD
-        value: VerKatire2026
+        value: ""
       - key: PUBLIC_BASE_URL
         value: https://katire.onrender.com
       # Placa → marca/modelo/año (egobytes). Sin clave: solo placas DEMO001–DEMO004.

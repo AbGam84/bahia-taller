@@ -14,6 +14,7 @@ from app.auth import create_access_token, get_current_user, require_admin, verif
 from app.config import (
     COPYRIGHT,
     IS_PRODUCTION,
+    LOCK_LEGACY_PUBLIC_LOGIN,
     PRODUCT_NAME,
     PUBLIC_BASE_URL,
     SHOP_LICENSE_NAME,
@@ -192,6 +193,9 @@ def on_startup():
             from app.part_shops import ensure_shops_for_all_tenants
 
             ensure_shops_for_all_tenants(db)
+            from app.production_hardening import disable_legacy_public_logins
+
+            disable_legacy_public_logins(db)
         except Exception:
             pass
     finally:
@@ -338,6 +342,7 @@ def api_product():
         "copyright": COPYRIGHT,
         "support": VENDOR_SUPPORT,
         "show_demo_hints": SHOW_DEMO_HINTS,
+        "lock_legacy_login": LOCK_LEGACY_PUBLIC_LOGIN,
         "license": license_status(),
         "production": IS_PRODUCTION,
     }

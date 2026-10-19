@@ -82,7 +82,11 @@
           const lic = p.license || {};
           showLicense(!lic.ok);
         }
-        if (p.show_demo_hints && !tenantCodeFromPath()) {
+        if (p.lock_legacy_login && !tenantCodeFromPath()) {
+          document.getElementById("loginSub").textContent =
+            "Use el enlace personal de su taller (Katire se lo envió por WhatsApp). Ejemplo: …/acceso/su-taller";
+        }
+        if (p.show_demo_hints && !tenantCodeFromPath() && !p.lock_legacy_login) {
           const h = document.getElementById("demoHint");
           h.hidden = false;
           h.innerHTML = "Demo: <strong>admin</strong> / dueño · <strong>cliente</strong> / recepción";
@@ -101,7 +105,7 @@
       if (!code) {
         const saved = localStorage.getItem("tp_tenant_code");
         if (saved) document.getElementById("tenantCode").value = saved;
-        else document.getElementById("tenantCode").value = "autorespuesto";
+        else document.getElementById("tenantCode").value = "";
         return;
       }
       document.getElementById("tenantCode").value = code;

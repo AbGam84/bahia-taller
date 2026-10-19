@@ -8,6 +8,7 @@ from app.config import (
     DEMO_NAME,
     DEMO_PASSWORD,
     DEMO_USERNAME,
+    LOCK_LEGACY_PUBLIC_LOGIN,
 )
 from datetime import datetime, timedelta
 
@@ -61,6 +62,14 @@ ISSUER = {
 def ensure_admin(db: Session) -> None:
     from app.tenancy import ensure_default_tenant
 
+    if LOCK_LEGACY_PUBLIC_LOGIN:
+        tenant = ensure_default_tenant(db)
+        user = db.query(User).filter(User.username == ADMIN_USERNAME, User.tenant_id == tenant.id).first()
+        if user:
+            user.active = False
+            db.commit()
+        return
+
     tenant = ensure_default_tenant(db)
     user = db.query(User).filter(User.username == ADMIN_USERNAME).first()
     if user:
@@ -84,7 +93,15 @@ def ensure_admin(db: Session) -> None:
 
 def ensure_demo_client(db: Session) -> None:
     """Usuario para que el cliente mire el sistema y oriente el desarrollo."""
-    if not DEMO_USERNAME or not DEMO_PASSWORD:
+    if LOCK_LEGACY_PUBLIC_LOGIN or not DEMO_USERNAME or not DEMO_PASSWORD:
+        if LOCK_LEGACY_PUBLIC_LOGIN:
+            from app.tenancy import ensure_default_tenant
+
+            tenant = ensure_default_tenant(db)
+            user = db.query(User).filter(User.username == DEMO_USERNAME, User.tenant_id == tenant.id).first()
+            if user:
+                user.active = False
+                db.commit()
         return
     from app.tenancy import ensure_default_tenant
 

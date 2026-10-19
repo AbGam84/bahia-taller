@@ -1,22 +1,8 @@
-Copie y pegue esto al cliente (WhatsApp / correo):
+Plantilla genérica — use el archivo del cliente concreto en clientes/
 
-------------------------------------------------
-Buenas. Acceso a Katire (taller + bodega + facturación CR).
+Auto Repuestos Katire (Norma):
+  Ver clientes/auto-repuestos-katire/MENSAJE-WHATSAPP-NORMA.txt
 
-NUBE (sin instalar):
-https://katire.onrender.com
-Primera vez: espere 40–60 segundos y recargue (F5).
-
-Usuario: cliente
-Clave: VerKatire2026
-
-Dueño (usted): admin / DuenoKatire2026
-
-Si no abre: espere un minuto y F5. No use admin123.
-
-En la PC del taller (opcional):
-doble clic INSTALAR-Y-ABRIR-KATIRE.bat
-(requiere Python 3.10+ con PATH).
-
-Si algo falla: Diagnostico-PC-Cliente.bat y mándenos foto.
-------------------------------------------------
+FyJ Automotriz:
+  https://katire.onrender.com/acceso/fyj-automotriz
+  (credenciales en bootstrap_clients / panel vendor)

@@ -59,6 +59,11 @@ LICENSE_KEY = _env("KATIRE_LICENSE_KEY", "")  # clave emitida para este taller
 SHOP_LICENSE_NAME = _env("KATIRE_SHOP_NAME", "Autorespuesto")
 # Mostrar pistas de demo solo fuera de producción
 SHOW_DEMO_HINTS = _env("KATIRE_SHOW_DEMO_HINTS", "0" if IS_PRODUCTION else "1") in {"1", "true", "yes"}
+LOCK_LEGACY_PUBLIC_LOGIN = _env("KATIRE_LOCK_LEGACY_LOGIN", "1" if IS_PRODUCTION else "0") in {
+    "1",
+    "true",
+    "yes",
+}
 COPYRIGHT = "© Katire Software. Uso exclusivo bajo licencia. Prohibida la reventa o redistribución."
 PRODUCT_NAME = "Katire"
 VENDOR_CONTACT = _env("KATIRE_VENDOR_CONTACT", "WhatsApp +506 6370-6546")

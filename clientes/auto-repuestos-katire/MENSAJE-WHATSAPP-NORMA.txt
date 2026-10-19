@@ -1,0 +1,21 @@
+Buenas, Norma. Le activamos *Katire* para *Auto Repuestos Katire* (venta de repuestos, bodega, patio y facturación).
+
+🔗 *Entrar al sistema* (guarde este enlace):
+https://katire.onrender.com/acceso/auto-repuestos-katire
+
+*Dueña (administración):*
+Usuario: norma
+Clave: Norma.Katire2026
+
+*Mostrador / ventas:*
+Usuario: ventas
+Clave: Ventas.Kat2026
+
+*Importante:*
+• Primera vez que abre la página: espere 40–90 segundos y pulse *Actualizar* (F5).
+• Use *solo* ese enlace; no entren por katire.onrender.com/login genérico.
+• Licencia mensual activa; soporte: WhatsApp +506 6370-6546.
+
+Recomendación: al entrar, cambie la clave en *Casa → Usuarios*.
+
+— Katire · De la llave al XML.

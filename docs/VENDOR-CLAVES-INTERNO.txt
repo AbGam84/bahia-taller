@@ -1,0 +1,15 @@
+INTERNO — no enviar al cliente
+
+Panel vendor (emitir licencias):
+  https://katire.onrender.com/vendor
+  Usuario: katire
+  Clave (Render env KATIRE_VENDOR_PASSWORD): Vnd6370Kat2026
+
+Login público demo Autorespuesto (admin/cliente): DESACTIVADO en producción (KATIRE_LOCK_LEGACY_LOGIN=1).
+
+Auto Repuestos Katire:
+  https://katire.onrender.com/acceso/auto-repuestos-katire
+  norma / Norma.Katire2026
+  ventas / Ventas.Kat2026
+
+Tras cambiar claves en Render: Manual Deploy en dashboard.

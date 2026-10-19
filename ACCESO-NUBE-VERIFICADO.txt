@@ -1,14 +1,13 @@
 KATIRE — ACCESO NUBE (24/7 · HTTPS · datos en disco Render)
 
-Taller (cliente final):
+Login genérico (solo si tiene enlace de taller):
   https://katire.onrender.com/login
-  Demo: cliente / VerKatire2026
-  Admin taller: admin / DuenoKatire2026
+  En producción NO hay demo admin/cliente en Autorespuesto legado.
 
 Panel VENDOR (crear licencia / cliente nuevo) — NO es /login:
   https://katire.onrender.com/vendor
   Usuario: katire
-  Clave:   KatireVendor2026
+  Clave:   Vnd6370Kat2026  (ver docs/VENDOR-CLAVES-INTERNO.txt)
 
 Cliente FyJ Automotriz (entrada con nombre en la URL):
   https://katire.onrender.com/acceso/fyj-automotriz
@@ -17,8 +16,8 @@ Cliente FyJ Automotriz (entrada con nombre en la URL):
 
 Auto Repuestos Katire (Norma Yelitza Rojas · cédula 801390994):
   https://katire.onrender.com/acceso/auto-repuestos-katire
-  Admin: norma / Katire.Oct2026
-  Mostrador: ventas / VentasKatire2026
+  Admin: norma / Norma.Katire2026
+  Mostrador: ventas / Ventas.Kat2026
   Licencia: mes calendario (renueva al desplegar o desde panel vendor)
 
 Activación con clave emitida:
