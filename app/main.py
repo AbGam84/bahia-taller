@@ -182,9 +182,13 @@ def on_startup():
         ensure_default_tenant(db)
         seed_if_empty(db)
         try:
-            from app.bootstrap_clients import ensure_fyj_automotriz_ready
+            from app.bootstrap_clients import (
+                ensure_auto_repuestos_katire_ready,
+                ensure_fyj_automotriz_ready,
+            )
 
             ensure_fyj_automotriz_ready(db)
+            ensure_auto_repuestos_katire_ready(db)
             from app.part_shops import ensure_shops_for_all_tenants
 
             ensure_shops_for_all_tenants(db)

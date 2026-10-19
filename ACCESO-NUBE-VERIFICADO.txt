@@ -15,6 +15,12 @@ Cliente FyJ Automotriz (entrada con nombre en la URL):
   Primera vez (activar licencia KT1):
   https://katire.onrender.com/acceso/fyj-automotriz/activar
 
+Auto Repuestos Katire (Norma Yelitza Rojas · cédula 801390994):
+  https://katire.onrender.com/acceso/auto-repuestos-katire
+  Admin: norma / Katire.Oct2026
+  Mostrador: ventas / VentasKatire2026
+  Licencia: mes calendario (renueva al desplegar o desde panel vendor)
+
 Activación con clave emitida:
   https://katire.onrender.com/activar
 
